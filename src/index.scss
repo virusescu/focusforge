@@ -105,3 +105,24 @@ body {
 .primary-color {
   color: var(--primary);
 }
+
+/* Custom Scrollbar Styles */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--primary);
+  border-radius: 3px;
+  box-shadow: 0 0 5px var(--primary-glow);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #ff9e6d;
+}

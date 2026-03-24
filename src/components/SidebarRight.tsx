@@ -4,7 +4,11 @@ import { Terminal, Activity, History } from 'lucide-react';
 import { useSystemLog } from '../hooks/useSystemLog';
 import { useFocus } from '../contexts/FocusContext';
 
-export const SidebarRight: FC = () => {
+interface Props {
+  onViewAnalytics: (date: string) => void;
+}
+
+export const SidebarRight: FC<Props> = ({ onViewAnalytics }) => {
   const { logs } = useSystemLog();
   const { dailyStats, recentSessions } = useFocus();
   const logContainerRef = useRef<HTMLDivElement>(null);
@@ -74,6 +78,7 @@ export const SidebarRight: FC = () => {
               className={`${styles.cell} ${cell.colorClass}`} 
               onMouseEnter={() => setHoveredCell({ date: cell.date, time: cell.formattedTime })}
               onMouseLeave={() => setHoveredCell(null)}
+              onClick={() => onViewAnalytics(cell.date)}
             />
           ))}
         </div>
@@ -109,4 +114,3 @@ export const SidebarRight: FC = () => {
     </aside>
   );
 };
-

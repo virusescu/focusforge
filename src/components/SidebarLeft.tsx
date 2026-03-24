@@ -1,9 +1,13 @@
 import { type FC } from 'react';
 import styles from './SidebarLeft.module.scss';
-import { User, Database, Cpu, HardDrive } from 'lucide-react';
+import { User, Database, Cpu, HardDrive, BarChart2 } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 
-export const SidebarLeft: FC = () => {
+interface Props {
+  onViewAnalytics?: () => void;
+}
+
+export const SidebarLeft: FC<Props> = ({ onViewAnalytics }) => {
   const { user, avatar, loading } = useUser();
 
   if (loading) return <aside className={styles.sidebar}>LOADING...</aside>;
@@ -65,6 +69,13 @@ export const SidebarLeft: FC = () => {
             </div>
           </div>
         </div>
+
+        {onViewAnalytics && (
+          <button className={styles.analyticsBtn} onClick={onViewAnalytics}>
+            <BarChart2 size={14} />
+            <span>SYSTEM_ANALYTICS</span>
+          </button>
+        )}
       </div>
       
       <div className="card">

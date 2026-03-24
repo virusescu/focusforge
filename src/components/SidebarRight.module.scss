@@ -26,16 +26,8 @@
   height: 120px; /* Reduced height to save space */
   overflow-y: auto;
   overflow-x: hidden;
-  padding-right: 0.5rem;
+  padding-right: 1.25rem; // Breathing room for scrollbar
   flex-shrink: 0;
-  
-  &::-webkit-scrollbar {
-    width: 2px;
-  }
-  
-  &::-webkit-scrollbar-thumb {
-    background: var(--border);
-  }
 }
 
 .logItem {

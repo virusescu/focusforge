@@ -121,3 +121,25 @@ export async function getDailyFocusStats(days: number = 21): Promise<DailyStat[]
   return results;
 }
 
+export async function getSessionsForDay(date: string): Promise<FocusSession[]> {
+  const database = await getDb();
+  
+  // We want sessions for the selected day AND sessions from the next day that started before 2 AM
+  const nextDay = new Date(date);
+  nextDay.setDate(nextDay.getDate() + 1);
+  const nextDayStr = nextDay.toISOString().split('T')[0];
+
+  return await database.select<FocusSession[]>(
+    `SELECT * FROM focus_sessions 
+     WHERE (date = $1 AND strftime('%H:%M:%S', start_time) >= '08:00:00')
+        OR (date = $2 AND strftime('%H:%M:%S', start_time) < '02:00:00')
+     ORDER BY start_time ASC`,
+    [date, nextDayStr]
+  );
+}
+
+export async function deleteFocusSession(id: number) {
+  const database = await getDb();
+  await database.execute('DELETE FROM focus_sessions WHERE id = ?', [id]);
+}
+

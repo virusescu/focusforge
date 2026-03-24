@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getGravatarUrl, saveFocusSession, getRecentSessions, getDailyFocusStats } from './db';
+import { getGravatarUrl, saveFocusSession, getRecentSessions, getDailyFocusStats, getSessionsForDay, deleteFocusSession } from './db';
 
 // Use vi.hoisted to ensure mocks are available when vi.mock is evaluated
 const { mockExecute, mockSelect } = vi.hoisted(() => {
@@ -71,6 +71,23 @@ describe('db utility functions', () => {
       );
       
       vi.useRealTimers();
+    });
+
+    it('getSessionsForDay should call select with selected date and next day', async () => {
+      const testDate = '2024-03-24';
+      await getSessionsForDay(testDate);
+      expect(mockSelect).toHaveBeenCalledWith(
+        expect.stringContaining('date = $1'),
+        [testDate, '2024-03-25']
+      );
+    });
+
+    it('deleteFocusSession should call execute with delete query and id', async () => {
+      await deleteFocusSession(42);
+      expect(mockExecute).toHaveBeenCalledWith(
+        expect.stringContaining('DELETE FROM focus_sessions WHERE id = ?'),
+        [42]
+      );
     });
   });
 });
