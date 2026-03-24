@@ -1,39 +1,35 @@
 import { type FC, useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import styles from './SettingsModal.module.scss';
-import { getUserSettings, updateUserSettings } from '../db';
 import { X, Check } from 'lucide-react';
+import { useUser } from '../contexts/UserContext';
 
 interface Props {
   onClose: () => void;
 }
 
 export const SettingsModal: FC<Props> = ({ onClose }) => {
+  const { user, updateSettings, loading } = useUser();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [debugSpeed, setDebugSpeed] = useState(1);
   const [experienceLvl, setExperienceLvl] = useState(42);
-  const [loading, setLoading] = useState(true);
 
   const isDev = import.meta.env.DEV;
 
   useEffect(() => {
-    getUserSettings().then(user => {
-      if (user) {
-        setName(user.name);
-        setEmail(user.email);
-        setDebugSpeed(user.debug_speed || 1);
-        setExperienceLvl(user.experience_lvl || 42);
-      }
-      setLoading(false);
-    });
-  }, []);
+    if (user) {
+      setName(user.name);
+      setEmail(user.email);
+      setDebugSpeed(user.debug_speed || 1);
+      setExperienceLvl(user.experience_lvl || 42);
+    }
+  }, [user]);
 
   const handleSave = useCallback(async () => {
-    await updateUserSettings(name, email, debugSpeed, experienceLvl);
-    window.dispatchEvent(new CustomEvent('user-settings-updated'));
+    await updateSettings(name, email, debugSpeed, experienceLvl);
     onClose();
-  }, [name, email, debugSpeed, experienceLvl, onClose]);
+  }, [name, email, debugSpeed, experienceLvl, updateSettings, onClose]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

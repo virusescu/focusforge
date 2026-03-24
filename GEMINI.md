@@ -1,20 +1,31 @@
 # GEMINI.md - FocusForge Project
 
 ## Project Overview
-**FocusForge** appears to be a new or empty project. At this stage, it contains configuration for the `.claude` desktop app and an MCP tool permission (`mcp__stitch__list_projects`). The project's name suggests it might be a playground or a development environment for "Stitch" related functionality.
+**FocusForge** is a high-performance productivity HUD (Heads-Up Display) built with **Tauri**, **React**, and **TypeScript**. It features a specialized "Neural Forge" timer designed to help operators maintain deep focus during intense engineering tasks.
 
-## Project Type
-**Non-Code / Initialized Project**
-The directory currently lacks standard code markers (e.g., `package.json`, `requirements.txt`, `src/`). It seems to be in the initial setup or exploration phase.
+## Tech Stack
+- **Frontend**: React 19 (TypeScript), Vite 8.
+- **Backend**: Tauri 2.
+- **State Management**: React Context (`UserContext`) for shared state and Custom Hooks (`useTimer`, `useSystemLog`) for specialized logic.
+- **Database**: SQLite via Tauri SQL Plugin.
+- **Styling**: SCSS (CSS Modules).
+- **Testing**: Vitest + React Testing Library.
+
+## Architecture & Principles
+- **Centralized User State**: Operator settings (name, email, multiplier) are managed via `UserProvider`.
+- **Logic Extraction**: Heavy logic (timer, system logs) is extracted into custom hooks to keep components focused on UI.
+- **Tauri-Ready**: Components are designed to work within the Tauri window environment, utilizing drag regions and system-level window controls.
+- **TDD First**: Core logic and components are covered by unit and integration tests.
 
 ## Key Files
-- **.claude/settings.local.json**: Contains local settings for the Claude desktop app, specifically granting permission for the `mcp__stitch__list_projects` tool.
-- **GEMINI.md**: This file, providing context and instructions for AI agents.
+- `src/contexts/UserContext.tsx`: The primary state hub for the application.
+- `src/hooks/useTimer.ts`: Manages the focus timer and global timer events.
+- `src/hooks/useSystemLog.ts`: Generates and manages the scrolling system log.
+- `src/db.ts`: Handles SQLite database initialization and operations.
+- `src/types/index.ts`: Centralized TypeScript definitions.
 
-## Usage
-As the project grows, this file should be updated to reflect the evolving architecture, build commands, and development practices.
-
-## TODOs
-- [ ] Initialize the project with a core technology stack (if applicable).
-- [ ] Add a `README.md` to describe the project's goals.
-- [ ] Define the project structure.
+## Key Scripts
+- `npm dev`: Start the Vite dev server.
+- `npm tauri dev`: Start the Tauri desktop application in development mode.
+- `npm test`: Run the full suite of unit tests.
+- `npm run build`: Compile the application for production.

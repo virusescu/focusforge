@@ -1,7 +1,8 @@
-@import './styles/theme.scss';
-@import './styles/components.scss';
+@use './styles/theme.scss' as theme;
+@use './styles/components.scss';
 
 * {
+
   margin: 0;
   padding: 0;
   box-sizing: border-box;

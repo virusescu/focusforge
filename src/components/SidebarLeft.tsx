@@ -1,27 +1,12 @@
-import { type FC, useEffect, useState } from 'react';
+import { type FC } from 'react';
 import styles from './SidebarLeft.module.scss';
 import { User, Database, Cpu, HardDrive } from 'lucide-react';
-import { getUserSettings, getGravatarUrl } from '../db';
+import { useUser } from '../contexts/UserContext';
 
 export const SidebarLeft: FC = () => {
-  const [user, setUser] = useState<{ name: string; email: string; experience_lvl: number } | null>(null);
-  const [avatar, setAvatar] = useState<string>('');
+  const { user, avatar, loading } = useUser();
 
-  useEffect(() => {
-    async function loadUser() {
-      const userData = await getUserSettings();
-      if (userData) {
-        setUser(userData);
-        const gravatar = await getGravatarUrl(userData.email);
-        setAvatar(gravatar);
-      }
-    }
-    loadUser();
-
-    // Listen for updates
-    window.addEventListener('user-settings-updated', loadUser);
-    return () => window.removeEventListener('user-settings-updated', loadUser);
-  }, []);
+  if (loading) return <aside className={styles.sidebar}>LOADING...</aside>;
 
   return (
     <aside className={styles.sidebar}>

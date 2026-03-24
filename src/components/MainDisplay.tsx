@@ -1,64 +1,16 @@
-import { useState, useEffect, type FC } from 'react';
+import { type FC } from 'react';
 import styles from './MainDisplay.module.scss';
 import { Play, Pause, RotateCcw, Zap } from 'lucide-react';
-import { getUserSettings } from '../db';
+import { useUser } from '../contexts/UserContext';
+import { useTimer } from '../hooks/useTimer';
 
 export const MainDisplay: FC = () => {
-  const [seconds, setSeconds] = useState(0);
-  const [isActive, setIsActive] = useState(false);
-  const [multiplier, setMultiplier] = useState(1);
-
-  useEffect(() => {
-    async function loadSettings() {
-      const settings = await getUserSettings();
-      if (settings) {
-        setMultiplier(settings.debug_speed || 1);
-      }
-    }
-    loadSettings();
-
-    // Refresh settings when they are updated in the modal
-    const handleUpdate = () => loadSettings();
-    window.addEventListener('user-settings-updated', handleUpdate);
-    return () => window.removeEventListener('user-settings-updated', handleUpdate);
-  }, []);
-
-  useEffect(() => {
-    let interval: number | undefined;
-    if (isActive) {
-      interval = setInterval(() => {
-        setSeconds((prev) => prev + multiplier);
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [isActive, multiplier]);
-
-  const formatTime = (totalSeconds: number) => {
-    const mins = Math.floor(totalSeconds / 60);
-    const secs = Math.floor(totalSeconds % 60);
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const toggleTimer = () => {
-    const nextState = !isActive;
-    setIsActive(nextState);
-    if (nextState) {
-      window.dispatchEvent(new CustomEvent('timer-active'));
-    } else {
-      window.dispatchEvent(new CustomEvent('timer-paused'));
-    }
-  };
-
-  const resetTimer = () => {
-    setIsActive(false);
-    setSeconds(0);
-    window.dispatchEvent(new CustomEvent('timer-reset'));
-  };
+  const { user } = useUser();
+  const { seconds, isActive, minutes, toggleTimer, resetTimer, formatTime } = useTimer(user?.debug_speed || 1);
 
   // Circle Math
   const circumference = 2 * Math.PI * 140; // ~879.6
   
-  const minutes = seconds / 60;
   const isOverLimit = minutes >= 60;
 
   let performance = "80%";
