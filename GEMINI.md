@@ -1,7 +1,7 @@
-# GEMINI.md - Stitchplay Project
+# GEMINI.md - FocusForge Project
 
 ## Project Overview
-**Stitchplay** appears to be a new or empty project. At this stage, it contains configuration for the `.claude` desktop app and an MCP tool permission (`mcp__stitch__list_projects`). The project's name suggests it might be a playground or a development environment for "Stitch" related functionality.
+**FocusForge** appears to be a new or empty project. At this stage, it contains configuration for the `.claude` desktop app and an MCP tool permission (`mcp__stitch__list_projects`). The project's name suggests it might be a playground or a development environment for "Stitch" related functionality.
 
 ## Project Type
 **Non-Code / Initialized Project**
