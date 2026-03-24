@@ -1,0 +1,43 @@
+:root {
+  --bg-darker: #0d0d0d;
+  --bg-dark: #1a1a1a;
+  --bg-card: rgba(26, 26, 26, 0.85);
+  
+  --primary: #ee682b;
+  --primary-glow: rgba(238, 104, 43, 0.4);
+  --primary-muted: rgba(238, 104, 43, 0.1);
+  
+  --secondary: #00f2ff;
+  --secondary-glow: rgba(0, 242, 255, 0.4);
+  
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.6);
+  --text-muted: rgba(255, 255, 255, 0.3);
+  
+  --border: rgba(255, 255, 255, 0.1);
+  --border-active: var(--primary);
+  
+  --font-mono: 'Space Grotesk', 'Fira Code', monospace;
+  
+  --glass: blur(12px);
+}
+
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+
+@keyframes pulse {
+  0% { opacity: 0.8; }
+  50% { opacity: 1; }
+  100% { opacity: 0.8; }
+}
+
+@keyframes glitch {
+  0% { transform: translate(0); }
+  20% { transform: translate(-2px, 2px); }
+  40% { transform: translate(-2px, -2px); }
+  60% { transform: translate(2px, 2px); }
+  80% { transform: translate(2px, -2px); }
+  100% { transform: translate(0); }
+}

@@ -1,67 +1,73 @@
-# FocusForge
+# React + TypeScript + Vite
 
-A gamified productivity timer built in Unity. Uses a **Time Slope** mechanic to reward sustained focus with exponential resource generation, interrupt tracking to diagnose productivity leaks, and a visual factory metaphor that evolves as you work.
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
-## Status: Pre-MVP
+Currently, two official plugins are available:
 
-The Unity project has not been created yet. The workspace is scaffolded and ready for Unity Hub project creation.
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
 
-## Concept
+## React Compiler
 
-- **Time Slope:** Focus multiplier grows the longer you stay in flow (1x → 1.5x → 3x)
-- **Resource Ticks:** Earn Scrap (base currency) every tick. At 60+ minutes, 5% chance of Rare Cores
-- **Streak Rewards:** Complete 4 sessions of 60+ minutes to earn a Super Core
-- **Pause Stakes:** Pausing too long (>3 min) or too often (>4x/hour) auto-ends the session
-- **Interrupt Tracking:** Log what broke your flow (meetings, phone, brain fog, etc.)
-- **Analytics:** Daily summaries of focus time and resources earned
+The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
 
-See [docs/initialideea.md](docs/initialideea.md) for the full product spec and [docs/projectplan.md](docs/projectplan.md) for the MVP milestone plan.
+## Expanding the ESLint configuration
 
-## Tech Stack
+If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
 
-| Component | Choice |
-|-----------|--------|
-| Engine | Unity 6 |
-| Language | C# |
-| UI | UI Toolkit |
-| Database | SQLite (local) |
-| Settings | Local JSON file |
-| Platform | Windows (standalone, windowed, 60 FPS) |
+```js
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      // Other configs...
 
-## Prerequisites
+      // Remove tseslint.configs.recommended and replace with this
+      tseslint.configs.recommendedTypeChecked,
+      // Alternatively, use this for stricter rules
+      tseslint.configs.strictTypeChecked,
+      // Optionally, add this for stylistic rules
+      tseslint.configs.stylisticTypeChecked,
 
-- [Unity Hub](https://unity.com/download) with Unity 6 installed
-- Visual Studio Code with [C# Dev Kit](https://marketplace.visualstudio.com/items?itemName=ms-dotnettools.csdevkit)
-
-## Getting Started
-
-1. Open Unity Hub → New Project → select a template (e.g., 3D Core) → set location to this folder
-2. Unity will populate the `Assets/` folder and generate project settings
-3. In Unity: `Edit > Preferences > External Tools` → set External Script Editor to VS Code
-4. Click "Regenerate project files" for C# IntelliSense
-
-## Project Structure
-
-```
-Assets/
-├── Animations/    # Animation clips and controllers
-├── Audio/         # Sound effects and music
-├── Editor/        # Editor-only scripts
-├── Materials/     # Materials and shaders
-├── Plugins/       # Third-party plugins (SQLite, charting)
-├── Prefabs/       # Reusable prefab assets
-├── Resources/     # Runtime-loaded resources
-├── Scenes/        # Unity scene files
-├── Scripts/       # C# game scripts
-├── Textures/      # Image and texture assets
-└── UI/            # UI-related assets
-docs/
-├── initialideea.md   # Full product specification
-└── projectplan.md    # MVP milestone plan
+      // Other configs...
+    ],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+      // other options...
+    },
+  },
+])
 ```
 
-## Coding Conventions
+You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
 
-- **Naming:** PascalCase for public members, `_camelCase` for private fields
-- **Inspector fields:** Use `[SerializeField]` for private fields exposed to the Inspector
-- **Organization:** Group scripts by feature/system in subfolders under `Assets/Scripts/`
+```js
+// eslint.config.js
+import reactX from 'eslint-plugin-react-x'
+import reactDom from 'eslint-plugin-react-dom'
+
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      // Other configs...
+      // Enable lint rules for React
+      reactX.configs['recommended-typescript'],
+      // Enable lint rules for React DOM
+      reactDom.configs.recommended,
+    ],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+      // other options...
+    },
+  },
+])
+```

@@ -1,0 +1,33 @@
+.controls {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.button {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  
+  &:hover {
+    background: var(--primary-muted);
+    border-color: var(--primary);
+    color: var(--primary);
+    box-shadow: 0 0 10px var(--primary-glow);
+  }
+}
+
+.close {
+  &:hover {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: #ef4444;
+    color: #ef4444;
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+  }
+}

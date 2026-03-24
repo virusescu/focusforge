@@ -1,0 +1,209 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3rem;
+  position: relative;
+}
+
+.boostBanner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.5rem;
+  background: var(--primary-muted);
+  border: 1px solid var(--primary);
+  color: var(--primary);
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.2em;
+  box-shadow: 0 0 20px var(--primary-muted);
+  transition: all 0.5s ease;
+  
+  .zapIcon {
+    animation: pulse 1s infinite;
+  }
+
+  &.limitBanner {
+    color: #ffffff;
+    border-color: #ffffff;
+    background: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+  }
+}
+
+.timerCircle {
+  width: 300px;
+  height: 300px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  .marker {
+    fill: var(--primary);
+    filter: drop-shadow(0 0 4px var(--primary-glow));
+    opacity: 0.6;
+  }
+  
+  .svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+  }
+  
+  .backgroundCircle {
+    fill: transparent;
+    stroke: var(--bg-card);
+    stroke-width: 8;
+  }
+
+  .backingCircle {
+    fill: rgba(0, 0, 0, 0.7);
+  }
+  
+  .progressCircle {
+    fill: transparent;
+    stroke: var(--primary);
+    stroke-width: 8;
+    stroke-linecap: square;
+    transition: stroke-dashoffset 0.5s linear, stroke 0.5s ease;
+    filter: drop-shadow(0 0 8px var(--primary-glow));
+
+    &.finished {
+      animation: colorPulse 3s infinite ease-in-out;
+    }
+  }
+}
+
+.limitReached {
+  animation: scalePulse 3s infinite ease-in-out;
+}
+
+@keyframes colorPulse {
+  0% { 
+    stroke: var(--primary);
+    filter: drop-shadow(0 0 8px var(--primary-glow));
+  }
+  50% { 
+    stroke: #ffffff;
+    filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.8));
+  }
+  100% { 
+    stroke: var(--primary);
+    filter: drop-shadow(0 0 8px var(--primary-glow));
+  }
+}
+
+@keyframes scalePulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.01); }
+  100% { transform: scale(1); }
+}
+
+.timerContent {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  position: relative;
+  z-index: 10;
+  
+  .label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    letter-spacing: 0.15em;
+  }
+  
+  .time {
+    font-size: 4.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1;
+    text-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+  }
+  
+  .subLabel {
+    font-size: 0.65rem;
+    color: var(--secondary);
+    letter-spacing: 0.1em;
+    font-weight: 600;
+  }
+}
+
+.controls {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.btnPrimary {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 2rem;
+  background: var(--primary);
+  border: none;
+  color: white;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 0 15px var(--primary-glow);
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 25px var(--primary-glow);
+  }
+  
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+.btnSecondary {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: all 0.2s;
+  
+  &:hover {
+    background: var(--border);
+    color: var(--text-primary);
+  }
+}
+
+.decoration {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0.1;
+  
+  .gridLine {
+    position: absolute;
+    background: var(--text-muted);
+    
+    &:nth-child(1) { width: 100%; height: 1px; top: 25%; }
+    &:nth-child(2) { width: 100%; height: 1px; top: 75%; }
+    &:nth-child(3) { height: 100%; width: 1px; left: 50%; }
+  }
+}

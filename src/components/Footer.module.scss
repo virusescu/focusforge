@@ -1,0 +1,28 @@
+.footer {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  padding: 0.75rem 2rem;
+  background: var(--bg-card);
+  border-top: 1px solid var(--border);
+  backdrop-filter: var(--glass);
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  letter-spacing: 0.1em;
+}
+
+.stat {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.time {
+  font-weight: 600;
+  color: var(--text-secondary);
+}

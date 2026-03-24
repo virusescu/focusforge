@@ -1,0 +1,106 @@
+@import './styles/theme.scss';
+@import './styles/components.scss';
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  user-select: none;
+  -webkit-user-drag: none;
+  cursor: default;
+}
+
+*:focus {
+  outline: none;
+}
+
+body {
+  font-family: var(--font-mono);
+  background-color: var(--bg-darker);
+  color: var(--text-primary);
+  height: 100vh;
+  overflow: hidden;
+  position: relative;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  
+  // Forge Background Layer
+  &::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: 
+      radial-gradient(circle, transparent 20%, var(--bg-darker) 90%),
+      url('./assets/forge-bg.png');
+    background-size: cover;
+    background-position: center;
+    opacity: 0.4;
+    z-index: -1;
+    filter: saturate(0.8) contrast(1.1) brightness(1);
+  }
+  
+  // Scanline Overlay
+  &::before {
+    content: "";
+    position: absolute;
+	opacity: 0.4;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: 
+      linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
+      linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+    background-size: 100% 4px, 3px 100%;
+    pointer-events: none;
+    z-index: 100;
+  }
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+}
+
+.hud-container {
+  width: 100%;
+  height: 100%;
+  padding: 2rem;
+  display: grid;
+  grid-template-columns: 350px 1fr 350px;
+  grid-template-rows: auto 1fr auto;
+  gap: 1.5rem;
+  position: relative;
+}
+
+.card {
+  background: var(--bg-card);
+  backdrop-filter: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1.5rem;
+  position: relative;
+  overflow: hidden;
+  
+  &::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, rgba(238, 104, 43, 0.05) 0%, transparent 50%);
+    pointer-events: none;
+  }
+}
+
+.glow-text {
+  text-shadow: 0 0 8px var(--primary-glow);
+}
+
+.primary-color {
+  color: var(--primary);
+}
