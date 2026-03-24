@@ -1,7 +1,8 @@
-import { type FC, useState, useEffect, useCallback } from 'react';
+import { type FC, useState, useEffect, useCallback, useMemo } from 'react';
 import styles from './AnalyticsView.module.scss';
-import { ChevronLeft, ChevronRight, ArrowLeft, BarChart2, X, Target } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ArrowLeft, BarChart2, X, Target, HelpCircle } from 'lucide-react';
 import { getSessionsForDay, deleteFocusSession } from '../db';
+import { useFocus } from '../contexts/FocusContext';
 import type { FocusSession } from '../types';
 
 interface Props {
@@ -10,10 +11,12 @@ interface Props {
 }
 
 export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
+  const { globalStats, refreshData } = useFocus();
   const [currentDate, setCurrentDate] = useState(initialDate || new Date());
   const [sessions, setSessions] = useState<FocusSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [hoveredSessionId, setHoveredSessionId] = useState<number | null>(null);
+  const [showHelp, setShowHelp] = useState(false);
 
   const loadSessions = useCallback(async () => {
     setLoading(true);
@@ -51,6 +54,44 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
   const handleDelete = async (id: number) => {
     await deleteFocusSession(id);
     await loadSessions();
+    await refreshData();
+  };
+
+  const diagnostics = useMemo(() => {
+    if (sessions.length === 0) return null;
+
+    const dayPeak = Math.max(...sessions.map(s => s.duration_seconds));
+    
+    // Average recovery (between sessions)
+    let totalRecovery = 0;
+    let breakCount = 0;
+    for (let i = 0; i < sessions.length - 1; i++) {
+      const endCurrent = new Date(sessions[i].start_time).getTime() + sessions[i].duration_seconds * 1000;
+      const startNext = new Date(sessions[i+1].start_time).getTime();
+      const breakTime = (startNext - endCurrent) / 1000;
+      if (breakTime > 0) {
+        totalRecovery += breakTime;
+        breakCount++;
+      }
+    }
+    const avgRecovery = breakCount > 0 ? totalRecovery / breakCount : 0;
+
+    // Coherence (Consistency Score)
+    const avgSession = totalSeconds / sessions.length;
+    const coherence = Math.min((avgSession / 1800) * 100, 100);
+
+    return {
+      dayPeak,
+      avgRecovery,
+      coherence
+    };
+  }, [sessions, totalSeconds]);
+
+  const formatDuration = (seconds: number) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    if (h > 0) return `${h}h ${m}m`;
+    return `${m}m`;
   };
 
   // Time scale configuration: 8 AM to 2 AM (Next Day) - 18 hours
@@ -209,12 +250,72 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
         </div>
         
         <div className="card">
-          <h4>OPERATOR_STABILITY</h4>
+          <div className={styles.cardHeader}>
+            <h4>OPERATOR_DIAGNOSTICS</h4>
+            <button 
+              className={`${styles.helpToggle} ${showHelp ? styles.active : ''}`}
+              onClick={() => setShowHelp(!showHelp)}
+              title="DIAGNOSTIC_INFO"
+            >
+              <HelpCircle size={14} />
+            </button>
+          </div>
+
           <div className={styles.stabilityInfo}>
-            <p>NEURAL_STABILITY: 98.4%</p>
-            <p>FOCUS_COHERENCE: OPTIMAL</p>
-            <div className={styles.stabilityBar}>
-              <div className={styles.fill} style={{ width: '98%' }} />
+            {showHelp && (
+              <div className={styles.helpTooltip}>
+                <div className={styles.helpContent}>
+                  <div className={styles.helpItem}>
+                    <strong>NEURAL_COHERENCE:</strong> Consistency rating. Optimal performance at 30m+ sessions.
+                  </div>
+                  <div className={styles.helpItem}>
+                    <strong>AVG_RECOVERY:</strong> Mean idle time between consecutive forges.
+                  </div>
+                  <div className={styles.helpItem}>
+                    <strong>PEAK_INTENSITY:</strong> Longest duration reached in a single session.
+                  </div>
+                  <div className={styles.helpItem}>
+                    <strong>FORGE_VOLUME:</strong> Cumulative focus duration across different time-scales.
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className={styles.coherenceRow}>
+              <div className={styles.diagItem}>
+                <div className={styles.statLabel}>NEURAL_COHERENCE:</div>
+                <div className={styles.statValue}>{diagnostics ? diagnostics.coherence.toFixed(1) : 0}%</div>
+                <div className={styles.stabilityBar}>
+                  <div className={styles.fill} style={{ width: `${diagnostics?.coherence || 0}%` }} />
+                </div>
+              </div>
+              <div className={styles.recoveryItem}>
+                <div className={styles.statLabel}>AVG_RECOVERY:</div>
+                <div className={styles.statValue}>{diagnostics ? formatDuration(diagnostics.avgRecovery) : '0m'}</div>
+              </div>
+            </div>
+
+            <div className={styles.statsTable}>
+              <div className={styles.tableHeader}>
+                <div className={styles.colLabel}>METRIC</div>
+                <div className={styles.colLabel}>DAY</div>
+                <div className={styles.colLabel}>WEEK</div>
+                <div className={styles.colLabel}>ALL_TIME</div>
+              </div>
+              
+              <div className={styles.tableRow}>
+                <div className={styles.rowLabel}>PEAK_INTENSITY</div>
+                <div className={styles.cellValue}>{diagnostics ? formatDuration(diagnostics.dayPeak) : '0m'}</div>
+                <div className={styles.cellValue}>-</div>
+                <div className={styles.cellValue}>{globalStats ? formatDuration(globalStats.allTimePeak) : '0m'}</div>
+              </div>
+
+              <div className={styles.tableRow}>
+                <div className={styles.rowLabel}>FORGE_VOLUME</div>
+                <div className={styles.cellValue}>{formatDuration(totalSeconds)}</div>
+                <div className={styles.cellValue}>{globalStats ? formatDuration(globalStats.weekTotal) : '0h'}</div>
+                <div className={styles.cellValue}>{globalStats ? formatDuration(globalStats.allTimeTotal) : '0h'}</div>
+              </div>
             </div>
           </div>
         </div>

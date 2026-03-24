@@ -240,8 +240,33 @@
   h4 {
     font-size: 0.75rem;
     color: var(--text-muted);
-    margin-bottom: 1rem;
+    margin: 0;
     letter-spacing: 0.1em;
+  }
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.helpToggle {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+
+  &:hover, &.active {
+    color: var(--primary);
+    background: var(--primary-muted);
   }
 }
 
@@ -315,24 +340,160 @@
 }
 
 .stabilityInfo {
+  position: relative;
   font-size: 0.8rem;
   color: var(--text-secondary);
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 1.5rem;
+}
 
-  .stabilityBar {
-    width: 100%;
-    height: 6px;
-    background: var(--bg-dark);
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    overflow: hidden;
+.coherenceRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 2rem;
 
-    .fill {
-      height: 100%;
-      background: #4ade80;
-      box-shadow: 0 0 10px rgba(74, 222, 128, 0.4);
+  .diagItem {
+    flex: 1;
+  }
+
+  .recoveryItem {
+    text-align: right;
+    min-width: 100px;
+  }
+}
+
+.statLabel {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+  letter-spacing: 0.05em;
+}
+
+.statValue {
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: var(--primary);
+  margin-bottom: 0.5rem;
+}
+
+.stabilityBar {
+  width: 100%;
+  height: 4px;
+  background: var(--bg-dark);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+
+  .fill {
+    height: 100%;
+    background: #4ade80;
+    box-shadow: 0 0 10px rgba(74, 222, 128, 0.4);
+    transition: width 0.5s ease-out;
+  }
+}
+
+.statsTable {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.tableHeader {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr 1fr;
+  padding: 0.5rem;
+  background: var(--primary-muted);
+  border-bottom: 1px solid var(--border);
+
+  .colLabel {
+    font-size: 0.6rem;
+    color: var(--primary);
+    font-weight: bold;
+    letter-spacing: 0.1em;
+  }
+}
+
+.tableRow {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr 1fr;
+  padding: 0.6rem 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  .rowLabel {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  .cellValue {
+    font-size: 0.75rem;
+    color: var(--text-primary);
+    font-weight: bold;
+  }
+}
+
+.helpTooltip {
+  position: absolute;
+  top: -0.5rem;
+  left: -0.5rem;
+  right: -0.5rem;
+  bottom: -0.5rem;
+  background: rgba(13, 13, 13, 0.98);
+  border: 1px solid var(--primary);
+  border-radius: 4px;
+  z-index: 50;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.8), 0 0 10px var(--primary-glow);
+
+  .helpContent {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .helpItem {
+    font-size: 0.7rem;
+    line-height: 1.4;
+    color: var(--text-secondary);
+
+    strong {
+      color: var(--primary);
+      display: block;
+      margin-bottom: 0.1rem;
+      font-size: 0.65rem;
+      letter-spacing: 0.05em;
+    }
+  }
+
+  .closeHelp {
+    margin-top: 1rem;
+    background: var(--primary-muted);
+    border: 1px solid var(--primary);
+    color: var(--primary);
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    padding: 0.4rem;
+    cursor: pointer;
+    font-weight: bold;
+    letter-spacing: 0.1em;
+
+    &:hover {
+      background: var(--primary);
+      color: #fff;
     }
   }
 }

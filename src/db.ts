@@ -143,3 +143,37 @@ export async function deleteFocusSession(id: number) {
   await database.execute('DELETE FROM focus_sessions WHERE id = ?', [id]);
 }
 
+export async function getGlobalStats() {
+  const database = await getDb();
+  
+  // All time stats
+  const allTime = await database.select<{ allTimeTotal: number, allTimePeak: number }[]>(
+    'SELECT SUM(duration_seconds) as allTimeTotal, MAX(duration_seconds) as allTimePeak FROM focus_sessions'
+  );
+
+  // Week stats (last 7 days)
+  const dWeek = new Date();
+  dWeek.setDate(dWeek.getDate() - 7);
+  const weekStr = dWeek.toISOString().split('T')[0];
+  const week = await database.select<{ weekTotal: number }[]>(
+    'SELECT SUM(duration_seconds) as weekTotal FROM focus_sessions WHERE date >= $1',
+    [weekStr]
+  );
+
+  // Month stats (last 30 days)
+  const dMonth = new Date();
+  dMonth.setDate(dMonth.getDate() - 30);
+  const monthStr = dMonth.toISOString().split('T')[0];
+  const month = await database.select<{ monthTotal: number }[]>(
+    'SELECT SUM(duration_seconds) as monthTotal FROM focus_sessions WHERE date >= $1',
+    [monthStr]
+  );
+
+  return {
+    allTimeTotal: allTime[0]?.allTimeTotal || 0,
+    allTimePeak: allTime[0]?.allTimePeak || 0,
+    weekTotal: week[0]?.weekTotal || 0,
+    monthTotal: month[0]?.monthTotal || 0
+  };
+}
+
