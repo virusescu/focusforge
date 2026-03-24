@@ -3,6 +3,7 @@ import styles from './SidebarRight.module.scss';
 import { Terminal, Activity, History } from 'lucide-react';
 import { useSystemLog } from '../hooks/useSystemLog';
 import { useFocus } from '../contexts/FocusContext';
+import { soundEngine } from '../utils/audio';
 
 interface Props {
   onViewAnalytics: (date: string) => void;
@@ -49,6 +50,16 @@ export const SidebarRight: FC<Props> = ({ onViewAnalytics }) => {
     };
   });
 
+  const handleCellMouseEnter = (date: string, time: string) => {
+    soundEngine.playHover();
+    setHoveredCell({ date, time });
+  };
+
+  const handleCellClick = (date: string) => {
+    soundEngine.playClick();
+    onViewAnalytics(date);
+  };
+
   return (
     <aside className={styles.sidebar}>
       <div className="card">
@@ -76,9 +87,9 @@ export const SidebarRight: FC<Props> = ({ onViewAnalytics }) => {
             <div 
               key={i} 
               className={`${styles.cell} ${cell.colorClass}`} 
-              onMouseEnter={() => setHoveredCell({ date: cell.date, time: cell.formattedTime })}
+              onMouseEnter={() => handleCellMouseEnter(cell.date, cell.formattedTime)}
               onMouseLeave={() => setHoveredCell(null)}
-              onClick={() => onViewAnalytics(cell.date)}
+              onClick={() => handleCellClick(cell.date)}
             />
           ))}
         </div>

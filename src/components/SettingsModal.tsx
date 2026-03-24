@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import styles from './SettingsModal.module.scss';
 import { X, Check } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
+import { soundEngine } from '../utils/audio';
 
 interface Props {
   onClose: () => void;
@@ -27,9 +28,15 @@ export const SettingsModal: FC<Props> = ({ onClose }) => {
   }, [user]);
 
   const handleSave = useCallback(async () => {
+    soundEngine.playClick();
     await updateSettings(name, email, debugSpeed, experienceLvl);
     onClose();
   }, [name, email, debugSpeed, experienceLvl, updateSettings, onClose]);
+
+  const handleCancel = useCallback(() => {
+    soundEngine.playClick();
+    onClose();
+  }, [onClose]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -37,21 +44,25 @@ export const SettingsModal: FC<Props> = ({ onClose }) => {
         e.preventDefault();
         handleSave();
       } else if (e.key === 'Escape') {
-        onClose();
+        handleCancel();
+      } else if (e.key === 'Tab') {
+        soundEngine.playTab();
+      } else if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete') {
+        soundEngine.playKey();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleSave, onClose]);
+  }, [handleSave, handleCancel]);
 
   if (loading) return null;
 
   return createPortal(
-    <div className={styles.overlay} onClick={onClose}>
+    <div className={styles.overlay} onClick={handleCancel}>
       <div className={styles.modal} onClick={e => e.stopPropagation()}>
         <div className={styles.header}>
           <h2>SYSTEM_SETTINGS</h2>
-          <button className={styles.closeBtn} onClick={onClose}>
+          <button className={styles.closeBtn} onClick={handleCancel}>
             <X size={20} />
           </button>
         </div>
@@ -102,7 +113,7 @@ export const SettingsModal: FC<Props> = ({ onClose }) => {
         </div>
 
         <div className={styles.footer}>
-          <button className={styles.cancelBtn} onClick={onClose}>
+          <button className={styles.cancelBtn} onClick={handleCancel}>
             CANCEL
           </button>
           <button className={styles.saveBtn} onClick={handleSave}>

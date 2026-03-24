@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, ArrowLeft, BarChart2, X, Target, HelpCircle 
 import { getSessionsForDay, deleteFocusSession } from '../db';
 import { useFocus } from '../contexts/FocusContext';
 import type { FocusSession } from '../types';
+import { soundEngine } from '../utils/audio';
 
 interface Props {
   onBack: () => void;
@@ -17,6 +18,11 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
   const [loading, setLoading] = useState(true);
   const [hoveredSessionId, setHoveredSessionId] = useState<number | null>(null);
   const [showHelp, setShowHelp] = useState(false);
+
+  const handleBack = useCallback(() => {
+    soundEngine.playClick();
+    onBack();
+  }, [onBack]);
 
   const loadSessions = useCallback(async () => {
     setLoading(true);
@@ -35,23 +41,58 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
     loadSessions();
   }, [loadSessions]);
 
-  const changeDay = (delta: number) => {
-    const next = new Date(currentDate);
-    next.setDate(next.getDate() + delta);
-    setCurrentDate(next);
-  };
+  const changeDay = useCallback((delta: number) => {
+    soundEngine.playClick();
+    setCurrentDate(prev => {
+      const next = new Date(prev);
+      next.setDate(next.getDate() + delta);
+      return next;
+    });
+  }, []);
 
-  const jumpToToday = () => {
+  const jumpToToday = useCallback(() => {
+    soundEngine.playClick();
     setCurrentDate(new Date());
-  };
+  }, []);
 
   const isToday = currentDate.toDateString() === new Date().toDateString();
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') {
+        changeDay(-1);
+      } else if (e.key === 'ArrowRight') {
+        changeDay(1);
+      } else if (e.key === 'Escape') {
+        handleBack();
+      } else if (e.key === ' ' || e.key === 'Spacebar') {
+        if (!isToday) {
+          e.preventDefault();
+          jumpToToday();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [changeDay, handleBack, jumpToToday, isToday]);
+
+  const handleMouseEnterSession = (id: number) => {
+    if (hoveredSessionId !== id) {
+      soundEngine.playHover();
+      setHoveredSessionId(id);
+    }
+  };
+
+  const handleHover = () => {
+    soundEngine.playHover();
+  };
 
   const totalSeconds = sessions.reduce((acc, s) => acc + s.duration_seconds, 0);
   const totalHours = Math.floor(totalSeconds / 3600);
   const totalMinutes = Math.floor((totalSeconds % 3600) / 60);
 
   const handleDelete = async (id: number) => {
+    soundEngine.playPause(); // Warning-like sound
     await deleteFocusSession(id);
     await loadSessions();
     await refreshData();
@@ -137,7 +178,11 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
   return (
     <div className={styles.analyticsContainer}>
       <div className={styles.header}>
-        <button className={styles.backBtn} onClick={onBack}>
+        <button 
+          className={styles.backBtn} 
+          onClick={handleBack}
+          onMouseEnter={handleHover}
+        >
           <ArrowLeft size={16} />
           <span>BACK_TO_HUD</span>
         </button>
@@ -150,19 +195,24 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
       <div className="card">
         <div className={styles.navBar}>
           <div className={styles.dayPicker}>
-            <button onClick={() => changeDay(-1)} className={styles.navBtn}>
+            <button onClick={() => changeDay(-1)} className={styles.navBtn} onMouseEnter={handleHover}>
               <ChevronLeft size={20} />
             </button>
             <div className={styles.currentDate}>
               <span className={styles.label}>DAY:</span>
               <span className={styles.value}>{currentDate.toLocaleDateString()}</span>
             </div>
-            <button onClick={() => changeDay(1)} className={styles.navBtn}>
+            <button onClick={() => changeDay(1)} className={styles.navBtn} onMouseEnter={handleHover}>
               <ChevronRight size={20} />
             </button>
 
             {!isToday && (
-              <button onClick={jumpToToday} className={styles.todayBtn} title="JUMP_TO_PRESENT">
+              <button 
+                onClick={jumpToToday} 
+                className={styles.todayBtn} 
+                onMouseEnter={handleHover}
+                title="JUMP_TO_PRESENT"
+              >
                 <span>TODAY</span>
               </button>
             )}
@@ -206,7 +256,7 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
                       key={s.id} 
                       className={`${styles.sessionBlock} ${isHighlighted ? styles.highlighted : ''}`} 
                       style={pos}
-                      onMouseEnter={() => setHoveredSessionId(s.id)}
+                      onMouseEnter={() => handleMouseEnterSession(s.id)}
                       onMouseLeave={() => setHoveredSessionId(null)}
                       title={`${new Date(s.start_time).toLocaleTimeString()} - ${Math.floor(s.duration_seconds / 60)}m`}
                     />
@@ -226,7 +276,7 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
               <div 
                 key={s.id} 
                 className={`${styles.sessionItem} ${hoveredSessionId === s.id ? styles.itemHovered : ''}`}
-                onMouseEnter={() => setHoveredSessionId(s.id)}
+                onMouseEnter={() => handleMouseEnterSession(s.id)}
                 onMouseLeave={() => setHoveredSessionId(null)}
               >
                 <div className={styles.sessionMain}>
@@ -235,6 +285,7 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
                 </div>
                 <button 
                   className={styles.deleteBtn} 
+                  onMouseEnter={handleHover}
                   onClick={(e) => {
                     e.stopPropagation();
                     handleDelete(s.id);
@@ -254,7 +305,11 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
             <h4>OPERATOR_DIAGNOSTICS</h4>
             <button 
               className={`${styles.helpToggle} ${showHelp ? styles.active : ''}`}
-              onClick={() => setShowHelp(!showHelp)}
+              onMouseEnter={handleHover}
+              onClick={() => {
+                soundEngine.playClick();
+                setShowHelp(!showHelp);
+              }}
               title="DIAGNOSTIC_INFO"
             >
               <HelpCircle size={14} />

@@ -1,7 +1,8 @@
-import { type FC } from 'react';
+import { type FC, useCallback } from 'react';
 import styles from './SidebarLeft.module.scss';
 import { User, Database, Cpu, HardDrive, BarChart2 } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
+import { soundEngine } from '../utils/audio';
 
 interface Props {
   onViewAnalytics?: () => void;
@@ -9,6 +10,15 @@ interface Props {
 
 export const SidebarLeft: FC<Props> = ({ onViewAnalytics }) => {
   const { user, avatar, loading } = useUser();
+
+  const handleAnalyticsClick = useCallback(() => {
+    soundEngine.playClick();
+    onViewAnalytics?.();
+  }, [onViewAnalytics]);
+
+  const handleHover = () => {
+    soundEngine.playHover();
+  };
 
   if (loading) return <aside className={styles.sidebar}>LOADING...</aside>;
 
@@ -71,7 +81,11 @@ export const SidebarLeft: FC<Props> = ({ onViewAnalytics }) => {
         </div>
 
         {onViewAnalytics && (
-          <button className={styles.analyticsBtn} onClick={onViewAnalytics}>
+          <button 
+            className={styles.analyticsBtn} 
+            onClick={handleAnalyticsClick}
+            onMouseEnter={handleHover}
+          >
             <BarChart2 size={14} />
             <span>SYSTEM_ANALYTICS</span>
           </button>

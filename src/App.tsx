@@ -25,7 +25,7 @@ function App() {
       {view === 'hud' ? (
         <>
           <SidebarLeft onViewAnalytics={() => handleViewAnalytics()} />
-          <MainDisplay />
+          <MainDisplay onViewAnalytics={() => handleViewAnalytics()} />
           <SidebarRight onViewAnalytics={(date) => handleViewAnalytics(date)} />
         </>
       ) : (

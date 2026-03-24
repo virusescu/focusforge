@@ -1,12 +1,57 @@
-import { type FC } from 'react';
+import { type FC, useCallback, useEffect } from 'react';
 import styles from './MainDisplay.module.scss';
 import { Play, Pause, RotateCcw, Zap } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 import { useTimer } from '../hooks/useTimer';
+import { soundEngine } from '../utils/audio';
 
-export const MainDisplay: FC = () => {
+export const MainDisplay: FC<{ onViewAnalytics?: () => void }> = ({ onViewAnalytics }) => {
   const { user } = useUser();
-  const { seconds, isActive, minutes, toggleTimer, resetTimer, formatTime } = useTimer(user?.debug_speed || 1);
+  const { seconds, isActive, minutes, toggleTimer: baseToggle, resetTimer: baseReset, formatTime } = useTimer(user?.debug_speed || 1);
+
+  const toggleTimer = useCallback(() => {
+    if (isActive) {
+      soundEngine.playPause();
+    } else {
+      soundEngine.playStart();
+    }
+    baseToggle();
+  }, [isActive, baseToggle]);
+
+  const resetTimer = useCallback(() => {
+    if (seconds > 0) {
+      soundEngine.playReboot();
+      baseReset();
+    } else {
+      soundEngine.playDenied();
+    }
+  }, [seconds, baseReset]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if user is typing in an input (though there are none on main page currently)
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      if (e.key === ' ') {
+        e.preventDefault();
+        toggleTimer();
+      } else if (e.key === 'Escape') {
+        resetTimer();
+      } else if (e.key.toLowerCase() === 'a') {
+        if (onViewAnalytics) {
+          soundEngine.playClick();
+          onViewAnalytics();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [toggleTimer, resetTimer, onViewAnalytics]);
+
+  const handleHover = () => {
+    soundEngine.playHover();
+  };
 
   // Circle Math
   const circumference = 2 * Math.PI * 140; // ~879.6
@@ -95,11 +140,19 @@ export const MainDisplay: FC = () => {
       </div>
       
       <div className={styles.controls}>
-        <button onClick={toggleTimer} className={styles.btnPrimary}>
+        <button 
+          onClick={toggleTimer} 
+          onMouseEnter={handleHover}
+          className={styles.btnPrimary}
+        >
           {isActive ? <Pause size={24} /> : <Play size={24} />}
           <span>{isActive ? 'HALT_PROCESS' : 'INITIATE_FORGE'}</span>
         </button>
-        <button onClick={resetTimer} className={styles.btnSecondary}>
+        <button 
+          onClick={resetTimer} 
+          onMouseEnter={handleHover}
+          className={styles.btnSecondary}
+        >
           <RotateCcw size={20} />
           <span>REBOOT_CYCLE</span>
         </button>

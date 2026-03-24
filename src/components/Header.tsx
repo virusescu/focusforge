@@ -1,11 +1,17 @@
-import { type FC, useState } from 'react';
+import { type FC, useState, useCallback } from 'react';
 import styles from './Header.module.scss';
 import { Shield, Radio, Wifi, Settings } from 'lucide-react';
 import { WindowControls } from './WindowControls';
 import { SettingsModal } from './SettingsModal';
+import { soundEngine } from '../utils/audio';
 
 export const Header: FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  const handleOpenSettings = useCallback(() => {
+    soundEngine.playClick();
+    setIsSettingsOpen(true);
+  }, []);
 
   return (
     <header className={styles.header} data-tauri-drag-region>
@@ -36,7 +42,7 @@ export const Header: FC = () => {
         <div className={styles.divider} />
         <button 
           className={styles.settingsBtn} 
-          onClick={() => setIsSettingsOpen(true)}
+          onClick={handleOpenSettings}
           title="SYSTEM_SETTINGS"
         >
           <Settings size={16} />
