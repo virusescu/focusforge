@@ -17,3 +17,15 @@ export interface LogEntry {
 }
 
 export type LogCategory = keyof typeof LOG_MESSAGES;
+
+export interface FocusSession {
+  id: number;
+  start_time: string;
+  duration_seconds: number;
+  date: string;
+}
+
+export interface DailyStat {
+  date: string;
+  totalSeconds: number;
+}

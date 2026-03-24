@@ -23,7 +23,7 @@
   flex-direction: column;
   gap: 0.25rem;
   font-family: var(--font-mono);
-  height: 180px; /* Fixed height for ~10 rows */
+  height: 120px; /* Reduced height to save space */
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 0.5rem;
@@ -72,15 +72,84 @@
 
 .cell {
   aspect-ratio: 1;
-  background: var(--primary);
   border-radius: 2px;
+  transition: transform 0.2s, box-shadow 0.2s;
+  cursor: pointer;
+
+  &:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 5px rgba(255,255,255,0.5);
+    z-index: 10;
+  }
 }
 
-.notifItem {
+/* Activity Map Colors */
+.cellBlack {
+  background-color: #0d0d0d;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.cellBrown {
+  background-color: #5e3a24;
+}
+
+.cellOrange {
+  background-color: #ee682b;
+  box-shadow: 0 0 4px rgba(238, 104, 43, 0.4);
+}
+
+.cellBrightOrange {
+  background-color: #ff9e6d;
+  box-shadow: 0 0 8px rgba(255, 158, 109, 0.6);
+}
+
+.hoverTooltip {
+  position: absolute;
+  top: 0.5rem;
+  right: 1.5rem;
+  background: rgba(0, 0, 0, 0.8);
+  border: 1px solid var(--border);
+  padding: 0.25rem 0.5rem;
   font-size: 0.7rem;
-  padding: 0.75rem;
-  background: var(--bg-dark);
-  border: 1px dashed var(--border);
-  text-align: center;
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 20;
+
+  .highlight {
+    color: var(--primary);
+    font-weight: bold;
+  }
+}
+
+/* Recent Forges */
+.recentList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.recentItem {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem;
+  background: rgba(0, 0, 0, 0.3);
+  border-left: 2px solid var(--primary);
+  font-size: 0.8rem;
+}
+
+.sessionDate {
   color: var(--text-secondary);
 }
+
+.sessionDuration {
+  color: var(--primary);
+  font-weight: bold;
+}
+
+.noSessions {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  text-align: center;
+  padding: 1rem 0;
+}
+

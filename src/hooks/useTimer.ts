@@ -26,9 +26,12 @@ export const useTimer = (multiplier: number = 1) => {
 
   const resetTimer = useCallback(() => {
     setIsActive(false);
+    if (seconds > 0) {
+      window.dispatchEvent(new CustomEvent('timer-saved', { detail: { durationSeconds: seconds } }));
+    }
     setSeconds(0);
     window.dispatchEvent(new CustomEvent('timer-reset'));
-  }, []);
+  }, [seconds]);
 
   const formatTime = (totalSeconds: number) => {
     const mins = Math.floor(totalSeconds / 60);
