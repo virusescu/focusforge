@@ -8,6 +8,12 @@ const mockSaveSession = vi.fn();
 vi.mock('../db', () => ({
   getRecentSessions: vi.fn().mockResolvedValue([]),
   getDailyFocusStats: vi.fn().mockResolvedValue([]),
+  getGlobalStats: vi.fn().mockResolvedValue({
+    allTimeTotal: 0,
+    allTimePeak: 0,
+    weekTotal: 0,
+    monthTotal: 0
+  }),
   saveFocusSession: (start: string, dur: number) => mockSaveSession(start, dur)
 }));
 

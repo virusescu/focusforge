@@ -1,6 +1,6 @@
 import { type FC, useState, useEffect, useCallback, useMemo } from 'react';
 import styles from './AnalyticsView.module.scss';
-import { ChevronLeft, ChevronRight, ArrowLeft, BarChart2, X, Target, HelpCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ArrowLeft, BarChart2, X, HelpCircle } from 'lucide-react';
 import { getSessionsForDay, deleteFocusSession } from '../db';
 import { useFocus } from '../contexts/FocusContext';
 import type { FocusSession } from '../types';
