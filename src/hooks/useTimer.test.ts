@@ -82,4 +82,113 @@ describe('useTimer', () => {
     expect(result.current.formatTime(65)).toBe('01:05');
     expect(result.current.formatTime(3600)).toBe('60:00');
   });
+
+  it('includes startTime in timer-saved event', () => {
+    const listener = vi.fn();
+    window.addEventListener('timer-saved', listener);
+
+    const startTime = new Date('2024-03-24T10:00:00.000Z');
+    vi.setSystemTime(startTime);
+
+    const { result } = renderHook(() => useTimer(1));
+    act(() => { result.current.toggleTimer(); });
+    act(() => { vi.advanceTimersByTime(30000); });
+    act(() => { result.current.resetTimer(); });
+
+    expect(listener).toHaveBeenCalledWith(
+      expect.objectContaining({
+        detail: expect.objectContaining({ startTime: '2024-03-24T10:00:00.000Z' })
+      })
+    );
+
+    window.removeEventListener('timer-saved', listener);
+  });
+
+  it('records pause timestamp when timer is paused mid-session', () => {
+    const listener = vi.fn();
+    window.addEventListener('timer-saved', listener);
+
+    const { result } = renderHook(() => useTimer(1));
+
+    vi.setSystemTime(new Date('2024-03-24T10:00:00.000Z'));
+    act(() => { result.current.toggleTimer(); }); // start
+    act(() => { vi.advanceTimersByTime(10000); });
+
+    vi.setSystemTime(new Date('2024-03-24T10:15:00.000Z'));
+    act(() => { result.current.toggleTimer(); }); // pause
+
+    act(() => { result.current.resetTimer(); });
+
+    expect(listener).toHaveBeenCalledWith(
+      expect.objectContaining({
+        detail: expect.objectContaining({ pauseTimes: ['2024-03-24T10:15:00.000Z'] })
+      })
+    );
+
+    window.removeEventListener('timer-saved', listener);
+  });
+
+  it('records multiple pause timestamps', () => {
+    const listener = vi.fn();
+    window.addEventListener('timer-saved', listener);
+
+    const { result } = renderHook(() => useTimer(1));
+
+    vi.setSystemTime(new Date('2024-03-24T10:00:00.000Z'));
+    act(() => { result.current.toggleTimer(); });
+    act(() => { vi.advanceTimersByTime(20000); });
+
+    vi.setSystemTime(new Date('2024-03-24T10:20:00.000Z'));
+    act(() => { result.current.toggleTimer(); }); // first pause
+
+    act(() => { result.current.toggleTimer(); }); // resume
+
+    vi.setSystemTime(new Date('2024-03-24T10:40:00.000Z'));
+    act(() => { result.current.toggleTimer(); }); // second pause
+
+    act(() => { result.current.resetTimer(); });
+
+    expect(listener).toHaveBeenCalledWith(
+      expect.objectContaining({
+        detail: expect.objectContaining({
+          pauseTimes: ['2024-03-24T10:20:00.000Z', '2024-03-24T10:40:00.000Z'],
+        })
+      })
+    );
+
+    window.removeEventListener('timer-saved', listener);
+  });
+
+  it('clears pauseTimes and startTime after reset so next session starts fresh', () => {
+    const listener = vi.fn();
+    window.addEventListener('timer-saved', listener);
+
+    const { result } = renderHook(() => useTimer(1));
+
+    vi.setSystemTime(new Date('2024-03-24T10:00:00.000Z'));
+    act(() => { result.current.toggleTimer(); });
+    act(() => { vi.advanceTimersByTime(30000); });
+    vi.setSystemTime(new Date('2024-03-24T10:15:00.000Z'));
+    act(() => { result.current.toggleTimer(); }); // pause
+    act(() => { result.current.resetTimer(); }); // save + reset
+
+    listener.mockClear();
+
+    // Second session — no pauses
+    vi.setSystemTime(new Date('2024-03-24T11:00:00.000Z'));
+    act(() => { result.current.toggleTimer(); });
+    act(() => { vi.advanceTimersByTime(30000); });
+    act(() => { result.current.resetTimer(); });
+
+    expect(listener).toHaveBeenCalledWith(
+      expect.objectContaining({
+        detail: expect.objectContaining({
+          startTime: '2024-03-24T11:00:00.000Z',
+          pauseTimes: [],
+        })
+      })
+    );
+
+    window.removeEventListener('timer-saved', listener);
+  });
 });

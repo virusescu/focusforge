@@ -8,17 +8,27 @@ export const useTimer = (multiplier: number = 1) => {
   const [isActive, setIsActive] = useState(false);
   const [pauseSeconds, setPauseSeconds] = useState(0);
 
-  // Keep a ref to the latest seconds so resetTimer can read it without stale closure
   const secondsRef = useRef(seconds);
   secondsRef.current = seconds;
+
+  const startTimeRef = useRef<string | null>(null);
+  const pauseTimesRef = useRef<string[]>([]);
 
   const resetTimer = useCallback(() => {
     setIsActive(false);
     setPauseSeconds(0);
     if (secondsRef.current > 0) {
-      window.dispatchEvent(new CustomEvent('timer-saved', { detail: { durationSeconds: secondsRef.current } }));
+      window.dispatchEvent(new CustomEvent('timer-saved', {
+        detail: {
+          durationSeconds: secondsRef.current,
+          startTime: startTimeRef.current ?? new Date().toISOString(),
+          pauseTimes: [...pauseTimesRef.current],
+        },
+      }));
     }
     setSeconds(0);
+    startTimeRef.current = null;
+    pauseTimesRef.current = [];
     window.dispatchEvent(new CustomEvent('timer-reset'));
   }, []);
 
@@ -56,8 +66,14 @@ export const useTimer = (multiplier: number = 1) => {
     const nextState = !isActive;
     setIsActive(nextState);
     if (nextState) {
+      // Starting or resuming — record start time on first activation only
+      if (!startTimeRef.current) {
+        startTimeRef.current = new Date().toISOString();
+      }
       window.dispatchEvent(new CustomEvent('timer-active'));
     } else {
+      // Pausing — record wall-clock time of this pause
+      pauseTimesRef.current = [...pauseTimesRef.current, new Date().toISOString()];
       window.dispatchEvent(new CustomEvent('timer-paused'));
     }
   }, [isActive]);
