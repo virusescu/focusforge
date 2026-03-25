@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { AnalyticsView } from './AnalyticsView';
 import { FocusProvider } from '../contexts/FocusContext';
-import { ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 // Mock DB
 const mockSessions = [
@@ -27,7 +27,7 @@ vi.mock('../db', () => ({
 
 // Mock AudioContext which doesn't exist in JSDOM
 // Using an object instead of a constructor since vitest has issues with constructor mocks in some environments
-const mockAudioContext = vi.fn().mockImplementation(function() {
+const mockAudioContext = vi.fn().mockImplementation(function(this: any) {
   this.resume = vi.fn().mockResolvedValue(undefined);
   this.createOscillator = vi.fn().mockReturnValue({
     type: '',
