@@ -181,6 +181,7 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
       let localHours = d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600;
       if (diffDays === 1) localHours += 24;
       else if (diffDays === -1) localHours -= 24;
+      else if (diffDays !== 0) continue;
 
       const clamped = localHours < START_HOUR || localHours >= END_HOUR;
       const clampedLeft = localHours < START_HOUR;

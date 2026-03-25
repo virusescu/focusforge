@@ -187,9 +187,9 @@ describe('AnalyticsView', () => {
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([]);
     vi.mocked(getCompletedObjectivesForDay).mockResolvedValueOnce([
-      { id: 1, text: 'Objective A', created_at: '2026-03-24T08:00:00.000Z', completed_at: '2026-03-24T10:01:00.000Z' },
-      { id: 2, text: 'Objective B', created_at: '2026-03-24T08:00:00.000Z', completed_at: '2026-03-24T10:03:00.000Z' },
-      { id: 3, text: 'Objective C', created_at: '2026-03-24T08:00:00.000Z', completed_at: '2026-03-24T11:00:00.000Z' },
+      { id: 1, text: 'Objective A', created_at: '2026-03-24T08:00:00.000Z', completed_at: '2026-03-24T12:01:00.000Z' },
+      { id: 2, text: 'Objective B', created_at: '2026-03-24T08:00:00.000Z', completed_at: '2026-03-24T12:03:00.000Z' },
+      { id: 3, text: 'Objective C', created_at: '2026-03-24T08:00:00.000Z', completed_at: '2026-03-24T13:00:00.000Z' },
     ]);
 
     await act(async () => {
@@ -197,7 +197,7 @@ describe('AnalyticsView', () => {
     });
 
     await waitFor(() => {
-      // Objectives A and B are in same 5-min bucket (10:00-10:05) → 1 dot
+      // Objectives A and B are in same 5-min bucket (12:00-12:05) → 1 dot
       // Objective C is in its own bucket → 1 dot
       expect(screen.getAllByTestId('objective-dot').length).toBe(2);
     });
