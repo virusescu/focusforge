@@ -40,9 +40,7 @@
 ## 1. The Strategic Forge (Task Management)
 *Goal: Give focus sessions context and actionable goals.*
 
-- **Project Tagging**: Allow operators to assign a name/tag to a session before initiating the forge (e.g., `CORE_REFACTOR`, `UI_POLISH`). *(Not yet implemented)*
 - **Target Neutralization (Single-Task Focus)**: ✅ Implemented — see above.
-- **Project Analytics**: In the Analytics View, provide a breakdown (e.g., total hours per tag) to show where the most "neural energy" was spent during the week. *(Requires Project Tagging first)*
 
 ## 2. Visceral Momentum (Real-time Feedback)
 *Goal: Make the act of focusing feel like an evolving achievement.*
@@ -51,13 +49,8 @@
   - **Visuals**: Activity map heatmap color-codes days by focus intensity. ✅
   - **Purpose**: Provides visual proof of "momentum" without being distracting.
 - **Intervention Tracking**:
-  - **Tactical Decoupling (Manual Interruption)**: If you have to stop, you hit a "DECOUPLE" button and select a quick reason (e.g., `COMM_INBOUND`, `ADHD_DRIFT`). *(Not yet implemented — reset exists but no reason selection)*
-  - **Intelligent Halt (Short Breaks)**:
-    - Triggered by "HALT" button. *(Pause exists but no reason prompt)*
-    - Prompts for a reason (e.g., `HYDRATION`, `NOTES`, `PHONE_COMMS`). *(Not yet implemented)*
-    - **Neural Sync Rule**: Auto-reset if pause exceeds limit. ✅ Implemented (60s limit).
-  - **Visual Impact**: Show breaks/interruptions as distinct vertical lines or "cracks" in the Day View timeline. *(Not yet implemented — sessions are solid blocks only)*
-  - **Data Utility**: Tracking frequency and reason for breaks to identify peak focus windows. *(Not yet implemented — no reason data stored)*
+  - **Neural Sync Rule**: Auto-reset if pause exceeds limit. ✅ Implemented (60s limit).
+  - **Interruption Cracks**: Each time the timer is paused mid-session, record a timestamp. In the Day View timeline, render these as thin vertical crack marks inside the session block. Shows at a glance how fragmented a session was. No reason needed — the pattern across the day tells the story.
 
 ## 3. Project Forge Rewards (Variable Micro-Rewards)
 *Goal: Provide unpredictable, positive reinforcement for sustained focus.*
@@ -73,6 +66,4 @@
 *Goal: Use new diagnostic data to create a more detailed performance report.*
 
 - **Neural Stability Graph**: Use interrupt frequency and recovery efficiency to generate a "Stability Score" over time. ✅ Partially implemented — coherence score and avg recovery shown per-day, but no trend graph across days.
-- **The "Ghost" Session**: In the Day View, show a faint "Ghost" outline of yesterday's sessions.
-  - **Motivation**: ADHD brains often thrive on immediate competition. Can you "overtake" your ghost today? *(Not yet implemented)*
 - **Session Replay**: A way to hover over a specific day and see a summary of the most successful project tags and the primary sources of interruptions. *(Partial — clicking a heatmap cell navigates to that day's analytics. Hover preview not implemented. Project tag breakdown requires tagging feature.)*
