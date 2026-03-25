@@ -13,7 +13,10 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git worktree:*)",
-      "Bash(git branch:*)"
+      "Bash(git branch:*)",
+      "Bash(git:*)",
+      "Bash(npx vitest:*)",
+      "Bash(node -e \":*)"
     ]
   }
 }

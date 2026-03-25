@@ -67,3 +67,28 @@
 
 - **Neural Stability Graph**: Use interrupt frequency and recovery efficiency to generate a "Stability Score" over time. ✅ Partially implemented — coherence score and avg recovery shown per-day, but no trend graph across days.
 - **Session Replay**: A way to hover over a specific day and see a summary of the most successful project tags and the primary sources of interruptions. *(Partial — clicking a heatmap cell navigates to that day's analytics. Hover preview not implemented. Project tag breakdown requires tagging feature.)*
+
+---
+
+## 5. Advanced Analytical Screens (The Neuro-Visualizer)
+*Goal: Transform boring metrics into visceral, game-like visualizations that provide immediate feedback and long-term pattern recognition for the ADHD brain.*
+
+- **The Neural Mountain Range (Session Depth)**:
+  - **Visuals**: In the Day View, sessions become jagged mountain silhouettes. Height = Intensity (performance tier); Smoothness = Focus continuity (fewer interruptions = cleaner slopes).
+  - **Purpose**: Turns abstract time into a physical "trophy." Building a range of tall, smooth peaks is more rewarding than looking at a bar chart.
+- **The Context-Switching Ghost (Fragmented Flow)**:
+  - **Visuals**: Semi-transparent "electrical arcs" connect objective completion dots to the sessions they happened in. Tangled arcs = high task switching; thick, glowing arcs = deep flow.
+  - **Purpose**: Visualizes the hidden cost of "skipping" between tasks without using judgmental language.
+- **The "Dopamine Hot Zone" Overlay**:
+  - **Visuals**: A secondary heat-layer on the 18-hour timeline highlighting hours with the highest objective completion density. These zones pulse with high-contrast colors (e.g., Electric Blue).
+  - **Purpose**: Identifies the operator's "Prime Time" to help them plan deep work when their brain is naturally most "online."
+- **The Combo Meter (Momentum Tracking)**:
+  - **Visuals**: A high-octane "Streak Counter" tracking consecutive forge days or objectives neutralized without a reboot. Reaching milestones unlocks temporary UI color shifts or new audio sets.
+  - **Purpose**: Provides immediate micro-rewards for consistency, gamifying the act of showing up daily.
+- **The "Neural Debt" Tug-of-War**:
+  - **Visuals**: A horizontal "Red vs. Green" bar. Open objectives pull red; completed ones pull green. Completing tasks physically "crushes" the red side.
+  - **Purpose**: Visualizes the "Clearing of the Plate," providing the visceral sense of closure needed to stop for the day.
+- **The Stability Radar (Weekly Diagnostic)**:
+  - **Visuals**: A 7-sided radar chart (spider web) where the "web" grows based on daily volume and consistency.
+  - **Purpose**: Shows "Consistency vs. Chaos" as a shape rather than a grade, making it easier to spot weekly patterns at a glance.
+
