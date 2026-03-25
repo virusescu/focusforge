@@ -25,7 +25,9 @@ vi.mock('../db', () => ({
   }),
   getObjectives: vi.fn().mockResolvedValue([]),
   addObjective: vi.fn().mockResolvedValue(undefined),
-  deleteObjective: vi.fn().mockResolvedValue(undefined)
+  deleteObjective: vi.fn().mockResolvedValue(undefined),
+  completeObjective: vi.fn().mockResolvedValue(undefined),
+  getCompletedObjectivesForDay: vi.fn().mockResolvedValue([]),
 }));
 
 // Mock AudioContext which doesn't exist in JSDOM
@@ -176,6 +178,44 @@ describe('AnalyticsView', () => {
 
     await waitFor(() => {
       expect(screen.queryByTestId('interruption-crack')).not.toBeInTheDocument();
+    });
+  });
+
+  it('renders one dot per 5-min bucket of completed objectives', async () => {
+    const { getSessionsForDay, getCompletedObjectivesForDay } = await import('../db');
+    vi.mocked(getSessionsForDay)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+    vi.mocked(getCompletedObjectivesForDay).mockResolvedValueOnce([
+      { id: 1, text: 'Objective A', created_at: '2026-03-24T08:00:00.000Z', completed_at: '2026-03-24T10:01:00.000Z' },
+      { id: 2, text: 'Objective B', created_at: '2026-03-24T08:00:00.000Z', completed_at: '2026-03-24T10:03:00.000Z' },
+      { id: 3, text: 'Objective C', created_at: '2026-03-24T08:00:00.000Z', completed_at: '2026-03-24T11:00:00.000Z' },
+    ]);
+
+    await act(async () => {
+      render(<AnalyticsView onBack={onBack} initialDate={new Date('2026-03-24T12:00:00.000Z')} />, { wrapper });
+    });
+
+    await waitFor(() => {
+      // Objectives A and B are in same 5-min bucket (10:00-10:05) → 1 dot
+      // Objective C is in its own bucket → 1 dot
+      expect(screen.getAllByTestId('objective-dot').length).toBe(2);
+    });
+  });
+
+  it('renders no dots when no objectives completed that day', async () => {
+    const { getSessionsForDay, getCompletedObjectivesForDay } = await import('../db');
+    vi.mocked(getSessionsForDay)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+    vi.mocked(getCompletedObjectivesForDay).mockResolvedValueOnce([]);
+
+    await act(async () => {
+      render(<AnalyticsView onBack={onBack} initialDate={new Date('2026-03-24T12:00:00.000Z')} />, { wrapper });
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('objective-dot')).not.toBeInTheDocument();
     });
   });
 });
