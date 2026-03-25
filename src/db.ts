@@ -80,6 +80,13 @@ export async function initDb() {
     // Column already exists, ignore
   }
 
+  // Migration for objective completion tracking
+  try {
+    await database.execute('ALTER TABLE objectives ADD COLUMN completed_at TEXT');
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
   // Check if we have a user, if not insert default
   const users = await database.select<any[]>('SELECT * FROM user_settings LIMIT 1');
   if (users.length === 0) {
@@ -240,7 +247,7 @@ export async function getGlobalStats() {
 export async function getObjectives(): Promise<StrategicObjective[]> {
   const database = await getDb();
   return await database.select<StrategicObjective[]>(
-    'SELECT * FROM objectives ORDER BY sort_order ASC, id ASC'
+    'SELECT * FROM objectives WHERE completed_at IS NULL ORDER BY sort_order ASC, id ASC'
   );
 }
 
@@ -268,4 +275,30 @@ export async function addObjective(text: string): Promise<number> {
 export async function deleteObjective(id: number) {
   const database = await getDb();
   await database.execute('DELETE FROM objectives WHERE id = ?', [id]);
+}
+
+export async function completeObjective(id: number): Promise<void> {
+  const database = await getDb();
+  await database.execute(
+    'UPDATE objectives SET completed_at = ? WHERE id = ?',
+    [new Date().toISOString(), id]
+  );
+}
+
+export async function getCompletedObjectivesForDay(date: string): Promise<StrategicObjective[]> {
+  const database = await getDb();
+  const nextDay = new Date(date);
+  nextDay.setDate(nextDay.getDate() + 1);
+  const nextDayStr = nextDay.toISOString().split('T')[0];
+
+  return await database.select<StrategicObjective[]>(
+    `SELECT id, text, completed_at FROM objectives
+     WHERE completed_at IS NOT NULL
+       AND (
+         date(completed_at) = $1
+         OR (date(completed_at) = $2 AND strftime('%H:%M:%S', completed_at) < '02:00:00')
+       )
+     ORDER BY completed_at ASC`,
+    [date, nextDayStr]
+  );
 }
