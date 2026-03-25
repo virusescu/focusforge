@@ -203,6 +203,7 @@
   border-radius: 4px;
   transition: all 0.2s ease;
   mix-blend-mode: screen;
+  overflow: hidden;
 
   &.highlighted {
     opacity: 1;
@@ -219,6 +220,15 @@
     border-color: #fff;
     box-shadow: 0 0 20px var(--primary);
   }
+}
+
+.crack {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: rgba(0, 0, 0, 0.5);
+  transform: translateX(-50%);
 }
 
 .loading, .noData {

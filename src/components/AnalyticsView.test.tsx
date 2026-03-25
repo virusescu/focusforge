@@ -138,4 +138,44 @@ describe('AnalyticsView', () => {
       expect(mockDeleteFocusSession).toHaveBeenCalledWith(1);
     });
   });
+
+  it('renders crack marks inside session blocks when pause_times exist', async () => {
+    const { getSessionsForDay } = await import('../db');
+    vi.mocked(getSessionsForDay)
+      .mockResolvedValueOnce([
+        {
+          id: 1,
+          start_time: '2026-03-24T09:00:00.000Z',
+          duration_seconds: 3600,
+          date: '2026-03-24',
+          pause_times: ['2026-03-24T09:15:00.000Z', '2026-03-24T09:45:00.000Z'],
+        },
+      ])
+      .mockResolvedValueOnce([]);
+
+    await act(async () => {
+      render(<AnalyticsView onBack={onBack} initialDate={new Date('2026-03-24T12:00:00.000Z')} />, { wrapper });
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId('interruption-crack').length).toBe(2);
+    });
+  });
+
+  it('renders no cracks when session has no pause_times', async () => {
+    const { getSessionsForDay } = await import('../db');
+    vi.mocked(getSessionsForDay)
+      .mockResolvedValueOnce([
+        { id: 1, start_time: '2026-03-24T09:00:00.000Z', duration_seconds: 3600, date: '2026-03-24' },
+      ])
+      .mockResolvedValueOnce([]);
+
+    await act(async () => {
+      render(<AnalyticsView onBack={onBack} initialDate={new Date('2026-03-24T12:00:00.000Z')} />, { wrapper });
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('interruption-crack')).not.toBeInTheDocument();
+    });
+  });
 });

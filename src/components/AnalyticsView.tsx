@@ -251,15 +251,30 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
                   const pos = getPosition(s.start_time, s.duration_seconds);
                   if (!pos) return null;
                   const isHighlighted = hoveredSessionId === s.id;
+                  const sessionStartMs = new Date(s.start_time).getTime();
+                  const sessionDurationMs = s.duration_seconds * 1000;
                   return (
-                    <div 
-                      key={s.id} 
-                      className={`${styles.sessionBlock} ${isHighlighted ? styles.highlighted : ''}`} 
+                    <div
+                      key={s.id}
+                      className={`${styles.sessionBlock} ${isHighlighted ? styles.highlighted : ''}`}
                       style={pos}
                       onMouseEnter={() => handleMouseEnterSession(s.id)}
                       onMouseLeave={() => setHoveredSessionId(null)}
                       title={`${new Date(s.start_time).toLocaleTimeString()} - ${Math.floor(s.duration_seconds / 60)}m`}
-                    />
+                    >
+                      {s.pause_times?.map((pauseTime, i) => {
+                        const fraction = (new Date(pauseTime).getTime() - sessionStartMs) / sessionDurationMs;
+                        if (fraction <= 0 || fraction >= 1) return null;
+                        return (
+                          <div
+                            key={i}
+                            data-testid="interruption-crack"
+                            className={styles.crack}
+                            style={{ left: `${fraction * 100}%` }}
+                          />
+                        );
+                      })}
+                    </div>
                   );
                 })
               )}
