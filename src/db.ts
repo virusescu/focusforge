@@ -156,9 +156,9 @@ export async function getDailyFocusStats(days: number = 21): Promise<DailyStat[]
   const startDateStr = d.toISOString().split('T')[0];
 
   const results = await database.select<{ date: string, totalSeconds: number }[]>(
-    `SELECT date, SUM(duration_seconds) as totalSeconds 
+    `SELECT date(start_time, 'localtime') as date, SUM(duration_seconds) as totalSeconds 
      FROM focus_sessions 
-     WHERE date >= $1 
+     WHERE date(start_time, 'localtime') >= $1 
      GROUP BY date 
      ORDER BY date ASC`,
     [startDateStr]
@@ -172,12 +172,12 @@ export async function getSessionsForDay(date: string): Promise<FocusSession[]> {
 
   const nextDay = new Date(date);
   nextDay.setDate(nextDay.getDate() + 1);
-  const nextDayStr = nextDay.toISOString().split('T')[0];
+  const nextDayStr = `${nextDay.getFullYear()}-${String(nextDay.getMonth() + 1).padStart(2, '0')}-${String(nextDay.getDate()).padStart(2, '0')}`;
 
   const rows = await database.select<FocusSession[]>(
     `SELECT * FROM focus_sessions
-     WHERE (date = $1 AND strftime('%H:%M:%S', start_time) >= '08:00:00')
-        OR (date = $2 AND strftime('%H:%M:%S', start_time) < '02:00:00')
+     WHERE datetime(start_time, 'localtime') >= $1 || ' 08:00:00'
+       AND datetime(start_time, 'localtime') < $2 || ' 02:00:00'
      ORDER BY start_time ASC`,
     [date, nextDayStr]
   );
@@ -217,21 +217,21 @@ export async function getGlobalStats() {
     'SELECT SUM(duration_seconds) as allTimeTotal, MAX(duration_seconds) as allTimePeak FROM focus_sessions'
   );
 
-  // Week stats (last 7 days)
+  // Week stats (last 7 days local)
   const dWeek = new Date();
   dWeek.setDate(dWeek.getDate() - 7);
   const weekStr = dWeek.toISOString().split('T')[0];
   const week = await database.select<{ weekTotal: number }[]>(
-    'SELECT SUM(duration_seconds) as weekTotal FROM focus_sessions WHERE date >= $1',
+    "SELECT SUM(duration_seconds) as weekTotal FROM focus_sessions WHERE date(start_time, 'localtime') >= $1",
     [weekStr]
   );
 
-  // Month stats (last 30 days)
+  // Month stats (last 30 days local)
   const dMonth = new Date();
   dMonth.setDate(dMonth.getDate() - 30);
   const monthStr = dMonth.toISOString().split('T')[0];
   const month = await database.select<{ monthTotal: number }[]>(
-    'SELECT SUM(duration_seconds) as monthTotal FROM focus_sessions WHERE date >= $1',
+    "SELECT SUM(duration_seconds) as monthTotal FROM focus_sessions WHERE date(start_time, 'localtime') >= $1",
     [monthStr]
   );
 
@@ -289,15 +289,13 @@ export async function getCompletedObjectivesForDay(date: string): Promise<Strate
   const database = await getDb();
   const nextDay = new Date(date);
   nextDay.setDate(nextDay.getDate() + 1);
-  const nextDayStr = nextDay.toISOString().split('T')[0];
+  const nextDayStr = `${nextDay.getFullYear()}-${String(nextDay.getMonth() + 1).padStart(2, '0')}-${String(nextDay.getDate()).padStart(2, '0')}`;
 
   return await database.select<StrategicObjective[]>(
     `SELECT id, text, completed_at FROM objectives
      WHERE completed_at IS NOT NULL
-       AND (
-         date(completed_at) = $1
-         OR (date(completed_at) = $2 AND strftime('%H:%M:%S', completed_at) < '02:00:00')
-       )
+       AND datetime(completed_at, 'localtime') >= $1 || ' 08:00:00'
+       AND datetime(completed_at, 'localtime') < $2 || ' 02:00:00'
      ORDER BY completed_at ASC`,
     [date, nextDayStr]
   );

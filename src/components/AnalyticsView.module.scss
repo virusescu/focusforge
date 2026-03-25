@@ -266,8 +266,6 @@
 .dotTooltip {
   position: absolute;
   bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
   background: var(--bg-dark);
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -279,6 +277,21 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+
+  &.alignLeft {
+    left: 0;
+    transform: none;
+  }
+
+  &.alignRight {
+    right: 0;
+    transform: none;
+  }
+
+  &.alignCenter {
+    left: 50%;
+    transform: translateX(-50%);
+  }
 }
 
 .dotTooltipTime {
