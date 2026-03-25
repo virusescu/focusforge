@@ -122,7 +122,7 @@ describe('FocusContext', () => {
     expect(result.current.activeObjectiveId).toBe(42);
   });
 
-  it('neutralizeObjective triggers glitching and deletes objective', async () => {
+  it('neutralizeObjective triggers glitching and completes objective', async () => {
     const { result } = renderHook(() => useFocus(), { wrapper });
     await waitFor(() => expect(result.current.loading).toBe(false));
 
