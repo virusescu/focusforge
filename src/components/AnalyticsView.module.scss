@@ -319,13 +319,22 @@
 
     .sessionMain {
       display: flex;
-      justify-content: space-between;
+      justify-content: flex-start;
+      align-items: center;
+      gap: 0.75rem;
       flex: 1;
       padding-right: 1rem;
     }
 
     .duration {
       color: var(--primary);
+    }
+
+    .interruptCount {
+      color: var(--text-muted);
+      font-size: 0.7rem;
+      letter-spacing: 0.05em;
+      margin-left: auto;
     }
 
     .deleteBtn {

@@ -297,6 +297,9 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
                 <div className={styles.sessionMain}>
                   <span className={styles.time}>{new Date(s.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                   <span className={styles.duration}>{Math.floor(s.duration_seconds / 60)}m FORGE</span>
+                  {(s.pause_times?.length ?? 0) > 0 && (
+                    <span className={styles.interruptCount}>{s.pause_times!.length} INT</span>
+                  )}
                 </div>
                 <button 
                   className={styles.deleteBtn} 
