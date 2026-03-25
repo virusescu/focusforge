@@ -95,16 +95,17 @@ describe('db utility functions', () => {
     it('getObjectives should call select with correct query', async () => {
       await getObjectives();
       expect(mockSelect).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT * FROM objectives ORDER BY created_at ASC')
+        expect.stringContaining('SELECT * FROM objectives ORDER BY sort_order ASC')
       );
     });
 
     it('addObjective should call execute with insert query and text', async () => {
+      mockSelect.mockResolvedValueOnce([{ n: 0 }]);
       mockExecute.mockResolvedValueOnce({ lastInsertId: 123 });
       const id = await addObjective('Test Objective');
       expect(mockExecute).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT INTO objectives (text) VALUES (?)'),
-        ['Test Objective']
+        expect.stringContaining('INSERT INTO objectives (text, sort_order) VALUES (?, ?)'),
+        ['Test Objective', 0]
       );
       expect(id).toBe(123);
     });

@@ -16,6 +16,7 @@ vi.mock('../utils/audio', () => ({
     playObjectiveAdded: vi.fn(),
   },
   playNeutralizeChime: vi.fn(),
+  playObjectiveComplete: vi.fn(),
 }));
 
 // Mock DB
@@ -129,8 +130,8 @@ describe('FocusContext', () => {
     expect(result.current.isGlitching).toBe(true);
     expect(mockDeleteObjective).toHaveBeenCalledWith(1);
     
-    // Wait for glitching to end (500ms + some buffer)
-    await waitFor(() => expect(result.current.isGlitching).toBe(false), { timeout: 1000 });
+    // Wait for glitching to end (2800ms + some buffer)
+    await waitFor(() => expect(result.current.isGlitching).toBe(false), { timeout: 4000 });
   });
 
   it('listens for timer-saved event and triggers save', async () => {
