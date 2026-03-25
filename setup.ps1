@@ -53,7 +53,7 @@ try {
     $v = cargo --version 2>&1
     Check-OK "" $v
 } catch {
-    Check-Missing "Rust is not installed." "Download: https://rustup.rs/ — run rustup-init.exe then restart terminal"
+    Check-Missing "Rust is not installed." "Download: https://rustup.rs/ - run rustup-init.exe then restart terminal"
     $missing++
 }
 
@@ -110,7 +110,8 @@ if ($missing -eq 0) {
     Write-Host "    2. .\run_debug.bat       (start dev server)" -ForegroundColor DarkGray
     Write-Host "    3. .\deploy_release.bat  (build installer)" -ForegroundColor DarkGray
 } else {
-    Write-Host "  $missing dependenc$(if($missing -eq 1){'y is'}else{'ies are'}) MISSING (see above)." -ForegroundColor Red
+    $suffix = if ($missing -eq 1) { "y is" } else { "ies are" }
+    Write-Host "  $missing dependenc$suffix MISSING (see above)." -ForegroundColor Red
     Write-Host "  Install them, restart your terminal, and run setup again." -ForegroundColor Yellow
 }
 Write-Host "============================================" -ForegroundColor Cyan
