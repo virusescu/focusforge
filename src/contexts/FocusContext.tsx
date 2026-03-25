@@ -25,7 +25,7 @@ interface FocusContextType {
   activeObjectiveId: number | null;
   isGlitching: boolean;
   completedObjectiveText: string | null;
-  saveSession: (durationSeconds: number) => Promise<void>;
+  saveSession: (startTime: string, durationSeconds: number, pauseTimes?: string[]) => Promise<void>;
   refreshData: () => Promise<void>;
   addObjective: (text: string) => Promise<void>;
   deleteObjective: (id: number) => Promise<void>;
@@ -70,11 +70,9 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
     refreshData();
   }, [refreshData]);
 
-  const saveSession = useCallback(async (durationSeconds: number) => {
-    if (durationSeconds < 60) return; // Don't save sessions under 1 minute
-
-    const startTime = new Date().toISOString();
-    await dbSaveFocusSession(startTime, durationSeconds);
+  const saveSession = useCallback(async (startTime: string, durationSeconds: number, pauseTimes: string[] = []) => {
+    if (durationSeconds < 60) return;
+    await dbSaveFocusSession(startTime, durationSeconds, pauseTimes);
     await refreshData();
   }, [refreshData]);
 
@@ -122,9 +120,13 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const handleTimerSaved = (e: Event) => {
-      const customEvent = e as CustomEvent<{ durationSeconds: number }>;
+      const customEvent = e as CustomEvent<{ durationSeconds: number; startTime: string; pauseTimes?: string[] }>;
       if (customEvent.detail && customEvent.detail.durationSeconds) {
-        saveSession(customEvent.detail.durationSeconds);
+        saveSession(
+          customEvent.detail.startTime,
+          customEvent.detail.durationSeconds,
+          customEvent.detail.pauseTimes || []
+        );
       }
     };
 

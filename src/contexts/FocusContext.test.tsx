@@ -34,7 +34,7 @@ vi.mock('../db', () => ({
     weekTotal: 0,
     monthTotal: 0
   }),
-  saveFocusSession: (start: string, dur: number) => mockSaveSession(start, dur),
+  saveFocusSession: (start: string, dur: number, pauses: string[]) => mockSaveSession(start, dur, pauses),
   getObjectives: () => mockGetObjectives(),
   addObjective: (text: string) => mockAddObjective(text),
   deleteObjective: (id: number) => mockDeleteObjective(id)
@@ -139,15 +139,39 @@ describe('FocusContext', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     act(() => {
-      window.dispatchEvent(new CustomEvent('timer-saved', { 
-        detail: { durationSeconds: 120 } 
+      window.dispatchEvent(new CustomEvent('timer-saved', {
+        detail: { durationSeconds: 120, startTime: '2024-03-24T09:00:00.000Z', pauseTimes: [] },
       }));
     });
 
     await waitFor(() => {
       expect(mockSaveSession).toHaveBeenCalledWith(
-        expect.any(String),
-        120
+        '2024-03-24T09:00:00.000Z',
+        120,
+        []
+      );
+    });
+  });
+
+  it('forwards startTime and pauseTimes from timer-saved event to saveFocusSession', async () => {
+    const { result } = renderHook(() => useFocus(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent('timer-saved', {
+        detail: {
+          durationSeconds: 120,
+          startTime: '2024-03-24T09:00:00.000Z',
+          pauseTimes: ['2024-03-24T09:05:00.000Z', '2024-03-24T09:12:00.000Z'],
+        },
+      }));
+    });
+
+    await waitFor(() => {
+      expect(mockSaveSession).toHaveBeenCalledWith(
+        '2024-03-24T09:00:00.000Z',
+        120,
+        ['2024-03-24T09:05:00.000Z', '2024-03-24T09:12:00.000Z']
       );
     });
   });
