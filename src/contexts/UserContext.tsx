@@ -6,7 +6,7 @@ interface UserContextType {
   user: UserSettings | null;
   avatar: string;
   loading: boolean;
-  updateSettings: (name: string, email: string, debugSpeed: number, experienceLvl: number) => Promise<void>;
+  updateSettings: (name: string, email: string, debugSpeed: number, experienceLvl: number, dayStartHour: number, dayEndHour: number) => Promise<void>;
   refreshUser: () => Promise<void>;
 }
 
@@ -31,8 +31,8 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     refreshUser();
   }, [refreshUser]);
 
-  const updateSettings = async (name: string, email: string, debugSpeed: number, experienceLvl: number) => {
-    await dbUpdateUserSettings(name, email, debugSpeed, experienceLvl);
+  const updateSettings = async (name: string, email: string, debugSpeed: number, experienceLvl: number, dayStartHour: number, dayEndHour: number) => {
+    await dbUpdateUserSettings(name, email, debugSpeed, experienceLvl, dayStartHour, dayEndHour);
     await refreshUser();
   };
 

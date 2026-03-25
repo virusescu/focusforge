@@ -7,6 +7,8 @@ export interface UserSettings {
   avatar_url?: string;
   debug_speed: number;
   experience_lvl: number;
+  day_start_hour: number;
+  day_end_hour: number;
 }
 
 export interface LogEntry {

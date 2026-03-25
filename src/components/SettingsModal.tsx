@@ -15,6 +15,8 @@ export const SettingsModal: FC<Props> = ({ onClose }) => {
   const [email, setEmail] = useState('');
   const [debugSpeed, setDebugSpeed] = useState(1);
   const [experienceLvl, setExperienceLvl] = useState(42);
+  const [dayStartHour, setDayStartHour] = useState(8);
+  const [dayEndHour, setDayEndHour] = useState(2);
 
   const isDev = import.meta.env.DEV;
 
@@ -24,14 +26,16 @@ export const SettingsModal: FC<Props> = ({ onClose }) => {
       setEmail(user.email);
       setDebugSpeed(user.debug_speed || 1);
       setExperienceLvl(user.experience_lvl || 42);
+      setDayStartHour(user.day_start_hour ?? 8);
+      setDayEndHour(user.day_end_hour ?? 2);
     }
   }, [user]);
 
   const handleSave = useCallback(async () => {
     soundEngine.playClick();
-    await updateSettings(name, email, debugSpeed, experienceLvl);
+    await updateSettings(name, email, debugSpeed, experienceLvl, dayStartHour, dayEndHour);
     onClose();
-  }, [name, email, debugSpeed, experienceLvl, updateSettings, onClose]);
+  }, [name, email, debugSpeed, experienceLvl, dayStartHour, dayEndHour, updateSettings, onClose]);
 
   const handleCancel = useCallback(() => {
     soundEngine.playClick();
@@ -96,6 +100,29 @@ export const SettingsModal: FC<Props> = ({ onClose }) => {
               placeholder="Enter level..."
               min="1"
             />
+          </div>
+
+          <div className={styles.row}>
+            <div className={styles.field}>
+              <label>DAY_START_HOUR (0-23)</label>
+              <input 
+                type="number" 
+                value={dayStartHour} 
+                onChange={e => setDayStartHour(Number(e.target.value))} 
+                min="0"
+                max="23"
+              />
+            </div>
+            <div className={styles.field}>
+              <label>DAY_END_HOUR (0-23)</label>
+              <input 
+                type="number" 
+                value={dayEndHour} 
+                onChange={e => setDayEndHour(Number(e.target.value))} 
+                min="0"
+                max="23"
+              />
+            </div>
           </div>
 
           {isDev && (

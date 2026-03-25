@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { AnalyticsView } from './AnalyticsView';
 import { FocusProvider } from '../contexts/FocusContext';
+import { UserProvider } from '../contexts/UserContext';
 import type { ReactNode } from 'react';
 
 // Mock DB
@@ -28,10 +29,11 @@ vi.mock('../db', () => ({
   deleteObjective: vi.fn().mockResolvedValue(undefined),
   completeObjective: vi.fn().mockResolvedValue(undefined),
   getCompletedObjectivesForDay: vi.fn().mockResolvedValue([]),
+  getUserSettings: vi.fn().mockResolvedValue({ day_start_hour: 8, day_end_hour: 2 }),
+  getGravatarUrl: vi.fn().mockResolvedValue('avatar-url'),
 }));
 
 // Mock AudioContext which doesn't exist in JSDOM
-// Using an object instead of a constructor since vitest has issues with constructor mocks in some environments
 const mockAudioContext = vi.fn().mockImplementation(function(this: any) {
   this.resume = vi.fn().mockResolvedValue(undefined);
   this.createOscillator = vi.fn().mockReturnValue({
@@ -53,7 +55,9 @@ const mockAudioContext = vi.fn().mockImplementation(function(this: any) {
 vi.stubGlobal('AudioContext', mockAudioContext);
 
 const wrapper = ({ children }: { children: ReactNode }) => (
-  <FocusProvider>{children}</FocusProvider>
+  <UserProvider>
+    <FocusProvider>{children}</FocusProvider>
+  </UserProvider>
 );
 
 describe('AnalyticsView', () => {
@@ -71,10 +75,8 @@ describe('AnalyticsView', () => {
     expect(screen.getByText('SYSTEM_ANALYTICS')).toBeInTheDocument();
     
     await waitFor(() => {
-      // Find the labels to confirm structure is there
       expect(screen.getByText('TOTAL_TIME:')).toBeInTheDocument();
       expect(screen.getByText('SESSIONS:')).toBeInTheDocument();
-      // Check for the value 2 (sessions count)
       expect(screen.getByText('2')).toBeInTheDocument();
     });
   });
@@ -84,7 +86,6 @@ describe('AnalyticsView', () => {
       render(<AnalyticsView onBack={onBack} />, { wrapper });
     });
     
-    // Find nav buttons (ChevronLeft is first, ChevronRight is second)
     const navButtons = screen.getAllByRole('button');
     const prevBtn = navButtons[1];
     const nextBtn = navButtons[2];
@@ -187,9 +188,9 @@ describe('AnalyticsView', () => {
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([]);
     vi.mocked(getCompletedObjectivesForDay).mockResolvedValueOnce([
-      { id: 1, text: 'Objective A', created_at: '2026-03-24T08:00:00.000Z', completed_at: '2026-03-24T12:01:00.000Z' },
-      { id: 2, text: 'Objective B', created_at: '2026-03-24T08:00:00.000Z', completed_at: '2026-03-24T12:03:00.000Z' },
-      { id: 3, text: 'Objective C', created_at: '2026-03-24T08:00:00.000Z', completed_at: '2026-03-24T13:00:00.000Z' },
+      { id: 1, text: 'Objective A', created_at: '2026-03-24T08:00:00.000Z', completed_at: '2026-03-24T12:01:00.000Z', sort_order: 0 },
+      { id: 2, text: 'Objective B', created_at: '2026-03-24T08:00:00.000Z', completed_at: '2026-03-24T12:03:00.000Z', sort_order: 1 },
+      { id: 3, text: 'Objective C', created_at: '2026-03-24T08:00:00.000Z', completed_at: '2026-03-24T13:00:00.000Z', sort_order: 2 },
     ]);
 
     await act(async () => {
@@ -197,8 +198,6 @@ describe('AnalyticsView', () => {
     });
 
     await waitFor(() => {
-      // Objectives A and B are in same 5-min bucket (12:00-12:05) → 1 dot
-      // Objective C is in its own bucket → 1 dot
       expect(screen.getAllByTestId('objective-dot').length).toBe(2);
     });
   });

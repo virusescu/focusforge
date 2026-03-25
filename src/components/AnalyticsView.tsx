@@ -3,6 +3,7 @@ import styles from './AnalyticsView.module.scss';
 import { ChevronLeft, ChevronRight, ArrowLeft, BarChart2, X, HelpCircle } from 'lucide-react';
 import { getSessionsForDay, deleteFocusSession, getCompletedObjectivesForDay } from '../db';
 import { useFocus } from '../contexts/FocusContext';
+import { useUser } from '../contexts/UserContext';
 import type { FocusSession, StrategicObjective } from '../types';
 import { soundEngine } from '../utils/audio';
 
@@ -20,6 +21,7 @@ interface ObjectiveDot {
 
 export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
   const { globalStats, refreshData } = useFocus();
+  const { user } = useUser();
   const [currentDate, setCurrentDate] = useState(initialDate || new Date());
   const [sessions, setSessions] = useState<FocusSession[]>([]);
   const [completedObjectives, setCompletedObjectives] = useState<StrategicObjective[]>([]);
@@ -27,6 +29,14 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
   const [hoveredSessionId, setHoveredSessionId] = useState<number | null>(null);
   const [hoveredDotKey, setHoveredDotKey] = useState<string | null>(null);
   const [showHelp, setShowHelp] = useState(false);
+
+  const startHourSetting = user?.day_start_hour ?? 8;
+  const endHourSetting = user?.day_end_hour ?? 2;
+
+  // Configuration for dynamic time scale
+  const START_HOUR = startHourSetting;
+  const END_HOUR = endHourSetting <= startHourSetting ? endHourSetting + 24 : endHourSetting;
+  const TOTAL_HOURS = END_HOUR - START_HOUR;
 
   const handleBack = useCallback(() => {
     soundEngine.playClick();
@@ -43,8 +53,8 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
     
     try {
       const [data, completed] = await Promise.all([
-        getSessionsForDay(dateStr),
-        getCompletedObjectivesForDay(dateStr),
+        getSessionsForDay(dateStr, startHourSetting, endHourSetting),
+        getCompletedObjectivesForDay(dateStr, startHourSetting, endHourSetting),
       ]);
       setSessions(data);
       setCompletedObjectives(completed);
@@ -53,7 +63,7 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
     } finally {
       setLoading(false);
     }
-  }, [currentDate]);
+  }, [currentDate, startHourSetting, endHourSetting]);
 
   useEffect(() => {
     loadSessions();
@@ -148,10 +158,6 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
     return `${m}m`;
   };
 
-  const START_HOUR = 8;
-  const END_HOUR = 26;
-  const TOTAL_HOURS = END_HOUR - START_HOUR;
-
   const getPosition = (isoString: string, durationSeconds: number) => {
     const sessionDate = new Date(isoString);
     const viewDate = new Date(currentDate);
@@ -164,13 +170,17 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
     else if (diffDays === -1) localHours -= 24;
     else if (diffDays !== 0) return null;
 
-    const startOffset = Math.max(localHours - START_HOUR, 0);
-    const endOffset = Math.min(localHours + durationSeconds / 3600 - START_HOUR, TOTAL_HOURS);
-    if (startOffset >= TOTAL_HOURS || endOffset <= 0) return null;
+    const startOffset = localHours - START_HOUR;
+    const durationOffset = durationSeconds / 3600;
+    
+    const visibleStart = Math.max(startOffset, 0);
+    const visibleEnd = Math.min(startOffset + durationOffset, TOTAL_HOURS);
+    
+    if (visibleStart >= TOTAL_HOURS || visibleEnd <= 0) return null;
 
     return {
-      left: `${(startOffset / TOTAL_HOURS) * 100}%`,
-      width: `${((endOffset - startOffset) / TOTAL_HOURS) * 100}%`
+      left: `${(visibleStart / TOTAL_HOURS) * 100}%`,
+      width: `${((visibleEnd - visibleStart) / TOTAL_HOURS) * 100}%`
     };
   };
 
@@ -188,7 +198,6 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
       let localHours = d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600;
       if (diffDays === 1) localHours += 24;
       else if (diffDays === -1) localHours -= 24;
-      else if (diffDays !== 0) continue;
 
       const clamped = localHours < START_HOUR || localHours >= END_HOUR;
       const clampedLeft = localHours < START_HOUR;
@@ -210,7 +219,7 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
       leftPercent: items[0].leftPercent,
       clamped: items[0].clamped,
     }));
-  }, [completedObjectives, currentDate]);
+  }, [completedObjectives, currentDate, START_HOUR, END_HOUR, TOTAL_HOURS]);
 
   const hoursArray = Array.from({ length: TOTAL_HOURS + 1 }, (_, i) => START_HOUR + i);
 
@@ -338,14 +347,13 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
                           styles.alignCenter
                         }`}>
                           {dot.objectives.map(obj => (
-                            <div key={obj.id}>
-                              <div className={styles.dotTooltipTime}>
-                                {new Date(obj.completed_at!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </div>
-                              <div className={styles.dotTooltipItem}>{obj.text}</div>
+                            <div key={obj.id} className={styles.dotTooltipRow}>
+                              <span className={styles.dotTooltipTime}>
+                                [{new Date(obj.completed_at!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}]
+                              </span>
+                              <span className={styles.dotTooltipItem}>{obj.text}</span>
                             </div>
-                          ))}
-                        </div>
+                          ))}                        </div>
                       )}
                     </div>
                   ))}

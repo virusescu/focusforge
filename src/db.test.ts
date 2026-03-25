@@ -67,7 +67,7 @@ describe('db utility functions', () => {
       
       // 21 days including today (March 24) means starting from March 4
       expect(mockSelect).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE date >= $1'),
+        expect.stringContaining("WHERE date(start_time, 'localtime') >= $1"),
         ['2024-03-04']
       );
       
@@ -79,8 +79,8 @@ describe('db utility functions', () => {
       mockSelect.mockResolvedValueOnce([]); // empty sessions → early return, no pauses query
       await getSessionsForDay(testDate);
       expect(mockSelect).toHaveBeenCalledWith(
-        expect.stringContaining('date = $1'),
-        [testDate, '2024-03-25']
+        expect.stringContaining("datetime(start_time, 'localtime') >= $1"),
+        [testDate, '2024-03-25', '08:00:00', '02:00:00']
       );
     });
 
@@ -185,7 +185,7 @@ describe('db utility functions', () => {
       await getCompletedObjectivesForDay('2026-03-24');
       expect(mockSelect).toHaveBeenCalledWith(
         expect.stringContaining('completed_at IS NOT NULL'),
-        ['2026-03-24', '2026-03-25']
+        ['2026-03-24', '2026-03-25', '08:00:00', '02:00:00']
       );
     });
 

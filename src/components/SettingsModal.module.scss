@@ -51,6 +51,15 @@
   gap: 1.25rem;
 }
 
+.row {
+  display: flex;
+  gap: 1rem;
+  
+  .field {
+    flex: 1;
+  }
+}
+
 .field {
   display: flex;
   flex-direction: column;

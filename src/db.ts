@@ -87,21 +87,33 @@ export async function initDb() {
     // Column already exists, ignore
   }
 
+  // Migration for day_start_hour and day_end_hour
+  try {
+    await database.execute('ALTER TABLE user_settings ADD COLUMN day_start_hour INTEGER DEFAULT 8');
+  } catch (e) {
+    // Column already exists, ignore
+  }
+  try {
+    await database.execute('ALTER TABLE user_settings ADD COLUMN day_end_hour INTEGER DEFAULT 2');
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
   // Check if we have a user, if not insert default
   const users = await database.select<any[]>('SELECT * FROM user_settings LIMIT 1');
   if (users.length === 0) {
     await database.execute(
-      'INSERT INTO user_settings (name, email, debug_speed, experience_lvl) VALUES (?, ?, ?, ?)',
-      ['NEURAL_OP_42', 'operator@focusforge.sync', 1.0, 42]
+      'INSERT INTO user_settings (name, email, debug_speed, experience_lvl, day_start_hour, day_end_hour) VALUES (?, ?, ?, ?, ?, ?)',
+      ['NEURAL_OP_42', 'operator@focusforge.sync', 1.0, 42, 8, 2]
     );
   }
 }
 
-export async function updateUserSettings(name: string, email: string, debugSpeed: number, experienceLvl: number) {
+export async function updateUserSettings(name: string, email: string, debugSpeed: number, experienceLvl: number, dayStartHour: number, dayEndHour: number) {
   const database = await getDb();
   await database.execute(
-    'UPDATE user_settings SET name = ?, email = ?, debug_speed = ?, experience_lvl = ? WHERE id = 1',
-    [name, email, debugSpeed, experienceLvl]
+    'UPDATE user_settings SET name = ?, email = ?, debug_speed = ?, experience_lvl = ?, day_start_hour = ?, day_end_hour = ? WHERE id = 1',
+    [name, email, debugSpeed, experienceLvl, dayStartHour, dayEndHour]
   );
 }
 
@@ -167,19 +179,23 @@ export async function getDailyFocusStats(days: number = 21): Promise<DailyStat[]
   return results;
 }
 
-export async function getSessionsForDay(date: string): Promise<FocusSession[]> {
+export async function getSessionsForDay(date: string, startHour: number = 8, endHour: number = 2): Promise<FocusSession[]> {
   const database = await getDb();
 
   const nextDay = new Date(date);
   nextDay.setDate(nextDay.getDate() + 1);
   const nextDayStr = `${nextDay.getFullYear()}-${String(nextDay.getMonth() + 1).padStart(2, '0')}-${String(nextDay.getDate()).padStart(2, '0')}`;
 
+  const startHourStr = String(startHour).padStart(2, '0') + ':00:00';
+  const endHourStr = String(endHour).padStart(2, '0') + ':00:00';
+
+  // Query using local time window
   const rows = await database.select<FocusSession[]>(
     `SELECT * FROM focus_sessions
-     WHERE datetime(start_time, 'localtime') >= $1 || ' 08:00:00'
-       AND datetime(start_time, 'localtime') < $2 || ' 02:00:00'
+     WHERE datetime(start_time, 'localtime') >= $1 || ' ' || $3
+       AND datetime(start_time, 'localtime') < $2 || ' ' || $4
      ORDER BY start_time ASC`,
-    [date, nextDayStr]
+    [date, nextDayStr, startHourStr, endHourStr]
   );
 
   if (rows.length === 0) return [];
@@ -285,18 +301,21 @@ export async function completeObjective(id: number): Promise<void> {
   );
 }
 
-export async function getCompletedObjectivesForDay(date: string): Promise<StrategicObjective[]> {
+export async function getCompletedObjectivesForDay(date: string, startHour: number = 8, endHour: number = 2): Promise<StrategicObjective[]> {
   const database = await getDb();
   const nextDay = new Date(date);
   nextDay.setDate(nextDay.getDate() + 1);
   const nextDayStr = `${nextDay.getFullYear()}-${String(nextDay.getMonth() + 1).padStart(2, '0')}-${String(nextDay.getDate()).padStart(2, '0')}`;
 
+  const startHourStr = String(startHour).padStart(2, '0') + ':00:00';
+  const endHourStr = String(endHour).padStart(2, '0') + ':00:00';
+
   return await database.select<StrategicObjective[]>(
     `SELECT id, text, completed_at FROM objectives
      WHERE completed_at IS NOT NULL
-       AND datetime(completed_at, 'localtime') >= $1 || ' 08:00:00'
-       AND datetime(completed_at, 'localtime') < $2 || ' 02:00:00'
+       AND datetime(completed_at, 'localtime') >= $1 || ' ' || $3
+       AND datetime(completed_at, 'localtime') < $2 || ' ' || $4
      ORDER BY completed_at ASC`,
-    [date, nextDayStr]
+    [date, nextDayStr, startHourStr, endHourStr]
   );
 }
