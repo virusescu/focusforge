@@ -28,7 +28,17 @@
   - **Visual Impact**: Show these breaks and interruptions as distinct vertical lines or "cracks" in the Day View timeline. 
   - **Data Utility**: Tracking the *frequency* and *reason* for breaks helps identify peak focus windows vs high-distraction periods.
 
-## 3. High-Fidelity Data Visualization
+## 3. Project Forge Rewards (Variable Micro-Rewards)
+*Goal: Provide unpredictable, positive reinforcement for sustained focus.*
+
+- **The Loot System**: Every completed forge session has a chance to "extract" a reward (e.g., a new schematic, a UI color accent, or a tactical soundbite).
+- **Duration Scaling**: The probability and "rarity" of rewards increase based on the uninterrupted session length. 
+  - *Short Burst (15m):* Low chance of common drop.
+  - *Deep Forge (45m+):* Guaranteed high-quality drop.
+- **Collection Log**: A new HUD tab where the operator can view their "Extracted Schematics."
+- **Focus**: Purely positive reinforcement. No penalties for stopping, only escalating rewards for continuing.
+
+## 4. High-Fidelity Data Visualization
 *Goal: Use new diagnostic data to create a more detailed performance report.*
 
 - **Neural Stability Graph**: Use interrupt frequency and recovery efficiency to generate a "Stability Score" over time.
