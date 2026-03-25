@@ -79,8 +79,8 @@ describe('db utility functions', () => {
       mockSelect.mockResolvedValueOnce([]); // empty sessions → early return, no pauses query
       await getSessionsForDay(testDate);
       expect(mockSelect).toHaveBeenCalledWith(
-        expect.stringContaining("datetime(start_time, 'localtime') >= $1"),
-        [testDate, '2024-03-25', '08:00:00', '02:00:00']
+        expect.stringContaining("datetime(start_time, 'localtime') >= $1 || ' 00:00:00'"),
+        [testDate, '2024-03-25', '02:00:00']
       );
     });
 
@@ -184,8 +184,8 @@ describe('db utility functions', () => {
       mockSelect.mockResolvedValueOnce([]);
       await getCompletedObjectivesForDay('2026-03-24');
       expect(mockSelect).toHaveBeenCalledWith(
-        expect.stringContaining('completed_at IS NOT NULL'),
-        ['2026-03-24', '2026-03-25', '08:00:00', '02:00:00']
+        expect.stringContaining("datetime(completed_at, 'localtime') >= $1 || ' 00:00:00'"),
+        ['2026-03-24', '2026-03-25', '02:00:00']
       );
     });
 

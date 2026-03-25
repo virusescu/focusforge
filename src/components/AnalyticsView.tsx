@@ -1,4 +1,4 @@
-import { type FC, useState, useEffect, useCallback, useMemo } from 'react';
+import { type FC, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import styles from './AnalyticsView.module.scss';
 import { ChevronLeft, ChevronRight, ArrowLeft, BarChart2, X, HelpCircle } from 'lucide-react';
 import { getSessionsForDay, deleteFocusSession, getCompletedObjectivesForDay } from '../db';
@@ -29,6 +29,7 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
   const [hoveredSessionId, setHoveredSessionId] = useState<number | null>(null);
   const [hoveredDotKey, setHoveredDotKey] = useState<string | null>(null);
   const [showHelp, setShowHelp] = useState(false);
+  const sessionRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
   const startHourSetting = user?.day_start_hour ?? 8;
   const endHourSetting = user?.day_end_hour ?? 2;
@@ -37,6 +38,16 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
   const START_HOUR = startHourSetting;
   const END_HOUR = endHourSetting <= startHourSetting ? endHourSetting + 24 : endHourSetting;
   const TOTAL_HOURS = END_HOUR - START_HOUR;
+
+  // Auto-scroll to highlighted session
+  useEffect(() => {
+    if (hoveredSessionId !== null) {
+      const el = sessionRefs.current.get(hoveredSessionId);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+  }, [hoveredSessionId]);
 
   const handleBack = useCallback(() => {
     soundEngine.playClick();
@@ -349,7 +360,7 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
                           {dot.objectives.map(obj => (
                             <div key={obj.id} className={styles.dotTooltipRow}>
                               <span className={styles.dotTooltipTime}>
-                                [{new Date(obj.completed_at!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}]
+                                {new Date(obj.completed_at!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
                               </span>
                               <span className={styles.dotTooltipItem}>{obj.text}</span>
                             </div>
@@ -368,33 +379,52 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
         <div className="card">
           <h4>FORGE_INTENSITY_LOG</h4>
           <div className={styles.sessionList}>
-            {sessions.map(s => (
-              <div
-                key={s.id}
-                className={`${styles.sessionItem} ${hoveredSessionId === s.id ? styles.itemHovered : ''}`}
-                onMouseEnter={() => handleMouseEnterSession(s.id)}
-                onMouseLeave={() => setHoveredSessionId(null)}
-              >
-                <div className={styles.sessionMain}>
-                  <span className={styles.time}>{new Date(s.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                  <span className={styles.duration}>{Math.floor(s.duration_seconds / 60)}m FORGE</span>
-                  {(s.pause_times?.length ?? 0) > 0 && (
-                    <span className={styles.interruptCount}>{s.pause_times!.length} INT</span>
-                  )}
-                </div>
-                <button
-                  className={styles.deleteBtn}
-                  onMouseEnter={handleHover}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDelete(s.id);
+            {sessions.map(s => {
+              const sessionDate = new Date(s.start_time);
+              const viewDate = new Date(currentDate);
+              const sessionLocalDate = new Date(sessionDate.getFullYear(), sessionDate.getMonth(), sessionDate.getDate());
+              const viewLocalDate = new Date(viewDate.getFullYear(), viewDate.getMonth(), viewDate.getDate());
+              const diffDays = Math.round((sessionLocalDate.getTime() - viewLocalDate.getTime()) / (1000 * 60 * 60 * 24));
+
+              let localStart = sessionDate.getHours() + sessionDate.getMinutes() / 60 + sessionDate.getSeconds() / 3600;
+              if (diffDays === 1) localStart += 24;
+              else if (diffDays === -1) localStart -= 24;
+              
+              const localEnd = localStart + (s.duration_seconds / 3600);
+              const isOffTimeline = localEnd <= START_HOUR || localStart >= END_HOUR;
+
+              return (
+                <div
+                  key={s.id}
+                  ref={el => {
+                    if (el) sessionRefs.current.set(s.id, el);
+                    else sessionRefs.current.delete(s.id);
                   }}
-                  title="DELETE_RECORD"
+                  className={`${styles.sessionItem} ${hoveredSessionId === s.id ? styles.itemHovered : ''} ${isOffTimeline ? styles.offTimeline : ''}`}
+                  onMouseEnter={() => handleMouseEnterSession(s.id)}
+                  onMouseLeave={() => setHoveredSessionId(null)}
                 >
-                  <X size={14} />
-                </button>
-              </div>
-            ))}
+                  <div className={styles.sessionMain}>
+                    <span className={styles.time}>{new Date(s.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    <span className={styles.duration}>{Math.floor(s.duration_seconds / 60)}m FORGE</span>
+                    {(s.pause_times?.length ?? 0) > 0 && (
+                      <span className={styles.interruptCount}>{s.pause_times!.length} INT</span>
+                    )}
+                  </div>
+                  <button
+                    className={styles.deleteBtn}
+                    onMouseEnter={handleHover}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(s.id);
+                    }}
+                    title="DELETE_RECORD"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              );
+            })}
             {sessions.length === 0 && <p className={styles.muted}>WAITING_FOR_DATA...</p>}
           </div>
         </div>

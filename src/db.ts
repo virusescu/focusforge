@@ -179,23 +179,23 @@ export async function getDailyFocusStats(days: number = 21): Promise<DailyStat[]
   return results;
 }
 
-export async function getSessionsForDay(date: string, startHour: number = 8, endHour: number = 2): Promise<FocusSession[]> {
+export async function getSessionsForDay(date: string, _startHour: number = 8, endHour: number = 2): Promise<FocusSession[]> {
   const database = await getDb();
 
   const nextDay = new Date(date);
   nextDay.setDate(nextDay.getDate() + 1);
   const nextDayStr = `${nextDay.getFullYear()}-${String(nextDay.getMonth() + 1).padStart(2, '0')}-${String(nextDay.getDate()).padStart(2, '0')}`;
 
-  const startHourStr = String(startHour).padStart(2, '0') + ':00:00';
   const endHourStr = String(endHour).padStart(2, '0') + ':00:00';
 
-  // Query using local time window
+  // Fetch from 00:00 of current day until the custom end hour of the next day
+  // This ensures we get sessions that started before the 'startHour' but on the same calendar day
   const rows = await database.select<FocusSession[]>(
     `SELECT * FROM focus_sessions
-     WHERE datetime(start_time, 'localtime') >= $1 || ' ' || $3
-       AND datetime(start_time, 'localtime') < $2 || ' ' || $4
+     WHERE datetime(start_time, 'localtime') >= $1 || ' 00:00:00'
+       AND datetime(start_time, 'localtime') < $2 || ' ' || $3
      ORDER BY start_time ASC`,
-    [date, nextDayStr, startHourStr, endHourStr]
+    [date, nextDayStr, endHourStr]
   );
 
   if (rows.length === 0) return [];
@@ -301,21 +301,20 @@ export async function completeObjective(id: number): Promise<void> {
   );
 }
 
-export async function getCompletedObjectivesForDay(date: string, startHour: number = 8, endHour: number = 2): Promise<StrategicObjective[]> {
+export async function getCompletedObjectivesForDay(date: string, _startHour: number = 8, endHour: number = 2): Promise<StrategicObjective[]> {
   const database = await getDb();
   const nextDay = new Date(date);
   nextDay.setDate(nextDay.getDate() + 1);
   const nextDayStr = `${nextDay.getFullYear()}-${String(nextDay.getMonth() + 1).padStart(2, '0')}-${String(nextDay.getDate()).padStart(2, '0')}`;
 
-  const startHourStr = String(startHour).padStart(2, '0') + ':00:00';
   const endHourStr = String(endHour).padStart(2, '0') + ':00:00';
 
   return await database.select<StrategicObjective[]>(
     `SELECT id, text, completed_at FROM objectives
      WHERE completed_at IS NOT NULL
-       AND datetime(completed_at, 'localtime') >= $1 || ' ' || $3
-       AND datetime(completed_at, 'localtime') < $2 || ' ' || $4
+       AND datetime(completed_at, 'localtime') >= $1 || ' 00:00:00'
+       AND datetime(completed_at, 'localtime') < $2 || ' ' || $3
      ORDER BY completed_at ASC`,
-    [date, nextDayStr, startHourStr, endHourStr]
+    [date, nextDayStr, endHourStr]
   );
 }

@@ -269,14 +269,14 @@
   background: var(--bg-dark);
   border: 1px solid var(--border);
   border-radius: 4px;
-  padding: 0.4rem 0.6rem;
-  font-size: 0.65rem;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.6rem;
   white-space: nowrap;
   z-index: 20;
   pointer-events: none;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 
   &.alignLeft {
     left: 0;
@@ -294,12 +294,23 @@
   }
 }
 
+.dotTooltipRow {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0.4rem;
+}
+
 .dotTooltipTime {
   color: var(--text-muted);
+  font-family: var(--font-mono);
+  text-align: left;
+  min-width: 35px;
 }
 
 .dotTooltipItem {
   color: var(--text-primary);
+  text-align: left;
 }
 
 .loading, .noData {
@@ -378,6 +389,10 @@
       .deleteBtn {
         opacity: 1;
       }
+    }
+
+    &.offTimeline {
+      border-left-color: #fbbf24; // Yellow-500
     }
 
     &:hover {
