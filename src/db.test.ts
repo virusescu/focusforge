@@ -161,6 +161,9 @@ describe('db utility functions', () => {
       expect(mockSelect).toHaveBeenCalledWith(
         expect.stringContaining('WHERE completed_at IS NULL')
       );
+      expect(mockSelect).toHaveBeenCalledWith(
+        expect.stringContaining('ORDER BY sort_order ASC')
+      );
     });
 
     it('completeObjective sets completed_at timestamp on the row', async () => {
