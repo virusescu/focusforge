@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getGravatarUrl, saveFocusSession, getRecentSessions, getDailyFocusStats, getSessionsForDay, deleteFocusSession, getObjectives, addObjective, deleteObjective } from './db';
+import { getGravatarUrl, saveFocusSession, getRecentSessions, getDailyFocusStats, getSessionsForDay, deleteFocusSession, getObjectives, addObjective, deleteObjective, completeObjective, getCompletedObjectivesForDay } from './db';
 
 // Use vi.hoisted to ensure mocks are available when vi.mock is evaluated
 const { mockExecute, mockSelect } = vi.hoisted(() => {
@@ -156,11 +156,46 @@ describe('db utility functions', () => {
   });
 
   describe('Strategic Objective Methods', () => {
-    it('getObjectives should call select with correct query', async () => {
+    it('getObjectives filters out completed objectives', async () => {
       await getObjectives();
       expect(mockSelect).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT * FROM objectives ORDER BY sort_order ASC')
+        expect.stringContaining('WHERE completed_at IS NULL')
       );
+      expect(mockSelect).toHaveBeenCalledWith(
+        expect.stringContaining('ORDER BY sort_order ASC')
+      );
+    });
+
+    it('completeObjective sets completed_at timestamp on the row', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-03-25T14:30:00.000Z'));
+
+      await completeObjective(42);
+
+      expect(mockExecute).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE objectives SET completed_at = ?'),
+        ['2026-03-25T14:30:00.000Z', 42]
+      );
+
+      vi.useRealTimers();
+    });
+
+    it('getCompletedObjectivesForDay queries target date and next-day 02:00 window', async () => {
+      mockSelect.mockResolvedValueOnce([]);
+      await getCompletedObjectivesForDay('2026-03-24');
+      expect(mockSelect).toHaveBeenCalledWith(
+        expect.stringContaining('completed_at IS NOT NULL'),
+        ['2026-03-24', '2026-03-25']
+      );
+    });
+
+    it('getCompletedObjectivesForDay returns completed objectives', async () => {
+      const mockData = [
+        { id: 1, text: 'Ship feature', completed_at: '2026-03-24T10:30:00.000Z' }
+      ];
+      mockSelect.mockResolvedValueOnce(mockData);
+      const result = await getCompletedObjectivesForDay('2026-03-24');
+      expect(result).toEqual(mockData);
     });
 
     it('addObjective should call execute with insert query and text', async () => {

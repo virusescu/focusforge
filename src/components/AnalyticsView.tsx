@@ -1,9 +1,9 @@
 import { type FC, useState, useEffect, useCallback, useMemo } from 'react';
 import styles from './AnalyticsView.module.scss';
 import { ChevronLeft, ChevronRight, ArrowLeft, BarChart2, X, HelpCircle } from 'lucide-react';
-import { getSessionsForDay, deleteFocusSession } from '../db';
+import { getSessionsForDay, deleteFocusSession, getCompletedObjectivesForDay } from '../db';
 import { useFocus } from '../contexts/FocusContext';
-import type { FocusSession } from '../types';
+import type { FocusSession, StrategicObjective } from '../types';
 import { soundEngine } from '../utils/audio';
 
 interface Props {
@@ -11,12 +11,21 @@ interface Props {
   initialDate?: Date;
 }
 
+interface ObjectiveDot {
+  key: string;
+  objectives: StrategicObjective[];
+  leftPercent: number;
+  clamped: boolean;
+}
+
 export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
   const { globalStats, refreshData } = useFocus();
   const [currentDate, setCurrentDate] = useState(initialDate || new Date());
   const [sessions, setSessions] = useState<FocusSession[]>([]);
+  const [completedObjectives, setCompletedObjectives] = useState<StrategicObjective[]>([]);
   const [loading, setLoading] = useState(true);
   const [hoveredSessionId, setHoveredSessionId] = useState<number | null>(null);
+  const [hoveredDotKey, setHoveredDotKey] = useState<string | null>(null);
   const [showHelp, setShowHelp] = useState(false);
 
   const handleBack = useCallback(() => {
@@ -28,8 +37,12 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
     setLoading(true);
     const dateStr = currentDate.toISOString().split('T')[0];
     try {
-      const data = await getSessionsForDay(dateStr);
+      const [data, completed] = await Promise.all([
+        getSessionsForDay(dateStr),
+        getCompletedObjectivesForDay(dateStr),
+      ]);
       setSessions(data);
+      setCompletedObjectives(completed);
     } catch (e) {
       console.error('Failed to load sessions for day', e);
     } finally {
@@ -92,7 +105,7 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
   const totalMinutes = Math.floor((totalSeconds % 3600) / 60);
 
   const handleDelete = async (id: number) => {
-    soundEngine.playPause(); // Warning-like sound
+    soundEngine.playPause();
     await deleteFocusSession(id);
     await loadSessions();
     await refreshData();
@@ -102,13 +115,12 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
     if (sessions.length === 0) return null;
 
     const dayPeak = Math.max(...sessions.map(s => s.duration_seconds));
-    
-    // Average recovery (between sessions)
+
     let totalRecovery = 0;
     let breakCount = 0;
     for (let i = 0; i < sessions.length - 1; i++) {
       const endCurrent = new Date(sessions[i].start_time).getTime() + sessions[i].duration_seconds * 1000;
-      const startNext = new Date(sessions[i+1].start_time).getTime();
+      const startNext = new Date(sessions[i + 1].start_time).getTime();
       const breakTime = (startNext - endCurrent) / 1000;
       if (breakTime > 0) {
         totalRecovery += breakTime;
@@ -116,16 +128,10 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
       }
     }
     const avgRecovery = breakCount > 0 ? totalRecovery / breakCount : 0;
-
-    // Coherence (Consistency Score)
     const avgSession = totalSeconds / sessions.length;
     const coherence = Math.min((avgSession / 1800) * 100, 100);
 
-    return {
-      dayPeak,
-      avgRecovery,
-      coherence
-    };
+    return { dayPeak, avgRecovery, coherence };
   }, [sessions, totalSeconds]);
 
   const formatDuration = (seconds: number) => {
@@ -135,35 +141,24 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
     return `${m}m`;
   };
 
-  // Time scale configuration: 8 AM to 2 AM (Next Day) - 18 hours
   const START_HOUR = 8;
-  const END_HOUR = 26; // 24 + 2
+  const END_HOUR = 26;
   const TOTAL_HOURS = END_HOUR - START_HOUR;
 
   const getPosition = (isoString: string, durationSeconds: number) => {
     const sessionDate = new Date(isoString);
     const viewDate = new Date(currentDate);
-    
-    // Normalize to local midnight for comparison
     const sessionLocalDate = new Date(sessionDate.getFullYear(), sessionDate.getMonth(), sessionDate.getDate());
     const viewLocalDate = new Date(viewDate.getFullYear(), viewDate.getMonth(), viewDate.getDate());
-    
-    // Calculate difference in days (local)
     const diffDays = Math.round((sessionLocalDate.getTime() - viewLocalDate.getTime()) / (1000 * 60 * 60 * 24));
-    
+
     let localHours = sessionDate.getHours() + sessionDate.getMinutes() / 60 + sessionDate.getSeconds() / 3600;
-    
-    if (diffDays === 1) {
-      localHours += 24;
-    } else if (diffDays === -1) {
-      localHours -= 24;
-    } else if (diffDays !== 0) {
-      return null;
-    }
-    
+    if (diffDays === 1) localHours += 24;
+    else if (diffDays === -1) localHours -= 24;
+    else if (diffDays !== 0) return null;
+
     const startOffset = Math.max(localHours - START_HOUR, 0);
     const endOffset = Math.min(localHours + durationSeconds / 3600 - START_HOUR, TOTAL_HOURS);
-    
     if (startOffset >= TOTAL_HOURS || endOffset <= 0) return null;
 
     return {
@@ -172,14 +167,51 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
     };
   };
 
-  // Create a linear array of hours for positioning, then modulo for display
+  const objectiveDots = useMemo((): ObjectiveDot[] => {
+    const groups = new Map<string, { obj: StrategicObjective; leftPercent: number; clamped: boolean }[]>();
+
+    for (const obj of completedObjectives) {
+      if (!obj.completed_at) continue;
+
+      const d = new Date(obj.completed_at);
+      const viewLocalDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+      const objLocalDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      const diffDays = Math.round((objLocalDate.getTime() - viewLocalDate.getTime()) / (1000 * 60 * 60 * 24));
+
+      let localHours = d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600;
+      if (diffDays === 1) localHours += 24;
+      else if (diffDays === -1) localHours -= 24;
+      else if (diffDays !== 0) continue;
+
+      const clamped = localHours < START_HOUR || localHours >= END_HOUR;
+      const clampedLeft = localHours < START_HOUR;
+      const leftPercent = clamped
+        ? clampedLeft ? 0 : 100
+        : ((localHours - START_HOUR) / TOTAL_HOURS) * 100;
+
+      const bucketKey = clamped
+        ? clampedLeft ? 'clamped-left' : 'clamped-right'
+        : `bucket-${Math.floor((localHours - START_HOUR) * 60 / 5)}`;
+
+      if (!groups.has(bucketKey)) groups.set(bucketKey, []);
+      groups.get(bucketKey)!.push({ obj, leftPercent, clamped });
+    }
+
+    return Array.from(groups.entries()).map(([key, items]) => ({
+      key,
+      objectives: items.map(i => i.obj),
+      leftPercent: items[0].leftPercent,
+      clamped: items[0].clamped,
+    }));
+  }, [completedObjectives, currentDate]);
+
   const hoursArray = Array.from({ length: TOTAL_HOURS + 1 }, (_, i) => START_HOUR + i);
 
   return (
     <div className={styles.analyticsContainer}>
       <div className={styles.header}>
-        <button 
-          className={styles.backBtn} 
+        <button
+          className={styles.backBtn}
           onClick={handleBack}
           onMouseEnter={handleHover}
         >
@@ -207,9 +239,9 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
             </button>
 
             {!isToday && (
-              <button 
-                onClick={jumpToToday} 
-                className={styles.todayBtn} 
+              <button
+                onClick={jumpToToday}
+                className={styles.todayBtn}
                 onMouseEnter={handleHover}
                 title="JUMP_TO_PRESENT"
               >
@@ -239,7 +271,7 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
               </div>
             ))}
           </div>
-          
+
           <div className={styles.visualizerArea}>
             <div className={styles.track}>
               {loading ? (
@@ -279,6 +311,32 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
                 })
               )}
             </div>
+
+            <div className={styles.objectiveTrack}>
+              {objectiveDots.map(dot => (
+                <div
+                  key={dot.key}
+                  data-testid="objective-dot"
+                  className={`${styles.objectiveDot} ${dot.clamped ? styles.clamped : ''}`}
+                  style={{ left: `${dot.leftPercent}%` }}
+                  onMouseEnter={() => setHoveredDotKey(dot.key)}
+                  onMouseLeave={() => setHoveredDotKey(null)}
+                >
+                  {hoveredDotKey === dot.key && (
+                    <div className={styles.dotTooltip}>
+                      {dot.objectives.map(obj => (
+                        <div key={obj.id}>
+                          <div className={styles.dotTooltipTime}>
+                            {new Date(obj.completed_at!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                          <div className={styles.dotTooltipItem}>{obj.text}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -288,8 +346,8 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
           <h4>FORGE_INTENSITY_LOG</h4>
           <div className={styles.sessionList}>
             {sessions.map(s => (
-              <div 
-                key={s.id} 
+              <div
+                key={s.id}
                 className={`${styles.sessionItem} ${hoveredSessionId === s.id ? styles.itemHovered : ''}`}
                 onMouseEnter={() => handleMouseEnterSession(s.id)}
                 onMouseLeave={() => setHoveredSessionId(null)}
@@ -301,8 +359,8 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
                     <span className={styles.interruptCount}>{s.pause_times!.length} INT</span>
                   )}
                 </div>
-                <button 
-                  className={styles.deleteBtn} 
+                <button
+                  className={styles.deleteBtn}
                   onMouseEnter={handleHover}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -317,11 +375,11 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
             {sessions.length === 0 && <p className={styles.muted}>WAITING_FOR_DATA...</p>}
           </div>
         </div>
-        
+
         <div className="card">
           <div className={styles.cardHeader}>
             <h4>OPERATOR_DIAGNOSTICS</h4>
-            <button 
+            <button
               className={`${styles.helpToggle} ${showHelp ? styles.active : ''}`}
               onMouseEnter={handleHover}
               onClick={() => {
@@ -375,7 +433,7 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
                 <div className={styles.colLabel}>WEEK</div>
                 <div className={styles.colLabel}>ALL_TIME</div>
               </div>
-              
+
               <div className={styles.tableRow}>
                 <div className={styles.rowLabel}>PEAK_INTENSITY</div>
                 <div className={styles.cellValue}>{diagnostics ? formatDuration(diagnostics.dayPeak) : '0m'}</div>

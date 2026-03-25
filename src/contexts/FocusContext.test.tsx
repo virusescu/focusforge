@@ -23,6 +23,7 @@ vi.mock('../utils/audio', () => ({
 const mockSaveSession = vi.fn();
 const mockAddObjective = vi.fn();
 const mockDeleteObjective = vi.fn();
+const mockCompleteObjective = vi.fn();
 const mockGetObjectives = vi.fn().mockResolvedValue([]);
 
 vi.mock('../db', () => ({
@@ -37,7 +38,9 @@ vi.mock('../db', () => ({
   saveFocusSession: (start: string, dur: number, pauses: string[]) => mockSaveSession(start, dur, pauses),
   getObjectives: () => mockGetObjectives(),
   addObjective: (text: string) => mockAddObjective(text),
-  deleteObjective: (id: number) => mockDeleteObjective(id)
+  deleteObjective: (id: number) => mockDeleteObjective(id),
+  completeObjective: (id: number) => mockCompleteObjective(id),
+  reorderObjectives: vi.fn().mockResolvedValue(undefined),
 }));
 
 const wrapper = ({ children }: { children: ReactNode }) => (
@@ -48,6 +51,7 @@ describe('FocusContext', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetObjectives.mockResolvedValue([]);
+    mockCompleteObjective.mockResolvedValue(undefined);
   });
 
   it('provides focus data and loading state', async () => {
@@ -118,7 +122,7 @@ describe('FocusContext', () => {
     expect(result.current.activeObjectiveId).toBe(42);
   });
 
-  it('neutralizeObjective triggers glitching and deletes objective', async () => {
+  it('neutralizeObjective triggers glitching and completes objective', async () => {
     const { result } = renderHook(() => useFocus(), { wrapper });
     await waitFor(() => expect(result.current.loading).toBe(false));
 
@@ -128,10 +132,22 @@ describe('FocusContext', () => {
     });
 
     expect(result.current.isGlitching).toBe(true);
-    expect(mockDeleteObjective).toHaveBeenCalledWith(1);
-    
+    expect(mockCompleteObjective).toHaveBeenCalledWith(1);
+
     // Wait for glitching to end (2800ms + some buffer)
     await waitFor(() => expect(result.current.isGlitching).toBe(false), { timeout: 4000 });
+  });
+
+  it('neutralizeObjective calls completeObjective, not deleteObjective', async () => {
+    const { result } = renderHook(() => useFocus(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      result.current.neutralizeObjective(1);
+    });
+
+    expect(mockCompleteObjective).toHaveBeenCalledWith(1);
+    expect(mockDeleteObjective).not.toHaveBeenCalled();
   });
 
   it('listens for timer-saved event and triggers save', async () => {

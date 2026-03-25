@@ -9,6 +9,7 @@ import {
   getObjectives,
   addObjective as dbAddObjective,
   deleteObjective as dbDeleteObjective,
+  completeObjective as dbCompleteObjective,
   reorderObjectives as dbReorderObjectives
 } from '../db';
 
@@ -111,7 +112,7 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
       setCompletedObjectiveText(null);
     }, 2800);
 
-    await dbDeleteObjective(id);
+    await dbCompleteObjective(id);
     if (activeObjectiveId === id) {
       setActiveObjectiveId(null);
     }
