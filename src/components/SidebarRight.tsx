@@ -5,6 +5,49 @@ import { useSystemLog } from '../hooks/useSystemLog';
 import { useFocus } from '../contexts/FocusContext';
 import { soundEngine } from '../utils/audio';
 
+type RGB = [number, number, number];
+
+const COLOR_STOPS: { at: number; color: RGB; glowRadius: number; glowOpacity: number }[] = [
+  { at: 0,   color: [13, 13, 13],     glowRadius: 0, glowOpacity: 0   },
+  { at: 60,  color: [94, 58, 36],     glowRadius: 0, glowOpacity: 0   },
+  { at: 120, color: [238, 104, 43],   glowRadius: 4, glowOpacity: 0.4 },
+  { at: 240, color: [255, 158, 109],  glowRadius: 8, glowOpacity: 0.6 },
+];
+
+function lerp(a: number, b: number, t: number) { return a + (b - a) * t; }
+function lerpRgb(c1: RGB, c2: RGB, t: number): RGB {
+  return [Math.round(lerp(c1[0], c2[0], t)), Math.round(lerp(c1[1], c2[1], t)), Math.round(lerp(c1[2], c2[2], t))];
+}
+
+function getCellStyle(minutes: number): React.CSSProperties {
+  if (minutes <= 0) return { backgroundColor: '#0d0d0d', border: '1px solid rgba(255,255,255,0.05)' };
+
+  const capped = Math.min(minutes, COLOR_STOPS[COLOR_STOPS.length - 1].at);
+
+  for (let i = 0; i < COLOR_STOPS.length - 1; i++) {
+    const s0 = COLOR_STOPS[i];
+    const s1 = COLOR_STOPS[i + 1];
+    if (capped >= s0.at && capped <= s1.at) {
+      const t = (capped - s0.at) / (s1.at - s0.at);
+      const [r, g, b] = lerpRgb(s0.color, s1.color, t);
+      const glowRadius = lerp(s0.glowRadius, s1.glowRadius, t);
+      const glowOpacity = lerp(s0.glowOpacity, s1.glowOpacity, t);
+      return {
+        backgroundColor: `rgb(${r},${g},${b})`,
+        boxShadow: glowRadius > 0.5 ? `0 0 ${glowRadius.toFixed(1)}px rgba(${r},${g},${b},${glowOpacity.toFixed(2)})` : undefined,
+      };
+    }
+  }
+
+  // Beyond max stop
+  const last = COLOR_STOPS[COLOR_STOPS.length - 1];
+  const [r, g, b] = last.color;
+  return {
+    backgroundColor: `rgb(${r},${g},${b})`,
+    boxShadow: `0 0 ${last.glowRadius}px rgba(${r},${g},${b},${last.glowOpacity})`,
+  };
+}
+
 interface Props {
   onViewAnalytics: (date: string) => void;
 }
@@ -33,11 +76,6 @@ export const SidebarRight: FC<Props> = ({ onViewAnalytics }) => {
     const totalSeconds = stat ? stat.totalSeconds : 0;
     const minutes = totalSeconds / 60;
     
-    let colorClass = styles.cellBlack;
-    if (minutes > 0 && minutes < 120) colorClass = styles.cellBrown;
-    else if (minutes >= 120 && minutes < 240) colorClass = styles.cellOrange;
-    else if (minutes >= 240) colorClass = styles.cellBrightOrange;
-
     const h = Math.floor(minutes / 60);
     const m = Math.floor(minutes % 60);
     const timeStr = `${h}:${m.toString().padStart(2, '0')}`;
@@ -45,7 +83,7 @@ export const SidebarRight: FC<Props> = ({ onViewAnalytics }) => {
     return {
       date: dateStr,
       minutes,
-      colorClass,
+      cellStyle: getCellStyle(minutes),
       formattedTime: timeStr
     };
   });
@@ -86,7 +124,8 @@ export const SidebarRight: FC<Props> = ({ onViewAnalytics }) => {
           {heatmapCells.map((cell, i) => (
             <div 
               key={i} 
-              className={`${styles.cell} ${cell.colorClass}`} 
+              className={styles.cell}
+              style={cell.cellStyle}
               onMouseEnter={() => handleCellMouseEnter(cell.date, cell.formattedTime)}
               onMouseLeave={() => setHoveredCell(null)}
               onClick={() => handleCellClick(cell.date)}

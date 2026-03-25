@@ -118,6 +118,165 @@
   letter-spacing: 0.15em;
 }
 
+.objectiveInputContainer {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+
+  .objectiveInput {
+    flex: 1;
+    background: var(--bg-dark);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    padding: 0.4rem 0.6rem;
+    outline: none;
+    transition: all 0.2s ease;
+
+    &:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 5px var(--primary-glow);
+    }
+  }
+
+  .addBtn {
+    background: transparent;
+    border: 1px solid var(--primary);
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: var(--primary-muted);
+      box-shadow: 0 0 10px var(--primary-glow);
+    }
+  }
+}
+
+.objectiveList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  height: 260px;
+  overflow-y: auto;
+  padding-right: 4px;
+
+  &::-webkit-scrollbar {
+    width: 2px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: var(--border);
+  }
+}
+
+.dragHandle {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: grab;
+  padding: 2px 4px;
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  flex-shrink: 0;
+
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+.objectiveItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  &:hover .dragHandle {
+    opacity: 0.5;
+  }
+
+  &.activeObjective .dragHandle {
+    color: var(--primary);
+  }
+  padding: 0.5rem;
+  font-size: 0.75rem;
+  border: 1px solid var(--border);
+  background: rgba(var(--primary-rgb), 0.05);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: var(--font-mono);
+
+  &:hover {
+    border-color: var(--primary);
+    background: rgba(var(--primary-rgb), 0.1);
+    
+    .deleteBtn {
+      opacity: 1;
+    }
+  }
+
+  &.activeObjective {
+    border-color: var(--primary);
+    background: var(--primary-muted);
+    box-shadow: inset 0 0 10px var(--primary-glow);
+    font-weight: bold;
+    color: var(--primary);
+  }
+}
+
+.objectiveText {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+
+  .targetIcon {
+    color: var(--primary);
+    animation: pulse 2s infinite;
+  }
+}
+
+.deleteBtn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.4;
+  transition: all 0.2s ease;
+
+  &:hover {
+    color: #ef4444;
+    opacity: 1 !important;
+  }
+}
+
+.emptyPool {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 1rem 0;
+  border: 1px dashed var(--border);
+  letter-spacing: 0.1em;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.2); opacity: 0.7; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
 .augments {
   display: flex;
   flex-direction: column;

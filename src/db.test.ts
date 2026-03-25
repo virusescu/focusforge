@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getGravatarUrl, saveFocusSession, getRecentSessions, getDailyFocusStats, getSessionsForDay, deleteFocusSession } from './db';
+import { getGravatarUrl, saveFocusSession, getRecentSessions, getDailyFocusStats, getSessionsForDay, deleteFocusSession, getObjectives, addObjective, deleteObjective } from './db';
 
 // Use vi.hoisted to ensure mocks are available when vi.mock is evaluated
 const { mockExecute, mockSelect } = vi.hoisted(() => {
@@ -86,6 +86,33 @@ describe('db utility functions', () => {
       await deleteFocusSession(42);
       expect(mockExecute).toHaveBeenCalledWith(
         expect.stringContaining('DELETE FROM focus_sessions WHERE id = ?'),
+        [42]
+      );
+    });
+  });
+
+  describe('Strategic Objective Methods', () => {
+    it('getObjectives should call select with correct query', async () => {
+      await getObjectives();
+      expect(mockSelect).toHaveBeenCalledWith(
+        expect.stringContaining('SELECT * FROM objectives ORDER BY created_at ASC')
+      );
+    });
+
+    it('addObjective should call execute with insert query and text', async () => {
+      mockExecute.mockResolvedValueOnce({ lastInsertId: 123 });
+      const id = await addObjective('Test Objective');
+      expect(mockExecute).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO objectives (text) VALUES (?)'),
+        ['Test Objective']
+      );
+      expect(id).toBe(123);
+    });
+
+    it('deleteObjective should call execute with delete query and id', async () => {
+      await deleteObjective(42);
+      expect(mockExecute).toHaveBeenCalledWith(
+        expect.stringContaining('DELETE FROM objectives WHERE id = ?'),
         [42]
       );
     });

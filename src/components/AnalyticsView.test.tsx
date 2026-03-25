@@ -22,7 +22,10 @@ vi.mock('../db', () => ({
     allTimePeak: 3600,
     weekTotal: 5400,
     monthTotal: 5400
-  })
+  }),
+  getObjectives: vi.fn().mockResolvedValue([]),
+  addObjective: vi.fn().mockResolvedValue(undefined),
+  deleteObjective: vi.fn().mockResolvedValue(undefined)
 }));
 
 // Mock AudioContext which doesn't exist in JSDOM

@@ -5,6 +5,7 @@ import { MainDisplay } from './components/MainDisplay';
 import { SidebarRight } from './components/SidebarRight';
 import { Footer } from './components/Footer';
 import { AnalyticsView } from './components/AnalyticsView';
+import { GlitchOverlay } from './components/GlitchOverlay';
 
 function App() {
   const [view, setView] = useState<'hud' | 'analytics'>('hud');
@@ -21,6 +22,7 @@ function App() {
 
   return (
     <div className="hud-container">
+      <GlitchOverlay />
       <Header />
       {view === 'hud' ? (
         <>

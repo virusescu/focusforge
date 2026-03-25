@@ -1,13 +1,26 @@
-import { type FC, useCallback, useEffect } from 'react';
+import { type FC, useCallback, useEffect, useMemo } from 'react';
 import styles from './MainDisplay.module.scss';
-import { Play, Pause, RotateCcw, Zap } from 'lucide-react';
+import { Play, Pause, RotateCcw, Zap, Target } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
+import { useFocus } from '../contexts/FocusContext';
 import { useTimer } from '../hooks/useTimer';
 import { soundEngine } from '../utils/audio';
 
 export const MainDisplay: FC<{ onViewAnalytics?: () => void }> = ({ onViewAnalytics }) => {
   const { user } = useUser();
-  const { seconds, isActive, minutes, toggleTimer: baseToggle, resetTimer: baseReset, formatTime } = useTimer(user?.debug_speed || 1);
+  const { activeObjectiveId, objectivePool, neutralizeObjective } = useFocus();
+  const { seconds, isActive, minutes, pauseSeconds, pauseLimit, toggleTimer: baseToggle, resetTimer: baseReset, formatTime } = useTimer(user?.debug_speed || 1);
+
+  const activeObjective = useMemo(() => 
+    objectivePool.find(o => o.id === activeObjectiveId),
+    [objectivePool, activeObjectiveId]
+  );
+
+  const handleNeutralize = useCallback(() => {
+    if (activeObjectiveId !== null) {
+      neutralizeObjective(activeObjectiveId);
+    }
+  }, [activeObjectiveId, neutralizeObjective]);
 
   const toggleTimer = useCallback(() => {
     if (isActive) {
@@ -37,6 +50,11 @@ export const MainDisplay: FC<{ onViewAnalytics?: () => void }> = ({ onViewAnalyt
         toggleTimer();
       } else if (e.key === 'Escape') {
         resetTimer();
+      } else if (e.key === 'Enter' && e.ctrlKey) {
+        if (activeObjectiveId !== null && isActive) {
+          e.preventDefault();
+          handleNeutralize();
+        }
       } else if (e.key.toLowerCase() === 'a') {
         if (onViewAnalytics) {
           soundEngine.playClick();
@@ -47,7 +65,7 @@ export const MainDisplay: FC<{ onViewAnalytics?: () => void }> = ({ onViewAnalyt
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [toggleTimer, resetTimer, onViewAnalytics]);
+  }, [toggleTimer, resetTimer, onViewAnalytics, activeObjectiveId, isActive, handleNeutralize]);
 
   const handleHover = () => {
     soundEngine.playHover();
@@ -71,6 +89,21 @@ export const MainDisplay: FC<{ onViewAnalytics?: () => void }> = ({ onViewAnalyt
 
   return (
     <main className={styles.container}>
+      {activeObjective && (
+        <div className={styles.objectiveHUD}>
+          <span className={styles.hudLabel}>ACTIVE_OBJECTIVE // LOCKED_ON</span>
+          <div className={styles.hudText}>{activeObjective.text}</div>
+          <button
+            onClick={handleNeutralize}
+            onMouseEnter={handleHover}
+            className={styles.btnNeutralizeHUD}
+          >
+            <Target size={16} />
+            <span>NEUTRALIZE</span>
+          </button>
+        </div>
+      )}
+
       <div className={`${styles.boostBanner} ${isOverLimit ? styles.limitBanner : ''}`}>
         <Zap size={16} className={styles.zapIcon} />
         <span>{performance} PERFORMANCE</span>
@@ -139,6 +172,19 @@ export const MainDisplay: FC<{ onViewAnalytics?: () => void }> = ({ onViewAnalyt
         </div>
       </div>
       
+      {!isActive && pauseSeconds > 0 && (() => {
+        const remaining = pauseLimit - pauseSeconds;
+        const urgency = remaining < 10 ? styles.pauseRed : remaining < 30 ? styles.pauseYellow : '';
+        return (
+          <div className={`${styles.pauseWarning} ${urgency}`}>
+            <span className={styles.pauseLabel}>PAUSE_LIMIT_ENFORCED</span>
+            <span className={styles.pauseCountdown}>
+              REBOOT_IN {formatTime(remaining)}
+            </span>
+          </div>
+        );
+      })()}
+
       <div className={styles.controls}>
         <button 
           onClick={toggleTimer} 
@@ -146,9 +192,10 @@ export const MainDisplay: FC<{ onViewAnalytics?: () => void }> = ({ onViewAnalyt
           className={styles.btnPrimary}
         >
           {isActive ? <Pause size={24} /> : <Play size={24} />}
-          <span>{isActive ? 'HALT_PROCESS' : 'INITIATE_FORGE'}</span>
+          <span>{isActive ? 'HALT_PROCESS' : seconds > 0 ? 'RESUME_FORGE' : 'INITIATE_FORGE'}</span>
         </button>
-        <button 
+
+        <button
           onClick={resetTimer} 
           onMouseEnter={handleHover}
           className={styles.btnSecondary}

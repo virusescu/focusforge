@@ -29,3 +29,9 @@ export interface DailyStat {
   date: string;
   totalSeconds: number;
 }
+
+export interface StrategicObjective {
+  id: number;
+  text: string;
+  created_at: string;
+}

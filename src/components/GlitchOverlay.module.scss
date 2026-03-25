@@ -1,0 +1,261 @@
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 9999;
+  pointer-events: none;
+  overflow: hidden;
+  animation: overlayFlash 0.08s steps(1) infinite, overlayFadeOut 0.5s ease-in 2.3s forwards;
+}
+
+.bwLayer {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.78);
+  mix-blend-mode: color;
+  z-index: 1;
+}
+
+.glitchSlices {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+
+  &::before,
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
+
+  &::before {
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent 0px,
+      transparent 18px,
+      rgba(255, 255, 255, 0.07) 18px,
+      rgba(255, 255, 255, 0.07) 20px
+    );
+    animation: sliceShiftA 0.07s steps(1) infinite;
+  }
+
+  &::after {
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent 0px,
+      transparent 36px,
+      rgba(255, 255, 255, 0.05) 36px,
+      rgba(255, 255, 255, 0.05) 40px
+    );
+    animation: sliceShiftB 0.11s steps(1) infinite;
+  }
+}
+
+.scanlines {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 3px,
+    rgba(0, 0, 0, 0.45) 3px,
+    rgba(0, 0, 0, 0.45) 4px
+  );
+  animation: scanRoll 0.08s linear infinite;
+}
+
+.noise {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  opacity: 0.12;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 150px 150px;
+  animation: noiseDrift 0.05s steps(1) infinite;
+}
+
+.messageWrap {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+}
+
+// ── Phase 1: title slams in at 0.4s ──────────────────
+.messageGlitch {
+  font-family: var(--font-mono);
+  font-size: clamp(2rem, 5vw, 4rem);
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  color: #ffffff;
+  text-transform: uppercase;
+  position: relative;
+  text-shadow:
+    0 0 20px rgba(255, 255, 255, 0.9),
+    0 0 40px rgba(255, 255, 255, 0.5);
+  opacity: 0;
+  animation:
+    titleSlam 0.2s cubic-bezier(0.22, 0.61, 0.36, 1) 0.2s forwards,
+    mainTextGlitch 0.15s steps(1) 0.2s infinite;
+
+  &::before,
+  &::after {
+    content: attr(data-text);
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  &::before {
+    color: #0ff;
+    animation: chromaRed 0.1s steps(1) infinite;
+    clip-path: polygon(0 0, 100% 0, 100% 35%, 0 35%);
+  }
+
+  &::after {
+    color: #f0f;
+    animation: chromaBlue 0.13s steps(1) infinite;
+    clip-path: polygon(0 65%, 100% 65%, 100% 100%, 0 100%);
+  }
+}
+
+// ── Phase 2: objective name, letters bam in one by one ──
+.objectiveName {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.05em;
+  font-family: var(--font-mono);
+  font-size: clamp(1.2rem, 3vw, 2rem);
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: #ff6600;
+  text-transform: uppercase;
+  text-shadow:
+    0 0 15px rgba(255, 102, 0, 0.9),
+    0 0 30px rgba(255, 102, 0, 0.5);
+}
+
+.letter {
+  display: inline-block;
+  opacity: 0;
+  transform: scale(3) translateY(-10px);
+  animation: letterBam 0.15s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+}
+
+// ── Subtitle ─────────────────────────────────────────
+.messageSub {
+  font-family: var(--font-mono);
+  font-size: clamp(0.6rem, 1.5vw, 0.85rem);
+  letter-spacing: 0.35em;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 600;
+  opacity: 0;
+  animation: subFlicker 0.2s steps(1) 1.4s infinite, subFadeIn 0.25s ease 1.3s forwards;
+}
+
+// ── Keyframes ────────────────────────────────────────
+
+@keyframes overlayFlash {
+  0%   { opacity: 1; }
+  45%  { opacity: 0.92; }
+  50%  { opacity: 1; }
+  90%  { opacity: 0.95; }
+  100% { opacity: 1; }
+}
+
+@keyframes overlayFadeOut {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+@keyframes titleSlam {
+  0%   { opacity: 0; transform: scale(1.8); }
+  60%  { opacity: 1; transform: scale(0.95); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes letterBam {
+  0%   { opacity: 0; transform: scale(3) translateY(-8px); }
+  55%  { opacity: 1; transform: scale(0.88) translateY(2px); }
+  80%  { transform: scale(1.05) translateY(0); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes subFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes sliceShiftA {
+  0%   { transform: translateX(0); }
+  20%  { transform: translateX(-8px); }
+  40%  { transform: translateX(12px); }
+  60%  { transform: translateX(-4px); }
+  80%  { transform: translateX(6px); }
+  100% { transform: translateX(0); }
+}
+
+@keyframes sliceShiftB {
+  0%   { transform: translateX(0) scaleY(1); }
+  30%  { transform: translateX(10px) scaleY(1.01); }
+  60%  { transform: translateX(-6px) scaleY(0.99); }
+  100% { transform: translateX(0) scaleY(1); }
+}
+
+@keyframes scanRoll {
+  0%   { background-position: 0 0; }
+  100% { background-position: 0 4px; }
+}
+
+@keyframes noiseDrift {
+  0%   { background-position: 0 0; }
+  100% { background-position: 150px 150px; }
+}
+
+@keyframes mainTextGlitch {
+  0%   { transform: translate(0, 0); }
+  10%  { transform: translate(-4px, 0); }
+  20%  { transform: translate(4px, 1px); }
+  30%  { transform: translate(-2px, 0); }
+  40%  { transform: translate(3px, -1px); }
+  50%  { transform: translate(0, 0); }
+  60%  { transform: translate(-6px, 0); }
+  70%  { transform: translate(2px, 0); }
+  80%  { transform: translate(-2px, 1px); }
+  90%  { transform: translate(4px, 0); }
+  100% { transform: translate(0, 0); }
+}
+
+@keyframes chromaRed {
+  0%   { transform: translate(-6px, 0); opacity: 0.8; }
+  25%  { transform: translate(4px, -1px); opacity: 1; }
+  50%  { transform: translate(-2px, 0); opacity: 0.6; }
+  75%  { transform: translate(6px, 1px); opacity: 1; }
+  100% { transform: translate(-4px, 0); opacity: 0.8; }
+}
+
+@keyframes chromaBlue {
+  0%   { transform: translate(6px, 0); opacity: 0.8; }
+  25%  { transform: translate(-4px, 1px); opacity: 1; }
+  50%  { transform: translate(2px, 0); opacity: 0.6; }
+  75%  { transform: translate(-6px, -1px); opacity: 1; }
+  100% { transform: translate(4px, 0); opacity: 0.8; }
+}
+
+@keyframes subFlicker {
+  0%   { opacity: 1; }
+  30%  { opacity: 0.3; }
+  50%  { opacity: 1; }
+  70%  { opacity: 0.6; }
+  100% { opacity: 1; }
+}

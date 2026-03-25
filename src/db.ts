@@ -1,5 +1,5 @@
 import Database from '@tauri-apps/plugin-sql';
-import type { FocusSession, DailyStat } from './types';
+import type { FocusSession, DailyStat, StrategicObjective } from './types';
 
 let db: Database | null = null;
 
@@ -34,6 +34,15 @@ export async function initDb() {
     )
   `);
 
+  // Create objectives table
+  await database.execute(`
+    CREATE TABLE IF NOT EXISTS objectives (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      text TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
   // Migration for existing users who don't have the debug_speed column
   try {
     await database.execute('ALTER TABLE user_settings ADD COLUMN debug_speed REAL DEFAULT 1.0');
@@ -44,6 +53,19 @@ export async function initDb() {
   // Migration for experience_lvl
   try {
     await database.execute('ALTER TABLE user_settings ADD COLUMN experience_lvl INTEGER DEFAULT 42');
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
+  // Migration for objectives sort order
+  try {
+    await database.execute('ALTER TABLE objectives ADD COLUMN sort_order INTEGER DEFAULT 0');
+    // Seed existing rows with their current rowid order
+    await database.execute(`
+      UPDATE objectives SET sort_order = (
+        SELECT COUNT(*) FROM objectives o2 WHERE o2.id <= objectives.id
+      )
+    `);
   } catch (e) {
     // Column already exists, ignore
   }
@@ -177,3 +199,36 @@ export async function getGlobalStats() {
   };
 }
 
+// Strategic Objective Functions
+export async function getObjectives(): Promise<StrategicObjective[]> {
+  const database = await getDb();
+  return await database.select<StrategicObjective[]>(
+    'SELECT * FROM objectives ORDER BY sort_order ASC, id ASC'
+  );
+}
+
+export async function reorderObjectives(orderedIds: number[]): Promise<void> {
+  const database = await getDb();
+  for (let i = 0; i < orderedIds.length; i++) {
+    await database.execute(
+      'UPDATE objectives SET sort_order = ? WHERE id = ?',
+      [i, orderedIds[i]]
+    );
+  }
+}
+
+export async function addObjective(text: string): Promise<number> {
+  const database = await getDb();
+  const countResult = await database.select<{ n: number }[]>('SELECT COUNT(*) as n FROM objectives');
+  const nextOrder = countResult[0]?.n ?? 0;
+  const result = await database.execute(
+    'INSERT INTO objectives (text, sort_order) VALUES (?, ?)',
+    [text, nextOrder]
+  );
+  return result.lastInsertId;
+}
+
+export async function deleteObjective(id: number) {
+  const database = await getDb();
+  await database.execute('DELETE FROM objectives WHERE id = ?', [id]);
+}
