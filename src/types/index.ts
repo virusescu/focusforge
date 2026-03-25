@@ -23,6 +23,7 @@ export interface FocusSession {
   start_time: string;
   duration_seconds: number;
   date: string;
+  pause_times?: string[];
 }
 
 export interface DailyStat {

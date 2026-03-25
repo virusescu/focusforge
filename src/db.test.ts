@@ -40,9 +40,10 @@ describe('db utility functions', () => {
     it('saveFocusSession should extract date and execute insert', async () => {
       const startTime = '2024-03-24T12:00:00.000Z';
       const duration = 3600;
-      
+      mockExecute.mockResolvedValueOnce({ lastInsertId: 1, rowsAffected: 1 });
+
       await saveFocusSession(startTime, duration);
-      
+
       expect(mockExecute).toHaveBeenCalledWith(
         expect.stringContaining('INSERT INTO focus_sessions'),
         [startTime, duration, '2024-03-24']
@@ -75,6 +76,7 @@ describe('db utility functions', () => {
 
     it('getSessionsForDay should call select with selected date and next day', async () => {
       const testDate = '2024-03-24';
+      mockSelect.mockResolvedValueOnce([]); // empty sessions → early return, no pauses query
       await getSessionsForDay(testDate);
       expect(mockSelect).toHaveBeenCalledWith(
         expect.stringContaining('date = $1'),
@@ -82,8 +84,70 @@ describe('db utility functions', () => {
       );
     });
 
-    it('deleteFocusSession should call execute with delete query and id', async () => {
+    it('saveFocusSession inserts a session_pauses row for each pause time', async () => {
+      mockExecute.mockResolvedValueOnce({ lastInsertId: 7, rowsAffected: 1 });
+
+      await saveFocusSession(
+        '2024-03-24T09:00:00.000Z',
+        1800,
+        ['2024-03-24T09:07:30.000Z', '2024-03-24T09:22:00.000Z']
+      );
+
+      expect(mockExecute).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO session_pauses'),
+        [7, '2024-03-24T09:07:30.000Z']
+      );
+      expect(mockExecute).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO session_pauses'),
+        [7, '2024-03-24T09:22:00.000Z']
+      );
+    });
+
+    it('saveFocusSession with no pause times makes only one execute call', async () => {
+      mockExecute.mockResolvedValueOnce({ lastInsertId: 8, rowsAffected: 1 });
+
+      await saveFocusSession('2024-03-24T09:00:00.000Z', 1800);
+
+      expect(mockExecute).toHaveBeenCalledTimes(1);
+    });
+
+    it('getSessionsForDay fetches pause times and attaches them to sessions', async () => {
+      mockSelect
+        .mockResolvedValueOnce([
+          { id: 1, start_time: '2024-03-24T09:00:00.000Z', duration_seconds: 1800, date: '2024-03-24' },
+        ])
+        .mockResolvedValueOnce([
+          { session_id: 1, pause_time: '2024-03-24T09:07:30.000Z' },
+          { session_id: 1, pause_time: '2024-03-24T09:22:00.000Z' },
+        ]);
+
+      const sessions = await getSessionsForDay('2024-03-24');
+
+      expect(sessions[0].pause_times).toEqual([
+        '2024-03-24T09:07:30.000Z',
+        '2024-03-24T09:22:00.000Z',
+      ]);
+    });
+
+    it('getSessionsForDay returns empty pause_times when no pauses exist', async () => {
+      mockSelect
+        .mockResolvedValueOnce([
+          { id: 1, start_time: '2024-03-24T09:00:00.000Z', duration_seconds: 1800, date: '2024-03-24' },
+        ])
+        .mockResolvedValueOnce([]);
+
+      const sessions = await getSessionsForDay('2024-03-24');
+
+      expect(sessions[0].pause_times).toEqual([]);
+    });
+
+    it('deleteFocusSession deletes pause records before the session', async () => {
       await deleteFocusSession(42);
+
+      expect(mockExecute).toHaveBeenCalledWith(
+        expect.stringContaining('DELETE FROM session_pauses WHERE session_id = ?'),
+        [42]
+      );
       expect(mockExecute).toHaveBeenCalledWith(
         expect.stringContaining('DELETE FROM focus_sessions WHERE id = ?'),
         [42]

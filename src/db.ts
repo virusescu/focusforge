@@ -43,6 +43,16 @@ export async function initDb() {
     )
   `);
 
+  // Create session_pauses table
+  await database.execute(`
+    CREATE TABLE IF NOT EXISTS session_pauses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id INTEGER NOT NULL,
+      pause_time TEXT NOT NULL,
+      FOREIGN KEY (session_id) REFERENCES focus_sessions(id)
+    )
+  `);
+
   // Migration for existing users who don't have the debug_speed column
   try {
     await database.execute('ALTER TABLE user_settings ADD COLUMN debug_speed REAL DEFAULT 1.0');
@@ -106,13 +116,20 @@ export async function getGravatarUrl(email: string) {
 }
 
 // Focus Session Functions
-export async function saveFocusSession(startTime: string, durationSeconds: number) {
+export async function saveFocusSession(startTime: string, durationSeconds: number, pauseTimes: string[] = []) {
   const database = await getDb();
-  const date = startTime.split('T')[0]; // Extract YYYY-MM-DD from ISO string
-  await database.execute(
+  const date = startTime.split('T')[0];
+  const result = await database.execute(
     'INSERT INTO focus_sessions (start_time, duration_seconds, date) VALUES (?, ?, ?)',
     [startTime, durationSeconds, date]
   );
+  const sessionId = result.lastInsertId;
+  for (const pauseTime of pauseTimes) {
+    await database.execute(
+      'INSERT INTO session_pauses (session_id, pause_time) VALUES (?, ?)',
+      [sessionId, pauseTime]
+    );
+  }
 }
 
 export async function getRecentSessions(limit: number = 3): Promise<FocusSession[]> {
@@ -145,23 +162,43 @@ export async function getDailyFocusStats(days: number = 21): Promise<DailyStat[]
 
 export async function getSessionsForDay(date: string): Promise<FocusSession[]> {
   const database = await getDb();
-  
-  // We want sessions for the selected day AND sessions from the next day that started before 2 AM
+
   const nextDay = new Date(date);
   nextDay.setDate(nextDay.getDate() + 1);
   const nextDayStr = nextDay.toISOString().split('T')[0];
 
-  return await database.select<FocusSession[]>(
-    `SELECT * FROM focus_sessions 
+  const rows = await database.select<FocusSession[]>(
+    `SELECT * FROM focus_sessions
      WHERE (date = $1 AND strftime('%H:%M:%S', start_time) >= '08:00:00')
         OR (date = $2 AND strftime('%H:%M:%S', start_time) < '02:00:00')
      ORDER BY start_time ASC`,
     [date, nextDayStr]
   );
+
+  if (rows.length === 0) return [];
+
+  const ids = rows.map(r => r.id);
+  const placeholders = ids.map((_, i) => `$${i + 1}`).join(', ');
+  const pauses = await database.select<{ session_id: number; pause_time: string }[]>(
+    `SELECT session_id, pause_time FROM session_pauses WHERE session_id IN (${placeholders}) ORDER BY pause_time ASC`,
+    ids
+  );
+
+  const pauseMap = new Map<number, string[]>();
+  for (const p of pauses) {
+    if (!pauseMap.has(p.session_id)) pauseMap.set(p.session_id, []);
+    pauseMap.get(p.session_id)!.push(p.pause_time);
+  }
+
+  return rows.map(row => ({
+    ...row,
+    pause_times: pauseMap.get(row.id) || [],
+  }));
 }
 
 export async function deleteFocusSession(id: number) {
   const database = await getDb();
+  await database.execute('DELETE FROM session_pauses WHERE session_id = ?', [id]);
   await database.execute('DELETE FROM focus_sessions WHERE id = ?', [id]);
 }
 
