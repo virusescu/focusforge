@@ -34,6 +34,7 @@ interface FocusContextType {
   neutralizeObjective: (id: number) => Promise<void>;
   reorderObjectives: (orderedIds: number[]) => Promise<void>;
   loading: boolean;
+  timerStatus: 'idle' | 'active' | 'paused';
 }
 
 const FocusContext = createContext<FocusContextType | undefined>(undefined);
@@ -47,6 +48,7 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
   const [isGlitching, setIsGlitching] = useState(false);
   const [completedObjectiveText, setCompletedObjectiveText] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [timerStatus, setTimerStatus] = useState<'idle' | 'active' | 'paused'>('idle');
 
   const refreshData = useCallback(async () => {
     try {
@@ -129,10 +131,24 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
           customEvent.detail.pauseTimes || []
         );
       }
+      setTimerStatus('idle');
     };
 
+    const handleActive = () => setTimerStatus('active');
+    const handlePaused = () => setTimerStatus('paused');
+    const handleReset = () => setTimerStatus('idle');
+
     window.addEventListener('timer-saved', handleTimerSaved);
-    return () => window.removeEventListener('timer-saved', handleTimerSaved);
+    window.addEventListener('timer-active', handleActive);
+    window.addEventListener('timer-paused', handlePaused);
+    window.addEventListener('timer-reset', handleReset);
+
+    return () => {
+      window.removeEventListener('timer-saved', handleTimerSaved);
+      window.removeEventListener('timer-active', handleActive);
+      window.removeEventListener('timer-paused', handlePaused);
+      window.removeEventListener('timer-reset', handleReset);
+    };
   }, [saveSession]);
 
   return (
@@ -151,7 +167,8 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
       setActiveObjective,
       neutralizeObjective,
       reorderObjectives,
-      loading
+      loading,
+      timerStatus
     }}>
       {children}
     </FocusContext.Provider>

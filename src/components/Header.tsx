@@ -4,21 +4,36 @@ import { Shield, Radio, Wifi, Settings } from 'lucide-react';
 import { WindowControls } from './WindowControls';
 import { SettingsModal } from './SettingsModal';
 import { soundEngine } from '../utils/audio';
+import { useFocus } from '../contexts/FocusContext';
 
 export const Header: FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const { timerStatus } = useFocus();
 
   const handleOpenSettings = useCallback(() => {
     soundEngine.playClick();
     setIsSettingsOpen(true);
   }, []);
 
+  const getStatusConfig = () => {
+    switch (timerStatus) {
+      case 'active':
+        return { label: 'FORGING', className: styles.forging };
+      case 'paused':
+        return { label: 'FORGE_PAUSED', className: styles.paused };
+      default:
+        return { label: 'SYSTEM_READY', className: '' };
+    }
+  };
+
+  const status = getStatusConfig();
+
   return (
     <header className={styles.header} data-tauri-drag-region>
       <div className={styles.left}>
-        <div className={styles.status}>
+        <div className={`${styles.status} ${status.className}`}>
           <div className={styles.dot} />
-          <span>SYSTEM_READY</span>
+          <span>{status.label}</span>
         </div>
         <div className={styles.divider} />
         <div className={styles.rank}>

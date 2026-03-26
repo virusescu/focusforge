@@ -33,6 +33,7 @@
   align-items: center;
   gap: 0.5rem;
   color: #4ade80;
+  transition: all 0.3s ease;
   
   .dot {
     width: 6px;
@@ -41,6 +42,24 @@
     border-radius: 50%;
     box-shadow: 0 0 5px #4ade80;
     animation: pulse 2s infinite;
+  }
+
+  &.forging {
+    color: #facc15;
+    .dot {
+      background: #facc15;
+      box-shadow: 0 0 10px #facc15;
+      animation: pulse 1s infinite;
+    }
+  }
+
+  &.paused {
+    color: #fb923c;
+    .dot {
+      background: #fb923c;
+      box-shadow: 0 0 5px #fb923c;
+      animation: none;
+    }
   }
 }
 
