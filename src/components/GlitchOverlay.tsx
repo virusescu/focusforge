@@ -17,15 +17,19 @@ export const GlitchOverlay: FC = () => {
         <div className={styles.messageGlitch} data-text="OBJECTIVE_COMPLETED">OBJECTIVE_COMPLETED</div>
         {completedObjectiveText && (
           <div className={styles.objectiveName}>
-            {completedObjectiveText.split('').map((char, i) => (
-              <span
-                key={i}
-                className={styles.letter}
-                style={{ animationDelay: `${0.55 + i * 0.06}s` }}
-              >
-                {char === ' ' ? '\u00A0' : char}
-              </span>
-            ))}
+            {completedObjectiveText.split('').map((char, i) => {
+              const len = completedObjectiveText.length;
+              const interval = len <= 1 ? 0 : 0.5 / (len - 1);
+              return (
+                <span
+                  key={i}
+                  className={styles.letter}
+                  style={{ animationDelay: `${i * interval}s` }}
+                >
+                  {char === ' ' ? '\u00A0' : char}
+                </span>
+              );
+            })}
           </div>
         )}
         <div className={styles.messageSub}>TARGET_NEUTRALIZED // SYNC_CONFIRMED</div>
