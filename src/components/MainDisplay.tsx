@@ -7,9 +7,19 @@ import { useTimer } from '../hooks/useTimer';
 import { soundEngine } from '../utils/audio';
 
 export const MainDisplay: FC<{ onViewAnalytics?: () => void }> = ({ onViewAnalytics }) => {
-  const { user } = useUser();
-  const { activeObjectiveId, objectivePool, neutralizeObjective } = useFocus();
-  const { seconds, isActive, minutes, pauseSeconds, pauseLimit, toggleTimer: baseToggle, resetTimer: baseReset, formatTime } = useTimer(user?.debug_speed || 1);
+  const { 
+    activeObjectiveId, 
+    objectivePool, 
+    neutralizeObjective,
+    seconds,
+    isActive,
+    minutes,
+    pauseSeconds,
+    pauseLimit,
+    toggleTimer,
+    resetTimer,
+    formatTime
+  } = useFocus();
 
   const activeObjective = useMemo(() => 
     objectivePool.find(o => o.id === activeObjectiveId),
@@ -21,24 +31,6 @@ export const MainDisplay: FC<{ onViewAnalytics?: () => void }> = ({ onViewAnalyt
       neutralizeObjective(activeObjectiveId);
     }
   }, [activeObjectiveId, neutralizeObjective]);
-
-  const toggleTimer = useCallback(() => {
-    if (isActive) {
-      soundEngine.playPause();
-    } else {
-      soundEngine.playStart();
-    }
-    baseToggle();
-  }, [isActive, baseToggle]);
-
-  const resetTimer = useCallback(() => {
-    if (seconds > 0) {
-      soundEngine.playReboot();
-      baseReset();
-    } else {
-      soundEngine.playDenied();
-    }
-  }, [seconds, baseReset]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -81,6 +73,10 @@ export const MainDisplay: FC<{ onViewAnalytics?: () => void }> = ({ onViewAnalyt
   else if (minutes >= 30) performance = "150%";
   else if (minutes >= 15) performance = "120%";
 
+  const remainingPause = pauseLimit - pauseSeconds;
+  const isPaused = !isActive && seconds > 0;
+  const pauseUrgency = remainingPause < 10 ? styles.critical : remainingPause < 30 ? styles.warning : '';
+
   // Each segment has its own length (arc) and its own internal progress
   const getSegmentOffset = (current: number, max: number, segmentArc: number) => {
     const progress = Math.min(Math.max(current, 0) / max, 1);
@@ -104,7 +100,7 @@ export const MainDisplay: FC<{ onViewAnalytics?: () => void }> = ({ onViewAnalyt
         </div>
       )}
 
-      <div className={`${styles.timerCircle} ${isOverLimit ? styles.limitReached : ''}`}>
+      <div className={`${styles.timerCircle} ${isOverLimit ? styles.limitReached : ''} ${isPaused ? styles.timerPaused : ''}`}>
         <svg viewBox="0 0 320 320" className={styles.svg}>
           {/* Backing Circle for legibility */}
           <circle cx="160" cy="160" r="150" className={styles.backingCircle} />
@@ -161,25 +157,18 @@ export const MainDisplay: FC<{ onViewAnalytics?: () => void }> = ({ onViewAnalyt
           </g>
         </svg>
         <div className={styles.timerContent}>
-          <div className={styles.label}>{isOverLimit ? 'LIMIT_EXCEEDED' : 'NEURAL_FORGE_ACTIVE'}</div>
-          <div className={styles.time}>{formatTime(seconds)}</div>
-          <div className={styles.subLabel}>TARGET_DEPTH: {Math.min(Math.floor((minutes / 60) * 100), 100)}%</div>
+          <div className={styles.label}>
+            {isPaused ? 'PAUSE_LIMIT_ENFORCED' : isOverLimit ? 'LIMIT_EXCEEDED' : 'NEURAL_FORGE_ACTIVE'}
+          </div>
+          <div className={styles.time}>
+            {formatTime(seconds)}
+          </div>
+          <div className={`${styles.subLabel} ${isPaused ? `${styles.rebootTimer} ${pauseUrgency}` : ''}`}>
+            {isPaused ? `REBOOT_IN: ${formatTime(remainingPause)}` : `TARGET_DEPTH: ${Math.min(Math.floor((minutes / 60) * 100), 100)}%`}
+          </div>
         </div>
       </div>
       
-      {!isActive && pauseSeconds > 0 && (() => {
-        const remaining = pauseLimit - pauseSeconds;
-        const urgency = remaining < 10 ? styles.pauseRed : remaining < 30 ? styles.pauseYellow : '';
-        return (
-          <div className={`${styles.pauseWarning} ${urgency}`}>
-            <span className={styles.pauseLabel}>PAUSE_LIMIT_ENFORCED</span>
-            <span className={styles.pauseCountdown}>
-              REBOOT_IN {formatTime(remaining)}
-            </span>
-          </div>
-        );
-      })()}
-
       <div className={styles.controls}>
         <button 
           onClick={toggleTimer} 

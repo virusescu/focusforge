@@ -1,6 +1,8 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import type { FocusSession, DailyStat, StrategicObjective } from '../types';
 import { soundEngine, playObjectiveComplete } from '../utils/audio';
+import { useTimer } from '../hooks/useTimer';
+import { useUser } from './UserContext';
 import {
   getRecentSessions,
   getDailyFocusStats,
@@ -37,11 +39,32 @@ interface FocusContextType {
   reorderObjectives: (orderedIds: number[]) => Promise<void>;
   loading: boolean;
   timerStatus: 'idle' | 'active' | 'paused';
+  // Timer state
+  seconds: number;
+  minutes: number;
+  isActive: boolean;
+  pauseSeconds: number;
+  pauseLimit: number;
+  toggleTimer: () => void;
+  resetTimer: () => void;
+  formatTime: (totalSeconds: number) => string;
 }
 
 const FocusContext = createContext<FocusContextType | undefined>(undefined);
 
 export const FocusProvider = ({ children }: { children: ReactNode }) => {
+  const { user } = useUser();
+  const { 
+    seconds, 
+    isActive, 
+    minutes, 
+    pauseSeconds, 
+    pauseLimit, 
+    toggleTimer: baseToggle, 
+    resetTimer: baseReset, 
+    formatTime 
+  } = useTimer(user?.debug_speed || 1);
+
   const [recentSessions, setRecentSessions] = useState<FocusSession[]>([]);
   const [dailyStats, setDailyStats] = useState<DailyStat[]>([]);
   const [globalStats, setGlobalStats] = useState<FocusContextType['globalStats']>(null);
@@ -51,6 +74,35 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
   const [completedObjectiveText, setCompletedObjectiveText] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [timerStatus, setTimerStatus] = useState<'idle' | 'active' | 'paused'>('idle');
+
+  useEffect(() => {
+    if (isActive) {
+      setTimerStatus('active');
+    } else if (seconds > 0) {
+      setTimerStatus('paused');
+    } else {
+      setTimerStatus('idle');
+    }
+  }, [isActive, seconds]);
+
+  const toggleTimer = useCallback(() => {
+    if (isActive) {
+      soundEngine.playPause();
+    } else {
+      soundEngine.playStart();
+    }
+    baseToggle();
+  }, [isActive, baseToggle]);
+
+  const resetTimer = useCallback(() => {
+    if (seconds > 0) {
+      soundEngine.playReboot();
+      baseReset();
+    } else {
+      soundEngine.playDenied();
+    }
+  }, [seconds, baseReset]);
+
 
   const refreshData = useCallback(async () => {
     try {
@@ -176,7 +228,15 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
       neutralizeObjective,
       reorderObjectives,
       loading,
-      timerStatus
+      timerStatus,
+      seconds,
+      minutes,
+      isActive,
+      pauseSeconds,
+      pauseLimit,
+      toggleTimer,
+      resetTimer,
+      formatTime
     }}>
       {children}
     </FocusContext.Provider>

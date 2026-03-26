@@ -2,6 +2,18 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useTimer } from './useTimer';
 
+// Mock audio
+vi.mock('../utils/audio', () => ({
+  soundEngine: {
+    playStart: vi.fn(),
+    playPause: vi.fn(),
+    playReboot: vi.fn(),
+    playDenied: vi.fn(),
+    playClick: vi.fn(),
+    playHover: vi.fn(),
+  },
+}));
+
 describe('useTimer', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -190,5 +202,29 @@ describe('useTimer', () => {
     );
 
     window.removeEventListener('timer-saved', listener);
+  });
+
+  it('increments pauseSeconds and triggers reboot after PAUSE_LIMIT', () => {
+    const resetListener = vi.fn();
+    window.addEventListener('timer-reset', resetListener);
+
+    const { result } = renderHook(() => useTimer(1));
+    
+    act(() => { result.current.toggleTimer(); }); // start
+    act(() => { vi.advanceTimersByTime(10000); }); // run for 10s
+    expect(result.current.seconds).toBe(10);
+
+    act(() => { result.current.toggleTimer(); }); // pause
+    expect(result.current.isActive).toBe(false);
+
+    act(() => { vi.advanceTimersByTime(30000); });
+    expect(result.current.pauseSeconds).toBe(30);
+    expect(result.current.seconds).toBe(10); // main timer should stay at 10
+
+    act(() => { vi.advanceTimersByTime(30000); }); // reach 60s limit
+    expect(resetListener).toHaveBeenCalled();
+    expect(result.current.seconds).toBe(0); // should be reset
+
+    window.removeEventListener('timer-reset', resetListener);
   });
 });

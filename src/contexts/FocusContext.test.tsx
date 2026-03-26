@@ -43,6 +43,17 @@ vi.mock('../db', () => ({
   reorderObjectives: vi.fn().mockResolvedValue(undefined),
 }));
 
+// Mock UserContext
+vi.mock('./UserContext', () => ({
+  useUser: () => ({
+    user: { debug_speed: 1 },
+    avatar: '',
+    loading: false,
+    updateSettings: vi.fn(),
+    refreshUser: vi.fn(),
+  }),
+}));
+
 const wrapper = ({ children }: { children: ReactNode }) => (
   <FocusProvider>{children}</FocusProvider>
 );
