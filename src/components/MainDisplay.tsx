@@ -22,7 +22,6 @@ export const MainDisplay: FC<{ onViewAnalytics?: () => void }> = ({ onViewAnalyt
   const [charge, setCharge] = useState(0);
   const chargeRef = useRef(0);
   const lastClickTime = useRef(0);
-  const clickCount = useRef(0);
 
   const activeObjective = useMemo(() => 
     objectivePool.find(o => o.id === activeObjectiveId),
@@ -40,10 +39,10 @@ export const MainDisplay: FC<{ onViewAnalytics?: () => void }> = ({ onViewAnalyt
   const handleChargeClick = useCallback(() => {
     const now = Date.now();
 
-    clickCount.current = Math.min(clickCount.current + 1, 5);
-    playChargeClickWithFile(clickCount.current);
-
     const newCharge = Math.min(chargeRef.current + 0.2, 1);
+    const step = Math.min(5, Math.max(1, Math.ceil(newCharge * 5)));
+    playChargeClickWithFile(step);
+
     setCharge(newCharge);
     chargeRef.current = newCharge;
     lastClickTime.current = now;
@@ -65,9 +64,6 @@ export const MainDisplay: FC<{ onViewAnalytics?: () => void }> = ({ onViewAnalyt
         const newCharge = Math.max(chargeRef.current - decayAmount, 0);
         setCharge(newCharge);
         chargeRef.current = newCharge;
-        if (newCharge === 0) {
-          clickCount.current = 0;
-        }
       }
     }, 16); // ~60fps for smooth decay
 
