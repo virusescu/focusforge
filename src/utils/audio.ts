@@ -73,6 +73,34 @@ class SoundEngine {
     osc.stop(ctx.currentTime + 0.05);
   }
 
+  playChargeClick(step: number) {
+    const ctx = this.init();
+    const t = ctx.currentTime;
+
+    const configs: [number, number, number][] = [
+      [300,  500,  0.060], // step 1 – low tick
+      [500,  800,  0.065], // step 2 – brighter
+      [800,  1200, 0.070], // step 3 – crisp
+      [1200, 1800, 0.075], // step 4 – sharp
+      [1800, 2800, 0.080], // step 5 – high, snappy
+    ];
+
+    const idx = Math.max(0, Math.min(4, step - 1));
+    const [freqStart, freqEnd, dur] = configs[idx];
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freqStart, t);
+    osc.frequency.exponentialRampToValueAtTime(freqEnd, t + dur);
+    gain.gain.setValueAtTime(0.07, t);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + dur + 0.01);
+  }
+
   playHover() {
     const { osc, ctx } = this.createOscillator('sine', 1800, 0.03, 0.02);
     osc.start();
@@ -198,5 +226,15 @@ export async function playObjectiveComplete(): Promise<void> {
     await audio.play();
   } catch {
     soundEngine.playBoom();
+  }
+}
+
+export async function playChargeClickWithFile(step: number): Promise<void> {
+  try {
+    const audio = new Audio(`./sounds/charge-${step}.mp3`);
+    audio.volume = 0.75;
+    await audio.play();
+  } catch {
+    soundEngine.playChargeClick(step);
   }
 }
