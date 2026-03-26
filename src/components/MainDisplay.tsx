@@ -1,4 +1,4 @@
-import { type FC, useCallback, useEffect, useMemo } from 'react';
+import { type FC, useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import styles from './MainDisplay.module.scss';
 import { Play, Pause, RotateCcw, Zap, Target } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
@@ -21,6 +21,10 @@ export const MainDisplay: FC<{ onViewAnalytics?: () => void }> = ({ onViewAnalyt
     formatTime
   } = useFocus();
 
+  const [charge, setCharge] = useState(0);
+  const chargeRef = useRef(0);
+  const lastClickTime = useRef(0);
+
   const activeObjective = useMemo(() => 
     objectivePool.find(o => o.id === activeObjectiveId),
     [objectivePool, activeObjectiveId]
@@ -29,12 +33,47 @@ export const MainDisplay: FC<{ onViewAnalytics?: () => void }> = ({ onViewAnalyt
   const handleNeutralize = useCallback(() => {
     if (activeObjectiveId !== null) {
       neutralizeObjective(activeObjectiveId);
+      setCharge(0);
+      chargeRef.current = 0;
     }
   }, [activeObjectiveId, neutralizeObjective]);
 
+  const handleChargeClick = useCallback(() => {
+    const now = Date.now();
+    soundEngine.playClick();
+    
+    // Each click adds 0.3 to the charge (approx 4-5 clicks to trigger)
+    const newCharge = Math.min(chargeRef.current + 0.3, 1);
+    setCharge(newCharge);
+    chargeRef.current = newCharge;
+    lastClickTime.current = now;
+
+    if (newCharge >= 1) {
+      handleNeutralize();
+    }
+  }, [handleNeutralize]);
+
+  // Decay charge over time
+  useEffect(() => {
+    if (charge === 0 && chargeRef.current === 0) return;
+
+    const interval = setInterval(() => {
+      const now = Date.now();
+      // Only decay if user hasn't clicked in the last 150ms
+      if (now - lastClickTime.current > 150) {
+        const decayAmount = 0.5 / 60; // 0.5 per second, 60 ticks per second
+        const newCharge = Math.max(chargeRef.current - decayAmount, 0);
+        setCharge(newCharge);
+        chargeRef.current = newCharge;
+      }
+    }, 16); // ~60fps for smooth decay
+
+    return () => clearInterval(interval);
+  }, [charge]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't trigger if user is typing in an input (though there are none on main page currently)
+      // Don't trigger if user is typing in an input
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
       if (e.key === ' ') {
@@ -86,19 +125,32 @@ export const MainDisplay: FC<{ onViewAnalytics?: () => void }> = ({ onViewAnalyt
   return (
     <main className={styles.container}>
       {activeObjective && (
-        <div className={styles.objectiveHUD}>
+        <div 
+          className={styles.objectiveHUD} 
+          onClick={handleChargeClick}
+        >
           <span className={styles.hudLabel}>ACTIVE_OBJECTIVE // LOCKED_ON</span>
           <div className={styles.hudText}>{activeObjective.text}</div>
-          <button
-            onClick={handleNeutralize}
-            onMouseEnter={handleHover}
-            className={styles.btnNeutralizeHUD}
-          >
-            <Target size={16} />
-            <span>NEUTRALIZE</span>
-          </button>
         </div>
       )}
+
+      {charge > 0 && (
+        <div 
+          className={styles.fullScreenCharge}
+          style={{ height: `${charge * 100}vh` }}
+        />
+      )}
+
+      <div className={`${styles.slidingChargeBar} ${charge > 0 ? styles.active : ''}`}>
+        <div className={styles.chargeContent}>
+          <Target size={20} className={styles.chargeIcon} />
+          <div className={styles.chargeInfo}>
+            <span className={styles.chargePercent}>{Math.floor(charge * 100)}%</span>
+            <span className={styles.chargeAction}>NEUTRALIZING_TARGET...</span>
+          </div>
+          <div className={styles.chargeGlow} style={{ width: `${charge * 100}%` }} />
+        </div>
+      </div>
 
       <div className={`${styles.timerCircle} ${isOverLimit ? styles.limitReached : ''} ${isPaused ? styles.timerPaused : ''}`}>
         <svg viewBox="0 0 320 320" className={styles.svg}>
