@@ -10,15 +10,24 @@
   letter-spacing: 0.1em;
   font-size: 0.75rem;
   color: var(--text-secondary);
+  user-select: none;
 }
 
-.left, .right {
+.left {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  pointer-events: none;
+}
+
+.right {
   display: flex;
   align-items: center;
   gap: 1.5rem;
 }
 
 .center {
+  pointer-events: none;
   .title {
     font-weight: 700;
     font-size: 1.25rem;
@@ -67,6 +76,7 @@
   width: 1px;
   height: 12px;
   background: var(--border);
+  pointer-events: none;
 }
 
 .rank {
@@ -88,6 +98,7 @@
   display: flex;
   gap: 1rem;
   color: var(--text-muted);
+  pointer-events: none;
 }
 
 .settingsBtn {
@@ -100,6 +111,7 @@
   transition: all 0.2s;
   padding: 4px;
   border-radius: 4px;
+  pointer-events: auto;
 
   &:hover {
     color: var(--primary);
@@ -110,4 +122,5 @@
 
 .version {
   font-weight: 600;
+  pointer-events: none;
 }
