@@ -216,7 +216,7 @@ export const MainDisplay: FC<{ onViewAnalytics?: () => void }> = ({ onViewAnalyt
             {formatTime(seconds)}
           </div>
           <div className={`${styles.subLabel} ${isPaused ? `${styles.rebootTimer} ${pauseUrgency}` : ''}`}>
-            {isPaused ? `REBOOT_IN: ${formatTime(remainingPause)}` : `TARGET_DEPTH: ${Math.min(Math.floor((minutes / 60) * 100), 100)}%`}
+            {isPaused ? `REBOOT_IN: ${formatTime(remainingPause)}` : `TARGET_DEPTH: ${Math.min(Math.floor((minutes / 30) * 100), 100)}%`}
           </div>
         </div>
       </div>
