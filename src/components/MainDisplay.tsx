@@ -104,11 +104,6 @@ export const MainDisplay: FC<{ onViewAnalytics?: () => void }> = ({ onViewAnalyt
         </div>
       )}
 
-      <div className={`${styles.boostBanner} ${isOverLimit ? styles.limitBanner : ''}`}>
-        <Zap size={16} className={styles.zapIcon} />
-        <span>{performance} PERFORMANCE</span>
-      </div>
-      
       <div className={`${styles.timerCircle} ${isOverLimit ? styles.limitReached : ''}`}>
         <svg viewBox="0 0 320 320" className={styles.svg}>
           {/* Backing Circle for legibility */}
@@ -205,6 +200,11 @@ export const MainDisplay: FC<{ onViewAnalytics?: () => void }> = ({ onViewAnalyt
         </button>
       </div>
       
+      <div className={`${styles.boostBanner} ${isOverLimit ? styles.limitBanner : ''}`}>
+        <Zap size={16} className={styles.zapIcon} />
+        <span>{performance} PERFORMANCE</span>
+      </div>
+
       <div className={styles.decoration}>
         <div className={styles.gridLine} />
         <div className={styles.gridLine} />

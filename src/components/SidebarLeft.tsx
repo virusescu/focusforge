@@ -1,6 +1,6 @@
-import { type FC, useCallback, useState } from 'react';
+import { type FC, useCallback, useState, useRef, useEffect } from 'react';
 import styles from './SidebarLeft.module.scss';
-import { User, Database, Cpu, HardDrive, BarChart2, Plus, X, Target, GripVertical } from 'lucide-react';
+import { User, Database, Cpu, HardDrive, BarChart2, Plus, X, Target, GripVertical, Edit3, Check } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 import { useFocus } from '../contexts/FocusContext';
 import { soundEngine } from '../utils/audio';
@@ -29,11 +29,22 @@ interface SortableItemProps {
   isActive: boolean;
   onSelect: (id: number) => void;
   onDelete: (e: React.MouseEvent, id: number) => void;
+  onUpdate: (id: number, text: string) => void;
   onHover: () => void;
 }
 
-const SortableItem: FC<SortableItemProps> = ({ obj, isActive, onSelect, onDelete, onHover }) => {
+const SortableItem: FC<SortableItemProps> = ({ obj, isActive, onSelect, onDelete, onUpdate, onHover }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: obj.id });
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(obj.text);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isEditing]);
+
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -41,12 +52,36 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, onSelect, onDelete
     zIndex: isDragging ? 999 : undefined,
   };
 
+  const handleEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    soundEngine.playClick();
+    setIsEditing(true);
+  };
+
+  const handleSave = (e?: React.MouseEvent | React.FormEvent) => {
+    if (e) e.stopPropagation();
+    if (editText.trim() && editText !== obj.text) {
+      onUpdate(obj.id, editText.trim());
+    }
+    setIsEditing(false);
+    soundEngine.playClick();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSave();
+    } else if (e.key === 'Escape') {
+      setEditText(obj.text);
+      setIsEditing(false);
+    }
+  };
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={`${styles.objectiveItem} ${isActive ? styles.activeObjective : ''}`}
-      onClick={() => onSelect(obj.id)}
+      onClick={() => !isEditing && onSelect(obj.id)}
       onMouseEnter={onHover}
     >
       <button
@@ -58,14 +93,43 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, onSelect, onDelete
       >
         <GripVertical size={12} />
       </button>
-      <div className={styles.objectiveText}>
-        {isActive && <Target size={12} className={styles.targetIcon} />}
-        <span>{obj.text}</span>
-      </div>
+      
+      {isEditing ? (
+        <div className={styles.objectiveText} onClick={e => e.stopPropagation()}>
+          <input
+            ref={inputRef}
+            className={styles.editInput}
+            value={editText}
+            onChange={e => setEditText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onBlur={() => handleSave()}
+          />
+          <button className={styles.saveBtn} onClick={handleSave}>
+            <Check size={12} />
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className={styles.objectiveText}>
+            {isActive && <Target size={12} className={styles.targetIcon} />}
+            <span>{obj.text}</span>
+          </div>
+          <button
+            className={styles.editBtn}
+            onClick={handleEdit}
+            onMouseEnter={onHover}
+            title="Edit Objective"
+          >
+            <Edit3 size={12} />
+          </button>
+        </>
+      )}
+
       <button
         className={styles.deleteBtn}
         onClick={(e) => onDelete(e, obj.id)}
         onMouseEnter={onHover}
+        title="Delete Objective"
       >
         <X size={12} />
       </button>
@@ -79,7 +143,7 @@ interface Props {
 
 export const SidebarLeft: FC<Props> = ({ onViewAnalytics }) => {
   const { user, avatar, loading } = useUser();
-  const { objectivePool, activeObjectiveId, addObjective, deleteObjective, setActiveObjective, reorderObjectives } = useFocus();
+  const { objectivePool, activeObjectiveId, addObjective, deleteObjective, updateObjective, setActiveObjective, reorderObjectives } = useFocus();
   const [newObjective, setNewObjective] = useState('');
 
   const sensors = useSensors(
@@ -118,6 +182,10 @@ export const SidebarLeft: FC<Props> = ({ onViewAnalytics }) => {
     e.stopPropagation();
     soundEngine.playClick();
     deleteObjective(id);
+  };
+
+  const handleUpdateObjective = (id: number, text: string) => {
+    updateObjective(id, text);
   };
 
   const handleSelectObjective = (id: number) => {
@@ -223,6 +291,7 @@ export const SidebarLeft: FC<Props> = ({ onViewAnalytics }) => {
                   isActive={activeObjectiveId === obj.id}
                   onSelect={handleSelectObjective}
                   onDelete={handleDeleteObjective}
+                  onUpdate={handleUpdateObjective}
                   onHover={handleHover}
                 />
               ))}

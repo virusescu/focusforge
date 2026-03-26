@@ -215,8 +215,8 @@
     border-color: var(--primary);
     background: rgba(var(--primary-rgb), 0.1);
     
-    .deleteBtn {
-      opacity: 1;
+    .deleteBtn, .editBtn {
+      opacity: 0.6;
     }
   }
 
@@ -295,4 +295,50 @@
   padding: 0.5rem;
   color: var(--text-muted);
   border-left: 2px solid var(--border);
+}
+
+.editBtn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.4;
+  transition: all 0.2s ease;
+
+  &:hover {
+    color: var(--primary);
+    opacity: 1 !important;
+  }
+}
+
+.editInput {
+  flex: 1;
+  background: var(--bg-dark);
+  border: 1px solid var(--primary);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  padding: 0.2rem 0.4rem;
+  outline: none;
+  width: 100%;
+}
+
+.saveBtn {
+  background: transparent;
+  border: none;
+  color: #4ade80;
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+
+  &:hover {
+    filter: drop-shadow(0 0 5px #4ade80);
+  }
 }

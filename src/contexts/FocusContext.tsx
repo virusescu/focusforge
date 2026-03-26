@@ -9,6 +9,7 @@ import {
   getObjectives,
   addObjective as dbAddObjective,
   deleteObjective as dbDeleteObjective,
+  updateObjective as dbUpdateObjective,
   completeObjective as dbCompleteObjective,
   reorderObjectives as dbReorderObjectives
 } from '../db';
@@ -30,6 +31,7 @@ interface FocusContextType {
   refreshData: () => Promise<void>;
   addObjective: (text: string) => Promise<void>;
   deleteObjective: (id: number) => Promise<void>;
+  updateObjective: (id: number, text: string) => Promise<void>;
   setActiveObjective: (id: number | null) => void;
   neutralizeObjective: (id: number) => Promise<void>;
   reorderObjectives: (orderedIds: number[]) => Promise<void>;
@@ -91,6 +93,11 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
     }
     await refreshData();
   }, [activeObjectiveId, refreshData]);
+
+  const updateObjective = useCallback(async (id: number, text: string) => {
+    await dbUpdateObjective(id, text);
+    await refreshData();
+  }, [refreshData]);
 
   const setActiveObjective = useCallback((id: number | null) => {
     setActiveObjectiveId(id);
@@ -164,6 +171,7 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
       refreshData, 
       addObjective,
       deleteObjective,
+      updateObjective,
       setActiveObjective,
       neutralizeObjective,
       reorderObjectives,

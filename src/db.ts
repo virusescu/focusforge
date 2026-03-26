@@ -293,6 +293,14 @@ export async function deleteObjective(id: number) {
   await database.execute('DELETE FROM objectives WHERE id = ?', [id]);
 }
 
+export async function updateObjective(id: number, text: string) {
+  const database = await getDb();
+  await database.execute(
+    'UPDATE objectives SET text = ? WHERE id = ?',
+    [text, id]
+  );
+}
+
 export async function completeObjective(id: number): Promise<void> {
   const database = await getDb();
   await database.execute(
