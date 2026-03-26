@@ -1,9 +1,7 @@
 import { type FC, useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import styles from './MainDisplay.module.scss';
 import { Play, Pause, RotateCcw, Zap, Target } from 'lucide-react';
-import { useUser } from '../contexts/UserContext';
 import { useFocus } from '../contexts/FocusContext';
-import { useTimer } from '../hooks/useTimer';
 import { soundEngine } from '../utils/audio';
 
 export const MainDisplay: FC<{ onViewAnalytics?: () => void }> = ({ onViewAnalytics }) => {

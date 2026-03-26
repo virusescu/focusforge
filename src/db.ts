@@ -285,7 +285,7 @@ export async function addObjective(text: string): Promise<number> {
     'INSERT INTO objectives (text, sort_order) VALUES (?, ?)',
     [text, nextOrder]
   );
-  return result.lastInsertId;
+  return result.lastInsertId ?? 0;
 }
 
 export async function deleteObjective(id: number) {

@@ -38,4 +38,5 @@ export interface StrategicObjective {
   text: string;
   created_at: string;
   completed_at?: string;
+  sort_order?: number;
 }

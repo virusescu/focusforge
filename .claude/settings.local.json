@@ -16,7 +16,8 @@
       "Bash(git branch:*)",
       "Bash(git:*)",
       "Bash(npx vitest:*)",
-      "Bash(node -e \":*)"
+      "Bash(node -e \":*)",
+      "Bash(npm run:*)"
     ]
   }
 }
