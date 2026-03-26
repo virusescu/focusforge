@@ -2,7 +2,7 @@ import { type FC, useCallback, useEffect, useMemo, useState, useRef } from 'reac
 import styles from './MainDisplay.module.scss';
 import { Play, Pause, RotateCcw, Zap, Target } from 'lucide-react';
 import { useFocus } from '../contexts/FocusContext';
-import { soundEngine } from '../utils/audio';
+import { soundEngine, playChargeClickWithFile } from '../utils/audio';
 
 export const MainDisplay: FC<{ onViewAnalytics?: () => void }> = ({ onViewAnalytics }) => {
   const { 
@@ -22,6 +22,7 @@ export const MainDisplay: FC<{ onViewAnalytics?: () => void }> = ({ onViewAnalyt
   const [charge, setCharge] = useState(0);
   const chargeRef = useRef(0);
   const lastClickTime = useRef(0);
+  const clickCount = useRef(0);
 
   const activeObjective = useMemo(() => 
     objectivePool.find(o => o.id === activeObjectiveId),
@@ -38,10 +39,11 @@ export const MainDisplay: FC<{ onViewAnalytics?: () => void }> = ({ onViewAnalyt
 
   const handleChargeClick = useCallback(() => {
     const now = Date.now();
-    soundEngine.playClick();
-    
-    // Each click adds 0.3 to the charge (approx 4-5 clicks to trigger)
-    const newCharge = Math.min(chargeRef.current + 0.3, 1);
+
+    clickCount.current = Math.min(clickCount.current + 1, 5);
+    playChargeClickWithFile(clickCount.current);
+
+    const newCharge = Math.min(chargeRef.current + 0.2, 1);
     setCharge(newCharge);
     chargeRef.current = newCharge;
     lastClickTime.current = now;
@@ -63,6 +65,9 @@ export const MainDisplay: FC<{ onViewAnalytics?: () => void }> = ({ onViewAnalyt
         const newCharge = Math.max(chargeRef.current - decayAmount, 0);
         setCharge(newCharge);
         chargeRef.current = newCharge;
+        if (newCharge === 0) {
+          clickCount.current = 0;
+        }
       }
     }, 16); // ~60fps for smooth decay
 
