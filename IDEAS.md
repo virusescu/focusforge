@@ -21,6 +21,7 @@
 - **Pause Limit Enforcement (Neural Sync Rule)**: If the timer is paused mid-session, a countdown shows `PAUSE_LIMIT_ENFORCED / REBOOT_IN [time]`. The pause limit is 60 seconds. If not resumed in time, the session is auto-saved and reset. Visual urgency: yellow at <30s remaining, red at <10s.
 - **Neural Heat (Activity Map)**: The 21-day heatmap in SidebarRight uses color interpolation — black → dark brown → vibrant orange → bright coral — as daily focus minutes increase. Cells glow at higher values.
 - **Sound Engine**: Web Audio API synthesizer with distinct sounds for start, pause, reset/reboot, click, hover, key, denied, and objective completion (boom + chime cascade, with `/sounds/objective-complete.mp3` fallback).
+- **Interruption Cracks**: Each time the timer is paused mid-session, thin vertical crack marks appear inside the session block in the Day View timeline. Shows at a glance how fragmented a session was. ✅ Implemented.
 
 **Analytics**
 - **Day View Timeline**: Sessions shown as blocks on an 8am–2am timeline. Hover highlights sessions cross-referenced in the session list.
@@ -50,7 +51,6 @@
   - **Purpose**: Provides visual proof of "momentum" without being distracting.
 - **Intervention Tracking**:
   - **Neural Sync Rule**: Auto-reset if pause exceeds limit. ✅ Implemented (60s limit).
-  - **Interruption Cracks**: Each time the timer is paused mid-session, record a timestamp. In the Day View timeline, render these as thin vertical crack marks inside the session block. Shows at a glance how fragmented a session was. No reason needed — the pattern across the day tells the story.
 
 ## 3. Project Forge Rewards (Variable Micro-Rewards)
 *Goal: Provide unpredictable, positive reinforcement for sustained focus.*
@@ -62,20 +62,46 @@
 - **Collection Log**: A new HUD tab where the operator can view their "Extracted Schematics."
 - **Focus**: Purely positive reinforcement. No penalties for stopping, only escalating rewards for continuing.
 
-## 4. High-Fidelity Data Visualization
-*Goal: Use new diagnostic data to create a more detailed performance report.*
+## 4. Kill Rate (Day View Enhancement)
+*Goal: Surface objective throughput alongside existing daily diagnostics.*
 
-- **Neural Stability Graph**: Use interrupt frequency and recovery efficiency to generate a "Stability Score" over time. ✅ Partially implemented — coherence score and avg recovery shown per-day, but no trend graph across days.
-- **Session Replay**: A way to hover over a specific day and see a summary of the most successful project tags and the primary sources of interruptions. *(Partial — clicking a heatmap cell navigates to that day's analytics. Hover preview not implemented. Project tag breakdown requires tagging feature.)*
+- **Kill Rate Metric**: Add `KILL_RATE` to the existing Operator Diagnostics table (alongside Neural Coherence, Peak Intensity, etc.). Shows objectives neutralized for day / week / all-time, computed from `objectives.completed_at` timestamps.
+- **Purpose**: Gives the operator a quick count of "how many targets did I take down" right next to the focus time stats they already see.
 
----
+## 5. Operator Intelligence Hub (Separate Stats Page)
+*Goal: A dedicated analytics page for long-term pattern recognition across all sessions. Separate from the Day View — this is the macro picture.*
 
-## 5. Advanced Analytical Screens (The Neuro-Visualizer)
+- **Focus Time by Hour-of-Day**:
+  - **Visuals**: Horizontal or vertical histogram bucketing total accumulated focus minutes by hour (0–23). Derived from `focus_sessions.start_time` + `duration_seconds`, splitting sessions that span hour boundaries.
+  - **Purpose**: Identifies the operator's "Prime Time" — which hours of the day consistently produce the most focus. Helps plan deep work around natural brain rhythms.
+- **Focus by Day-of-Week**:
+  - **Visuals**: 7-bar chart (Mon–Sun) showing average or total focus time per weekday across all tracked history.
+  - **Purpose**: Reveals weekly patterns at a glance — "Fridays are dead," "Sundays are surprisingly strong." Helps the operator set realistic expectations per day.
+- **Session Length Distribution**:
+  - **Visuals**: Histogram bucketed by duration: <5m, 5–15m, 15–30m, 30–45m, 45–60m, 60m+. Each bucket shows the count of sessions that fall within that range.
+  - **Purpose**: Shows whether the operator tends toward short bursts or deep forges. Watching the distribution shift toward longer sessions over weeks is a strong motivator.
+- **Fragmentation Index**:
+  - **Visuals**: Derived from `session_pauses` — average number of pauses per session, trended over time (e.g., weekly rolling average). Also show a "Clean Forge Ratio": percentage of sessions completed with zero pauses.
+  - **Purpose**: Rewards uninterrupted focus. Watching the clean forge ratio climb is satisfying positive reinforcement.
+
+## 6. Objective Categories (Tagging System)
+*Goal: Classify objectives by difficulty or type, giving visual distinction and enabling category-based analytics.*
+
+- **Data Model**:
+  - New `objective_categories` table: `id` (INTEGER PK), `label` (TEXT), `color` (TEXT, hex code), `sort_order` (INTEGER).
+  - Add `category_id` (INTEGER, nullable FK → `objective_categories.id`) to the `objectives` table. NULL = uncategorized / default.
+  - Ship with built-in defaults: **Hard** (`#ff4444`, red), **Normal** (`#ffffff`, white), **Easy** (`#888888`, gray). User-configurable later.
+- **Sidebar Visuals (Objective Pool)**:
+  - Each objective's bullet/pip is colored to match its category. Hard objectives get a red bullet, Normal white, Easy gray.
+  - Category assignment via a small inline color-dot picker when adding or editing an objective — fast, no dropdowns, no friction.
+- **Analytics Integration**:
+  - Objective completion dots on the Day View timeline are colored by category.
+  - Kill Rate breakdown by category: "3 hard / 5 normal / 2 easy neutralized."
+  - Over time: track category completion ratios to surface patterns like "you avoid hard tasks on Fridays."
+
+## 7. Advanced Analytical Screens (The Neuro-Visualizer)
 *Goal: Transform boring metrics into visceral, game-like visualizations that provide immediate feedback and long-term pattern recognition for the ADHD brain.*
 
-- **The Neural Mountain Range (Session Depth)**:
-  - **Visuals**: In the Day View, sessions become jagged mountain silhouettes. Height = Intensity (performance tier); Smoothness = Focus continuity (fewer interruptions = cleaner slopes).
-  - **Purpose**: Turns abstract time into a physical "trophy." Building a range of tall, smooth peaks is more rewarding than looking at a bar chart.
 - **The Context-Switching Ghost (Fragmented Flow)**:
   - **Visuals**: Semi-transparent "electrical arcs" connect objective completion dots to the sessions they happened in. Tangled arcs = high task switching; thick, glowing arcs = deep flow.
   - **Purpose**: Visualizes the hidden cost of "skipping" between tasks without using judgmental language.
@@ -85,10 +111,4 @@
 - **The Combo Meter (Momentum Tracking)**:
   - **Visuals**: A high-octane "Streak Counter" tracking consecutive forge days or objectives neutralized without a reboot. Reaching milestones unlocks temporary UI color shifts or new audio sets.
   - **Purpose**: Provides immediate micro-rewards for consistency, gamifying the act of showing up daily.
-- **The "Neural Debt" Tug-of-War**:
-  - **Visuals**: A horizontal "Red vs. Green" bar. Open objectives pull red; completed ones pull green. Completing tasks physically "crushes" the red side.
-  - **Purpose**: Visualizes the "Clearing of the Plate," providing the visceral sense of closure needed to stop for the day.
-- **The Stability Radar (Weekly Diagnostic)**:
-  - **Visuals**: A 7-sided radar chart (spider web) where the "web" grows based on daily volume and consistency.
-  - **Purpose**: Shows "Consistency vs. Chaos" as a shape rather than a grade, making it easier to spot weekly patterns at a glance.
 
