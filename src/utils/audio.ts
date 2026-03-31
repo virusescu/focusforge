@@ -221,10 +221,16 @@ export const playBoom = () => soundEngine.playBoom();
 
 export async function playObjectiveComplete(): Promise<void> {
   try {
-    const audio = new Audio('/sounds/objective-complete.mp3');
-    audio.volume = 0.85;
+    const soundIndex = Math.floor(Math.random() * 6) + 1;
+    const audio = new Audio(`/sounds/objective-complete-${soundIndex}.mp3`);
+    
+    // Add slight random volume and playback rate variation for freshness
+    audio.volume = 0.8 + Math.random() * 0.15;
+    audio.playbackRate = 0.95 + Math.random() * 0.1;
+    
     await audio.play();
-  } catch {
+  } catch (e) {
+    console.error('Failed to play reward sound:', e);
     soundEngine.playBoom();
   }
 }
