@@ -1,8 +1,9 @@
 import { type FC, useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import styles from './SettingsModal.module.scss';
-import { X, Check } from 'lucide-react';
+import { X, Check, LogOut } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
+import { useAuth } from '../contexts/AuthContext';
 import { soundEngine } from '../utils/audio';
 
 interface Props {
@@ -10,9 +11,8 @@ interface Props {
 }
 
 export const SettingsModal: FC<Props> = ({ onClose }) => {
-  const { user, updateSettings, loading } = useUser();
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const { user, name, email, avatar, updateSettings, loading } = useUser();
+  const { logout } = useAuth();
   const [debugSpeed, setDebugSpeed] = useState(1);
   const [experienceLvl, setExperienceLvl] = useState(42);
   const [dayStartHour, setDayStartHour] = useState(8);
@@ -22,8 +22,6 @@ export const SettingsModal: FC<Props> = ({ onClose }) => {
 
   useEffect(() => {
     if (user) {
-      setName(user.name);
-      setEmail(user.email);
       setDebugSpeed(user.debug_speed || 1);
       setExperienceLvl(user.experience_lvl || 42);
       setDayStartHour(user.day_start_hour ?? 8);
@@ -33,14 +31,19 @@ export const SettingsModal: FC<Props> = ({ onClose }) => {
 
   const handleSave = useCallback(async () => {
     soundEngine.playClick();
-    await updateSettings(name, email, debugSpeed, experienceLvl, dayStartHour, dayEndHour);
+    await updateSettings(debugSpeed, experienceLvl, dayStartHour, dayEndHour);
     onClose();
-  }, [name, email, debugSpeed, experienceLvl, dayStartHour, dayEndHour, updateSettings, onClose]);
+  }, [debugSpeed, experienceLvl, dayStartHour, dayEndHour, updateSettings, onClose]);
 
   const handleCancel = useCallback(() => {
     soundEngine.playClick();
     onClose();
   }, [onClose]);
+
+  const handleLogout = useCallback(async () => {
+    soundEngine.playClick();
+    await logout();
+  }, [logout]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -74,51 +77,51 @@ export const SettingsModal: FC<Props> = ({ onClose }) => {
         <div className={styles.content}>
           <div className={styles.field}>
             <label>OPERATOR_NAME</label>
-            <input 
-              type="text" 
-              value={name} 
-              onChange={e => setName(e.target.value)} 
-              placeholder="Enter name..."
-              autoFocus
+            <input
+              type="text"
+              value={name}
+              disabled
+              style={{ opacity: 0.6 }}
             />
           </div>
           <div className={styles.field}>
-            <label>OPERATOR_EMAIL (USED_FOR_GRAVATAR)</label>
-            <input 
-              type="email" 
-              value={email} 
-              onChange={e => setEmail(e.target.value)} 
-              placeholder="Enter email..."
+            <label>OPERATOR_EMAIL</label>
+            <input
+              type="email"
+              value={email}
+              disabled
+              style={{ opacity: 0.6 }}
             />
           </div>
           <div className={styles.field}>
             <label>EXPERIENCE_LVL</label>
-            <input 
-              type="number" 
-              value={experienceLvl} 
-              onChange={e => setExperienceLvl(Number(e.target.value))} 
+            <input
+              type="number"
+              value={experienceLvl}
+              onChange={e => setExperienceLvl(Number(e.target.value))}
               placeholder="Enter level..."
               min="1"
+              autoFocus
             />
           </div>
 
           <div className={styles.row}>
             <div className={styles.field}>
               <label>DAY_START_HOUR (0-23)</label>
-              <input 
-                type="number" 
-                value={dayStartHour} 
-                onChange={e => setDayStartHour(Number(e.target.value))} 
+              <input
+                type="number"
+                value={dayStartHour}
+                onChange={e => setDayStartHour(Number(e.target.value))}
                 min="0"
                 max="23"
               />
             </div>
             <div className={styles.field}>
               <label>DAY_END_HOUR (0-23)</label>
-              <input 
-                type="number" 
-                value={dayEndHour} 
-                onChange={e => setDayEndHour(Number(e.target.value))} 
+              <input
+                type="number"
+                value={dayEndHour}
+                onChange={e => setDayEndHour(Number(e.target.value))}
                 min="0"
                 max="23"
               />
@@ -128,10 +131,10 @@ export const SettingsModal: FC<Props> = ({ onClose }) => {
           {isDev && (
             <div className={styles.field}>
               <label>DEBUG_SPEED_MULTIPLIER (DEV_ONLY)</label>
-              <input 
-                type="number" 
-                value={debugSpeed} 
-                onChange={e => setDebugSpeed(Number(e.target.value))} 
+              <input
+                type="number"
+                value={debugSpeed}
+                onChange={e => setDebugSpeed(Number(e.target.value))}
                 min="1"
                 max="1000"
               />
@@ -140,6 +143,11 @@ export const SettingsModal: FC<Props> = ({ onClose }) => {
         </div>
 
         <div className={styles.footer}>
+          <button className={styles.cancelBtn} onClick={handleLogout}>
+            <LogOut size={16} />
+            SIGN_OUT
+          </button>
+          <div style={{ flex: 1 }} />
           <button className={styles.cancelBtn} onClick={handleCancel}>
             CANCEL
           </button>
