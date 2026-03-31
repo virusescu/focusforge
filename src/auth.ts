@@ -59,7 +59,7 @@ export async function startOAuthFlow(): Promise<{ userInfo: GoogleUserInfo; refr
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      code,
+      code: decodeURIComponent(code),
       client_id: clientId,
       client_secret: clientSecret,
       redirect_uri: redirectUri,
