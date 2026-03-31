@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getGravatarUrl, saveFocusSession, getRecentSessions, getDailyFocusStats, getSessionsForDay, deleteFocusSession, getObjectives, addObjective, deleteObjective, completeObjective, getCompletedObjectivesForDay } from './db';
+import { getGravatarUrl, saveFocusSession, getRecentSessions, getDailyFocusStats, getSessionsForDay, deleteFocusSession, getObjectives, addObjective, deleteObjective, completeObjective, getCompletedObjectivesForDay, getKillRate, getAllSessions, getFragmentationStats } from './db';
 
 // Use vi.hoisted to ensure mocks are available when vi.mock is evaluated
 const { mockExecute, mockSelect } = vi.hoisted(() => {
@@ -184,8 +184,8 @@ describe('db utility functions', () => {
       mockSelect.mockResolvedValueOnce([]);
       await getCompletedObjectivesForDay('2026-03-24');
       expect(mockSelect).toHaveBeenCalledWith(
-        expect.stringContaining("datetime(completed_at, 'localtime') >= $1 || ' 00:00:00'"),
-        ['2026-03-24', '2026-03-25', '02:00:00']
+        expect.stringContaining("datetime(completed_at, 'localtime') >= $1"),
+        ['2026-03-24', '2026-03-25', '08:00:00', '02:00:00']
       );
     });
 
@@ -215,6 +215,84 @@ describe('db utility functions', () => {
         expect.stringContaining('DELETE FROM objectives WHERE id = ?'),
         [42]
       );
+    });
+  });
+
+  describe('Intelligence Hub Queries', () => {
+    it('getKillRate returns day, week, and allTime counts', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-03-30T12:00:00.000Z'));
+
+      mockSelect
+        .mockResolvedValueOnce([{ count: 3 }])   // day
+        .mockResolvedValueOnce([{ count: 12 }])   // week
+        .mockResolvedValueOnce([{ count: 45 }]);  // allTime
+
+      const result = await getKillRate();
+
+      expect(result).toEqual({ day: 3, week: 12, allTime: 45 });
+      expect(mockSelect).toHaveBeenCalledWith(
+        expect.stringContaining("completed_at IS NOT NULL AND date(completed_at, 'localtime') = $1"),
+        ['2026-03-30']
+      );
+
+      vi.useRealTimers();
+    });
+
+    it('getKillRate returns zeros when no completed objectives', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-03-30T12:00:00.000Z'));
+
+      mockSelect
+        .mockResolvedValueOnce([{ count: 0 }])
+        .mockResolvedValueOnce([{ count: 0 }])
+        .mockResolvedValueOnce([{ count: 0 }]);
+
+      const result = await getKillRate();
+      expect(result).toEqual({ day: 0, week: 0, allTime: 0 });
+
+      vi.useRealTimers();
+    });
+
+    it('getAllSessions returns all sessions sorted by start_time ASC', async () => {
+      const mockData = [
+        { id: 1, start_time: '2026-03-20T09:00:00.000Z', duration_seconds: 1800, date: '2026-03-20' },
+        { id: 2, start_time: '2026-03-21T10:00:00.000Z', duration_seconds: 3600, date: '2026-03-21' },
+      ];
+      mockSelect.mockResolvedValueOnce(mockData);
+
+      const result = await getAllSessions();
+
+      expect(result).toEqual(mockData);
+      expect(mockSelect).toHaveBeenCalledWith(
+        expect.stringContaining('SELECT * FROM focus_sessions ORDER BY start_time ASC')
+      );
+    });
+
+    it('getFragmentationStats returns pause counts per session via LEFT JOIN', async () => {
+      const mockData = [
+        { session_id: 1, pause_count: 0 },
+        { session_id: 2, pause_count: 3 },
+        { session_id: 3, pause_count: 1 },
+      ];
+      mockSelect.mockResolvedValueOnce(mockData);
+
+      const result = await getFragmentationStats();
+
+      expect(result).toEqual(mockData);
+      expect(mockSelect).toHaveBeenCalledWith(
+        expect.stringContaining('LEFT JOIN session_pauses sp ON sp.session_id = fs.id')
+      );
+      expect(mockSelect).toHaveBeenCalledWith(
+        expect.stringContaining('COUNT(sp.id) as pause_count')
+      );
+    });
+
+    it('getFragmentationStats returns empty array when no sessions exist', async () => {
+      mockSelect.mockResolvedValueOnce([]);
+
+      const result = await getFragmentationStats();
+      expect(result).toEqual([]);
     });
   });
 });

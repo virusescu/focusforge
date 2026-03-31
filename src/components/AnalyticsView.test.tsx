@@ -29,6 +29,7 @@ vi.mock('../db', () => ({
   deleteObjective: vi.fn().mockResolvedValue(undefined),
   completeObjective: vi.fn().mockResolvedValue(undefined),
   getCompletedObjectivesForDay: vi.fn().mockResolvedValue([]),
+  getKillRate: vi.fn().mockResolvedValue({ day: 0, week: 0, allTime: 0 }),
   getUserSettings: vi.fn().mockResolvedValue({ day_start_hour: 8, day_end_hour: 2 }),
   getGravatarUrl: vi.fn().mockResolvedValue('avatar-url'),
 }));

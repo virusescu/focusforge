@@ -1,7 +1,7 @@
 import { type FC, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import styles from './AnalyticsView.module.scss';
 import { ChevronLeft, ChevronRight, ArrowLeft, BarChart2, X, HelpCircle } from 'lucide-react';
-import { getSessionsForDay, deleteFocusSession, getCompletedObjectivesForDay } from '../db';
+import { getSessionsForDay, deleteFocusSession, getCompletedObjectivesForDay, getKillRate } from '../db';
 import { useFocus } from '../contexts/FocusContext';
 import { useUser } from '../contexts/UserContext';
 import type { FocusSession, StrategicObjective } from '../types';
@@ -29,6 +29,7 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
   const [hoveredSessionId, setHoveredSessionId] = useState<number | null>(null);
   const [hoveredDotKey, setHoveredDotKey] = useState<string | null>(null);
   const [showHelp, setShowHelp] = useState(false);
+  const [killRate, setKillRate] = useState<{ day: number; week: number; allTime: number }>({ day: 0, week: 0, allTime: 0 });
   const sessionRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
   const startHourSetting = user?.day_start_hour ?? 8;
@@ -63,12 +64,14 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
     const dateStr = `${year}-${month}-${day}`;
     
     try {
-      const [data, completed] = await Promise.all([
+      const [data, completed, kr] = await Promise.all([
         getSessionsForDay(dateStr, startHourSetting, endHourSetting),
         getCompletedObjectivesForDay(dateStr, startHourSetting, endHourSetting),
+        getKillRate(),
       ]);
       setSessions(data);
       setCompletedObjectives(completed);
+      setKillRate(kr);
     } catch (e) {
       console.error('Failed to load sessions for day', e);
     } finally {
@@ -461,6 +464,9 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
                   <div className={styles.helpItem}>
                     <strong>FORGE_VOLUME:</strong> Cumulative focus duration across different time-scales.
                   </div>
+                  <div className={styles.helpItem}>
+                    <strong>KILL_RATE:</strong> Objectives neutralized across different time-scales.
+                  </div>
                 </div>
               </div>
             )}
@@ -499,6 +505,13 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
                 <div className={styles.cellValue}>{formatDuration(totalSeconds)}</div>
                 <div className={styles.cellValue}>{globalStats ? formatDuration(globalStats.weekTotal) : '0h'}</div>
                 <div className={styles.cellValue}>{globalStats ? formatDuration(globalStats.allTimeTotal) : '0h'}</div>
+              </div>
+
+              <div className={styles.tableRow}>
+                <div className={styles.rowLabel}>KILL_RATE</div>
+                <div className={styles.cellValue}>{killRate.day}</div>
+                <div className={styles.cellValue}>{killRate.week}</div>
+                <div className={styles.cellValue}>{killRate.allTime}</div>
               </div>
             </div>
           </div>

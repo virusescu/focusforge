@@ -1,6 +1,6 @@
 import { type FC, useCallback, useState, useRef, useEffect } from 'react';
 import styles from './SidebarLeft.module.scss';
-import { User, Database, Cpu, HardDrive, BarChart2, Plus, X, Target, GripVertical, Edit3, Check } from 'lucide-react';
+import { User, Database, Cpu, HardDrive, BarChart2, Plus, X, Target, GripVertical, Edit3, Check, Activity } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 import { useFocus } from '../contexts/FocusContext';
 import { soundEngine } from '../utils/audio';
@@ -139,9 +139,10 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, onSelect, onDelete
 
 interface Props {
   onViewAnalytics?: () => void;
+  onViewIntel?: () => void;
 }
 
-export const SidebarLeft: FC<Props> = ({ onViewAnalytics }) => {
+export const SidebarLeft: FC<Props> = ({ onViewAnalytics, onViewIntel }) => {
   const { user, avatar, loading } = useUser();
   const { objectivePool, activeObjectiveId, addObjective, deleteObjective, updateObjective, setActiveObjective, reorderObjectives } = useFocus();
   const [newObjective, setNewObjective] = useState('');
@@ -164,6 +165,11 @@ export const SidebarLeft: FC<Props> = ({ onViewAnalytics }) => {
     soundEngine.playClick();
     onViewAnalytics?.();
   }, [onViewAnalytics]);
+
+  const handleIntelClick = useCallback(() => {
+    soundEngine.playTab();
+    onViewIntel?.();
+  }, [onViewIntel]);
 
   const handleHover = () => {
     soundEngine.playHover();
@@ -254,13 +260,23 @@ export const SidebarLeft: FC<Props> = ({ onViewAnalytics }) => {
         </div>
 
         {onViewAnalytics && (
-          <button 
-            className={styles.analyticsBtn} 
+          <button
+            className={styles.analyticsBtn}
             onClick={handleAnalyticsClick}
             onMouseEnter={handleHover}
           >
             <BarChart2 size={14} />
             <span>SYSTEM_ANALYTICS</span>
+          </button>
+        )}
+        {onViewIntel && (
+          <button
+            className={styles.intelBtn}
+            onClick={handleIntelClick}
+            onMouseEnter={handleHover}
+          >
+            <Activity size={14} />
+            <span>INTELLIGENCE_HUB</span>
           </button>
         )}
       </div>

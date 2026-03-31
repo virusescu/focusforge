@@ -18,7 +18,11 @@
       "Bash(npx vitest:*)",
       "Bash(node -e \":*)",
       "Bash(npm run:*)",
-      "Bash(find C:Workfocusforgesrc -name *.mp3 -o -name *.wav -o -name *.ogg)"
+      "Bash(find C:Workfocusforgesrc -name *.mp3 -o -name *.wav -o -name *.ogg)",
+      "Bash(npm list:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(npx tsc:*)",
+      "Bash(ls -lh src/components/IntelligenceHub*)"
     ]
   }
 }

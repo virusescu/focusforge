@@ -309,20 +309,75 @@ export async function completeObjective(id: number): Promise<void> {
   );
 }
 
-export async function getCompletedObjectivesForDay(date: string, _startHour: number = 8, endHour: number = 2): Promise<StrategicObjective[]> {
+export async function getCompletedObjectivesForDay(date: string, startHour: number = 8, endHour: number = 2): Promise<StrategicObjective[]> {
   const database = await getDb();
-  const nextDay = new Date(date);
-  nextDay.setDate(nextDay.getDate() + 1);
-  const nextDayStr = `${nextDay.getFullYear()}-${String(nextDay.getMonth() + 1).padStart(2, '0')}-${String(nextDay.getDate()).padStart(2, '0')}`;
 
+  const startHourStr = String(startHour).padStart(2, '0') + ':00:00';
   const endHourStr = String(endHour).padStart(2, '0') + ':00:00';
+
+  // If endHour > startHour, the day doesn't wrap (e.g., 8:00 to 20:00 same day)
+  // If endHour <= startHour, the day wraps to next day (e.g., 8:00 to 2:00 next day)
+  const endDate = endHour > startHour ? date : (() => {
+    const nextDay = new Date(date);
+    nextDay.setDate(nextDay.getDate() + 1);
+    return `${nextDay.getFullYear()}-${String(nextDay.getMonth() + 1).padStart(2, '0')}-${String(nextDay.getDate()).padStart(2, '0')}`;
+  })();
 
   return await database.select<StrategicObjective[]>(
     `SELECT id, text, completed_at FROM objectives
      WHERE completed_at IS NOT NULL
-       AND datetime(completed_at, 'localtime') >= $1 || ' 00:00:00'
-       AND datetime(completed_at, 'localtime') < $2 || ' ' || $3
+       AND datetime(completed_at, 'localtime') >= $1 || ' ' || $3
+       AND datetime(completed_at, 'localtime') < $2 || ' ' || $4
      ORDER BY completed_at ASC`,
-    [date, nextDayStr, endHourStr]
+    [date, endDate, startHourStr, endHourStr]
   );
+}
+
+export async function getKillRate() {
+  const database = await getDb();
+
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+  const dayResult = await database.select<{ count: number }[]>(
+    "SELECT COUNT(*) as count FROM objectives WHERE completed_at IS NOT NULL AND date(completed_at, 'localtime') = $1",
+    [todayStr]
+  );
+
+  const dWeek = new Date();
+  dWeek.setDate(dWeek.getDate() - 7);
+  const weekStr = dWeek.toISOString().split('T')[0];
+  const weekResult = await database.select<{ count: number }[]>(
+    "SELECT COUNT(*) as count FROM objectives WHERE completed_at IS NOT NULL AND date(completed_at, 'localtime') >= $1",
+    [weekStr]
+  );
+
+  const allResult = await database.select<{ count: number }[]>(
+    "SELECT COUNT(*) as count FROM objectives WHERE completed_at IS NOT NULL"
+  );
+
+  return {
+    day: dayResult[0]?.count || 0,
+    week: weekResult[0]?.count || 0,
+    allTime: allResult[0]?.count || 0,
+  };
+}
+
+export async function getAllSessions(): Promise<FocusSession[]> {
+  const database = await getDb();
+  return await database.select<FocusSession[]>(
+    'SELECT * FROM focus_sessions ORDER BY start_time ASC'
+  );
+}
+
+export async function getFragmentationStats(): Promise<{ session_id: number; pause_count: number }[]> {
+  const database = await getDb();
+  const results = await database.select<{ session_id: number; pause_count: number }[]>(
+    `SELECT fs.id as session_id, COUNT(sp.id) as pause_count
+     FROM focus_sessions fs
+     LEFT JOIN session_pauses sp ON sp.session_id = fs.id
+     GROUP BY fs.id
+     ORDER BY fs.start_time ASC`
+  );
+  return results;
 }

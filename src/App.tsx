@@ -5,19 +5,20 @@ import { MainDisplay } from './components/MainDisplay';
 import { SidebarRight } from './components/SidebarRight';
 import { Footer } from './components/Footer';
 import { AnalyticsView } from './components/AnalyticsView';
+import { IntelligenceHub } from './components/IntelligenceHub';
 import { GlitchOverlay } from './components/GlitchOverlay';
 import { useFocus } from './contexts/FocusContext';
 import { NavigationGuard } from './components/NavigationGuard';
 
 function App() {
-  const [view, setView] = useState<'hud' | 'analytics'>('hud');
+  const [view, setView] = useState<'hud' | 'analytics' | 'intel'>('hud');
   const [analyticsDate, setAnalyticsDate] = useState<Date>(new Date());
-  const [pendingNavigation, setPendingNavigation] = useState<{ dateStr?: string } | null>(null);
+  const [pendingNavigation, setPendingNavigation] = useState<{ target: 'analytics' | 'intel'; dateStr?: string } | null>(null);
   const { timerStatus, resetTimer } = useFocus();
 
   const handleViewAnalytics = (dateStr?: string) => {
     if (timerStatus !== 'idle') {
-      setPendingNavigation({ dateStr });
+      setPendingNavigation({ target: 'analytics', dateStr });
       return;
     }
 
@@ -29,16 +30,28 @@ function App() {
     setView('analytics');
   };
 
-  const handleConfirmNavigation = () => {
-    const dateStr = pendingNavigation?.dateStr;
-    resetTimer();
-    
-    if (dateStr) {
-      setAnalyticsDate(new Date(dateStr));
-    } else {
-      setAnalyticsDate(new Date());
+  const handleViewIntel = () => {
+    if (timerStatus !== 'idle') {
+      setPendingNavigation({ target: 'intel' });
+      return;
     }
-    setView('analytics');
+    setView('intel');
+  };
+
+  const handleConfirmNavigation = () => {
+    if (!pendingNavigation) return;
+    resetTimer();
+
+    if (pendingNavigation.target === 'analytics') {
+      if (pendingNavigation.dateStr) {
+        setAnalyticsDate(new Date(pendingNavigation.dateStr));
+      } else {
+        setAnalyticsDate(new Date());
+      }
+      setView('analytics');
+    } else {
+      setView('intel');
+    }
     setPendingNavigation(null);
   };
 
@@ -52,12 +65,14 @@ function App() {
       <Header />
       {view === 'hud' ? (
         <>
-          <SidebarLeft onViewAnalytics={() => handleViewAnalytics()} />
-          <MainDisplay onViewAnalytics={() => handleViewAnalytics()} />
+          <SidebarLeft onViewAnalytics={() => handleViewAnalytics()} onViewIntel={handleViewIntel} />
+          <MainDisplay onViewAnalytics={() => handleViewAnalytics()} onViewIntel={handleViewIntel} />
           <SidebarRight onViewAnalytics={(date) => handleViewAnalytics(date)} />
         </>
-      ) : (
+      ) : view === 'analytics' ? (
         <AnalyticsView initialDate={analyticsDate} onBack={() => setView('hud')} />
+      ) : (
+        <IntelligenceHub onBack={() => setView('hud')} />
       )}
       <Footer />
 

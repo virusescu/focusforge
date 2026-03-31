@@ -4,7 +4,7 @@ import { Play, Pause, RotateCcw, Zap, Target } from 'lucide-react';
 import { useFocus } from '../contexts/FocusContext';
 import { soundEngine, playChargeClickWithFile } from '../utils/audio';
 
-export const MainDisplay: FC<{ onViewAnalytics?: () => void }> = ({ onViewAnalytics }) => {
+export const MainDisplay: FC<{ onViewAnalytics?: () => void; onViewIntel?: () => void }> = ({ onViewAnalytics, onViewIntel }) => {
   const { 
     activeObjectiveId, 
     objectivePool, 
@@ -90,12 +90,17 @@ export const MainDisplay: FC<{ onViewAnalytics?: () => void }> = ({ onViewAnalyt
           soundEngine.playClick();
           onViewAnalytics();
         }
+      } else if (e.key.toLowerCase() === 'i') {
+        if (onViewIntel) {
+          soundEngine.playTab();
+          onViewIntel();
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [toggleTimer, resetTimer, onViewAnalytics, activeObjectiveId, isActive, handleNeutralize]);
+  }, [toggleTimer, resetTimer, onViewAnalytics, onViewIntel, activeObjectiveId, isActive, handleNeutralize]);
 
   const handleHover = () => {
     soundEngine.playHover();
