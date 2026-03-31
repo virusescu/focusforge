@@ -7,10 +7,14 @@ import { Footer } from './components/Footer';
 import { AnalyticsView } from './components/AnalyticsView';
 import { IntelligenceHub } from './components/IntelligenceHub';
 import { GlitchOverlay } from './components/GlitchOverlay';
+import { LoginScreen } from './components/LoginScreen';
 import { useFocus } from './contexts/FocusContext';
+import { useAuth } from './contexts/AuthContext';
+import { UserProvider } from './contexts/UserContext';
+import { FocusProvider } from './contexts/FocusContext';
 import { NavigationGuard } from './components/NavigationGuard';
 
-function App() {
+function HudApp() {
   const [view, setView] = useState<'hud' | 'analytics' | 'intel'>('hud');
   const [analyticsDate, setAnalyticsDate] = useState<Date>(new Date());
   const [pendingNavigation, setPendingNavigation] = useState<{ target: 'analytics' | 'intel'; dateStr?: string } | null>(null);
@@ -77,13 +81,43 @@ function App() {
       <Footer />
 
       {pendingNavigation && (
-        <NavigationGuard 
-          onConfirm={handleConfirmNavigation} 
-          onCancel={handleCancelNavigation} 
+        <NavigationGuard
+          onConfirm={handleConfirmNavigation}
+          onCancel={handleCancelNavigation}
         />
       )}
     </div>
   );
+}
+
+function App() {
+  const { authUser, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#0a0a0a', color: '#00ff88', fontFamily: 'monospace' }}>
+        INITIALIZING_SYSTEM...
+      </div>
+    );
+  }
+
+  if (!authUser) {
+    return <LoginScreen />;
+  }
+
+  return (
+    <UserProvider>
+      <FocusProvider>
+        <AppContent />
+      </FocusProvider>
+    </UserProvider>
+  );
+}
+
+// Extract the content that uses context hooks to a separate component
+// so that context providers are available when the hooks are called.
+function AppContent() {
+  return <HudApp />;
 }
 
 export default App;
