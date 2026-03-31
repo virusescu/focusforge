@@ -1,10 +1,16 @@
 import { LOG_MESSAGES } from '../logData';
 
+export interface AuthUser {
+  id: number;
+  google_sub: string;
+  email: string;
+  name: string;
+  avatar_url?: string;
+}
+
 export interface UserSettings {
   id: number;
-  name: string;
-  email: string;
-  avatar_url?: string;
+  user_id: number;
   debug_speed: number;
   experience_lvl: number;
   day_start_hour: number;
