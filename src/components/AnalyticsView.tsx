@@ -402,6 +402,12 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
                 <span>TODAY</span>
               </button>
             )}
+
+            {loading ? (
+              <span className={styles.loadingHeader}>// SYNCING_NEURAL_RECORDS...</span>
+            ) : sessions.length === 0 ? (
+              <span className={styles.noSessionsHeader}>// NO_SESSIONS_RECORDED</span>
+            ) : null}
           </div>
 
           <div className={styles.summary}>
@@ -448,78 +454,68 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
             </div>
 
             <div className={styles.visualizerArea}>
-              {loading ? (
-                <div className={styles.loading}>SYNCING_NEURAL_RECORDS...</div>
-              ) : (
-                <>
-                  <div className={styles.track}>
-                    {sessions.length === 0 ? (
-                      <div className={styles.noData}>NO_SESSIONS_RECORDED_FOR_THIS_PERIOD</div>
-                    ) : (
-                      sessions.map(s => {
-                        const pos = getPosition(s.start_time, s.duration_seconds);
-                        if (!pos) return null;
-                        const isHighlighted = hoveredSessionId === s.id;
-                        const sessionStartMs = new Date(s.start_time).getTime();
-                        const sessionDurationMs = s.duration_seconds * 1000;
+              <div className={styles.track}>
+                {sessions.map(s => {
+                  const pos = getPosition(s.start_time, s.duration_seconds);
+                  if (!pos) return null;
+                  const isHighlighted = hoveredSessionId === s.id;
+                  const sessionStartMs = new Date(s.start_time).getTime();
+                  const sessionDurationMs = s.duration_seconds * 1000;
+                  return (
+                    <div
+                      key={s.id}
+                      className={`${styles.sessionBlock} ${isHighlighted ? styles.highlighted : ''}`}
+                      style={pos}
+                      onMouseEnter={() => handleMouseEnterSession(s.id)}
+                      onMouseLeave={() => setHoveredSessionId(null)}
+                      title={`${new Date(s.start_time).toLocaleTimeString()} - ${Math.floor(s.duration_seconds / 60)}m`}
+                    >
+                      {s.pause_times?.map((pauseTime, i) => {
+                        const fraction = (new Date(pauseTime).getTime() - sessionStartMs) / sessionDurationMs;
+                        if (fraction <= 0 || fraction >= 1) return null;
                         return (
                           <div
-                            key={s.id}
-                            className={`${styles.sessionBlock} ${isHighlighted ? styles.highlighted : ''}`}
-                            style={pos}
-                            onMouseEnter={() => handleMouseEnterSession(s.id)}
-                            onMouseLeave={() => setHoveredSessionId(null)}
-                            title={`${new Date(s.start_time).toLocaleTimeString()} - ${Math.floor(s.duration_seconds / 60)}m`}
-                          >
-                            {s.pause_times?.map((pauseTime, i) => {
-                              const fraction = (new Date(pauseTime).getTime() - sessionStartMs) / sessionDurationMs;
-                              if (fraction <= 0 || fraction >= 1) return null;
-                              return (
-                                <div
-                                  key={i}
-                                  data-testid="interruption-crack"
-                                  className={styles.crack}
-                                  style={{ left: `${fraction * 100}%` }}
-                                />
-                              );
-                            })}
-                          </div>
+                            key={i}
+                            data-testid="interruption-crack"
+                            className={styles.crack}
+                            style={{ left: `${fraction * 100}%` }}
+                          />
                         );
-                      })
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className={styles.objectiveTrack}>
+                {objectiveDots.map(dot => (
+                  <div
+                    key={dot.key}
+                    data-testid="objective-dot"
+                    className={styles.objectiveDot}
+                    style={{ left: `${dot.leftPercent}%`, backgroundColor: dot.color }}
+                    onMouseEnter={() => setHoveredDotKey(dot.key)}
+                    onMouseLeave={() => setHoveredDotKey(null)}
+                  >
+                    {hoveredDotKey === dot.key && (
+                      <div className={`${styles.dotTooltip} ${
+                        dot.leftPercent < 15 ? styles.alignLeft : 
+                        dot.leftPercent > 85 ? styles.alignRight : 
+                        styles.alignCenter
+                      }`}>
+                        {dot.objectives.map(obj => (
+                          <div key={obj.id} className={styles.dotTooltipRow}>
+                            <span className={styles.dotTooltipTime}>
+                              {new Date(obj.completed_at!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
+                            </span>
+                            <span className={styles.dotTooltipItem}>{obj.text}</span>
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
-
-                  <div className={styles.objectiveTrack}>
-                    {objectiveDots.map(dot => (
-                      <div
-                        key={dot.key}
-                        data-testid="objective-dot"
-                        className={styles.objectiveDot}
-                        style={{ left: `${dot.leftPercent}%`, backgroundColor: dot.color }}
-                        onMouseEnter={() => setHoveredDotKey(dot.key)}
-                        onMouseLeave={() => setHoveredDotKey(null)}
-                      >
-                        {hoveredDotKey === dot.key && (
-                          <div className={`${styles.dotTooltip} ${
-                            dot.leftPercent < 15 ? styles.alignLeft : 
-                            dot.leftPercent > 85 ? styles.alignRight : 
-                            styles.alignCenter
-                          }`}>
-                            {dot.objectives.map(obj => (
-                              <div key={obj.id} className={styles.dotTooltipRow}>
-                                <span className={styles.dotTooltipTime}>
-                                  {new Date(obj.completed_at!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
-                                </span>
-                                <span className={styles.dotTooltipItem}>{obj.text}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
+                ))}
+              </div>
             </div>
           </div>
         </div>
