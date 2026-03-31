@@ -114,7 +114,10 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, categories, onSele
           <CategoryDotPicker
             categories={categories}
             selectedCategoryId={obj.category_id ?? null}
-            onSelect={(catId) => onCategoryChange(obj.id, catId)}
+            onSelect={(catId) => {
+              onCategoryChange(obj.id, catId);
+              setShowPicker(false);
+            }}
             onManage={onManageCategories}
           />
         </div>
@@ -342,7 +345,10 @@ export const SidebarLeft: FC<Props> = ({ onViewAnalytics, onViewIntel }) => {
               <CategoryDotPicker
                 categories={categories}
                 selectedCategoryId={newCategoryId}
-                onSelect={setNewCategoryId}
+                onSelect={(catId) => {
+                  setNewCategoryId(catId);
+                  setShowNewCategoryPicker(false);
+                }}
                 onManage={() => setShowCategoryManager(true)}
               />
             )}
