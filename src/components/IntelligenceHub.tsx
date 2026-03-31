@@ -2,6 +2,7 @@ import { type FC, useState, useEffect, useCallback, useMemo } from 'react';
 import styles from './IntelligenceHub.module.scss';
 import { ArrowLeft, Activity, HelpCircle, Clock, Calendar, BarChart3, Shield } from 'lucide-react';
 import { getAllSessions, getFragmentationStats } from '../db';
+import { useAuth } from '../contexts/AuthContext';
 import type { FocusSession } from '../types';
 import { soundEngine } from '../utils/audio';
 
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export const IntelligenceHub: FC<Props> = ({ onBack }) => {
+  const { authUser } = useAuth();
   const [sessions, setSessions] = useState<FocusSession[]>([]);
   const [fragStats, setFragStats] = useState<{ session_id: number; pause_count: number }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -17,10 +19,11 @@ export const IntelligenceHub: FC<Props> = ({ onBack }) => {
 
   useEffect(() => {
     const load = async () => {
+      if (!authUser) return;
       try {
         const [allSessions, frag] = await Promise.all([
-          getAllSessions(),
-          getFragmentationStats(),
+          getAllSessions(authUser.id),
+          getFragmentationStats(authUser.id),
         ]);
         setSessions(allSessions);
         setFragStats(frag);
@@ -31,7 +34,7 @@ export const IntelligenceHub: FC<Props> = ({ onBack }) => {
       }
     };
     load();
-  }, []);
+  }, [authUser]);
 
   const handleBack = useCallback(() => {
     soundEngine.playClick();

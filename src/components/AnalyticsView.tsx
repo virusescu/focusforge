@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, ArrowLeft, BarChart2, X, HelpCircle } from '
 import { getSessionsForDay, deleteFocusSession, getCompletedObjectivesForDay, getKillRate } from '../db';
 import { useFocus } from '../contexts/FocusContext';
 import { useUser } from '../contexts/UserContext';
+import { useAuth } from '../contexts/AuthContext';
 import type { FocusSession, StrategicObjective } from '../types';
 import { soundEngine } from '../utils/audio';
 
@@ -22,6 +23,7 @@ interface ObjectiveDot {
 export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
   const { globalStats, refreshData } = useFocus();
   const { user } = useUser();
+  const { authUser } = useAuth();
   const [currentDate, setCurrentDate] = useState(initialDate || new Date());
   const [sessions, setSessions] = useState<FocusSession[]>([]);
   const [completedObjectives, setCompletedObjectives] = useState<StrategicObjective[]>([]);
@@ -56,6 +58,7 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
   }, [onBack]);
 
   const loadSessions = useCallback(async () => {
+    if (!authUser) return;
     setLoading(true);
     // Use local date string YYYY-MM-DD instead of UTC-based toISOString
     const year = currentDate.getFullYear();
@@ -65,9 +68,9 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
     
     try {
       const [data, completed, kr] = await Promise.all([
-        getSessionsForDay(dateStr, startHourSetting, endHourSetting),
-        getCompletedObjectivesForDay(dateStr, startHourSetting, endHourSetting),
-        getKillRate(),
+        getSessionsForDay(authUser.id, dateStr, startHourSetting, endHourSetting),
+        getCompletedObjectivesForDay(authUser.id, dateStr, startHourSetting, endHourSetting),
+        getKillRate(authUser.id),
       ]);
       setSessions(data);
       setCompletedObjectives(completed);
@@ -77,7 +80,7 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
     } finally {
       setLoading(false);
     }
-  }, [currentDate, startHourSetting, endHourSetting]);
+  }, [currentDate, startHourSetting, endHourSetting, authUser]);
 
   useEffect(() => {
     loadSessions();
@@ -136,8 +139,9 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
   const totalMinutes = Math.floor((totalSeconds % 3600) / 60);
 
   const handleDelete = async (id: number) => {
+    if (!authUser) return;
     soundEngine.playPause();
-    await deleteFocusSession(id);
+    await deleteFocusSession(authUser.id, id);
     await loadSessions();
     await refreshData();
   };
