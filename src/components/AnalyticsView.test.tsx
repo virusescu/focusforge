@@ -1,40 +1,39 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { AnalyticsView } from './AnalyticsView';
-import { FocusProvider } from '../contexts/FocusContext';
-import { UserProvider } from '../contexts/UserContext';
-import type { ReactNode } from 'react';
 
-// Mock DB
-const mockSessions = [
-  { id: 1, start_time: '2026-03-24T12:00:00.000Z', duration_seconds: 3600, date: '2026-03-24' },
-  { id: 2, start_time: '2026-03-24T16:30:00.000Z', duration_seconds: 1800, date: '2026-03-24' }
-];
+// Mock hooks
+const mockUseUser = vi.fn();
+const mockUseFocus = vi.fn();
+const mockUseAuth = vi.fn();
 
-const mockDeleteFocusSession = vi.fn().mockResolvedValue(undefined);
+vi.mock('../contexts/UserContext', () => ({
+  useUser: () => mockUseUser(),
+}));
 
+vi.mock('../contexts/FocusContext', () => ({
+  useFocus: () => mockUseFocus(),
+}));
+
+vi.mock('../contexts/AuthContext', () => ({
+  useAuth: () => mockUseAuth(),
+}));
+
+// Mock DB functions used directly
 vi.mock('../db', () => ({
-  getSessionsForDay: vi.fn().mockImplementation(() => Promise.resolve(mockSessions)),
-  deleteFocusSession: (id: number) => mockDeleteFocusSession(id),
-  getRecentSessions: vi.fn().mockResolvedValue([]),
-  getDailyFocusStats: vi.fn().mockResolvedValue([]),
+  getSessionsForDay: vi.fn(),
+  deleteFocusSession: vi.fn(),
+  getCompletedObjectivesForDay: vi.fn(),
+  getKillRate: vi.fn().mockResolvedValue({ day: 0, week: 0, allTime: 0 }),
   getGlobalStats: vi.fn().mockResolvedValue({
     allTimeTotal: 5400,
     allTimePeak: 3600,
     weekTotal: 5400,
     monthTotal: 5400
   }),
-  getObjectives: vi.fn().mockResolvedValue([]),
-  addObjective: vi.fn().mockResolvedValue(undefined),
-  deleteObjective: vi.fn().mockResolvedValue(undefined),
-  completeObjective: vi.fn().mockResolvedValue(undefined),
-  getCompletedObjectivesForDay: vi.fn().mockResolvedValue([]),
-  getKillRate: vi.fn().mockResolvedValue({ day: 0, week: 0, allTime: 0 }),
-  getUserSettings: vi.fn().mockResolvedValue({ day_start_hour: 8, day_end_hour: 2 }),
-  getGravatarUrl: vi.fn().mockResolvedValue('avatar-url'),
 }));
 
-// Mock AudioContext which doesn't exist in JSDOM
+// Mock AudioContext
 const mockAudioContext = vi.fn().mockImplementation(function(this: any) {
   this.resume = vi.fn().mockResolvedValue(undefined);
   this.createOscillator = vi.fn().mockReturnValue({
@@ -52,26 +51,39 @@ const mockAudioContext = vi.fn().mockImplementation(function(this: any) {
   this.currentTime = 0;
   this.state = 'suspended';
 });
-
 vi.stubGlobal('AudioContext', mockAudioContext);
-
-const wrapper = ({ children }: { children: ReactNode }) => (
-  <UserProvider>
-    <FocusProvider>{children}</FocusProvider>
-  </UserProvider>
-);
 
 describe('AnalyticsView', () => {
   const onBack = vi.fn();
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    
+    mockUseAuth.mockReturnValue({
+      authUser: { id: 1, name: 'TEST_OP' },
+      loading: false,
+    });
+
+    mockUseUser.mockReturnValue({
+      user: { day_start_hour: 8, day_end_hour: 2 },
+      loading: false,
+    });
+
+    mockUseFocus.mockReturnValue({
+      globalStats: { allTimeTotal: 5400, allTimePeak: 3600, weekTotal: 5400, monthTotal: 5400 },
+      refreshData: vi.fn(),
+    });
+
+    const { getSessionsForDay, getCompletedObjectivesForDay } = await import('../db');
+    vi.mocked(getSessionsForDay).mockResolvedValue([
+      { id: 1, start_time: '2026-03-24T12:00:00.000Z', duration_seconds: 3600, date: '2026-03-24' },
+      { id: 2, start_time: '2026-03-24T16:30:00.000Z', duration_seconds: 1800, date: '2026-03-24' }
+    ]);
+    vi.mocked(getCompletedObjectivesForDay).mockResolvedValue([]);
   });
 
   it('renders correctly and loads sessions', async () => {
-    await act(async () => {
-      render(<AnalyticsView onBack={onBack} />, { wrapper });
-    });
+    render(<AnalyticsView onBack={onBack} />);
     
     expect(screen.getByText('SYSTEM_ANALYTICS')).toBeInTheDocument();
     
@@ -83,9 +95,7 @@ describe('AnalyticsView', () => {
   });
 
   it('navigates to previous and next days', async () => {
-    await act(async () => {
-      render(<AnalyticsView onBack={onBack} />, { wrapper });
-    });
+    render(<AnalyticsView onBack={onBack} />);
     
     const navButtons = screen.getAllByRole('button');
     const prevBtn = navButtons[1];
@@ -109,9 +119,7 @@ describe('AnalyticsView', () => {
   });
 
   it('calls onBack when back button is clicked', async () => {
-    await act(async () => {
-      render(<AnalyticsView onBack={onBack} />, { wrapper });
-    });
+    render(<AnalyticsView onBack={onBack} />);
     
     const backBtn = screen.getByText('BACK_TO_HUD').closest('button');
     if (backBtn) {
@@ -124,9 +132,8 @@ describe('AnalyticsView', () => {
   });
 
   it('calls deleteFocusSession when delete button is clicked', async () => {
-    await act(async () => {
-      render(<AnalyticsView onBack={onBack} />, { wrapper });
-    });
+    const { deleteFocusSession } = await import('../db');
+    render(<AnalyticsView onBack={onBack} />);
     
     await waitFor(() => {
       expect(screen.getAllByTitle('DELETE_RECORD').length).toBeGreaterThan(0);
@@ -139,27 +146,23 @@ describe('AnalyticsView', () => {
     });
 
     await waitFor(() => {
-      expect(mockDeleteFocusSession).toHaveBeenCalledWith(1);
+      expect(deleteFocusSession).toHaveBeenCalledWith(1);
     });
   });
 
   it('renders crack marks inside session blocks when pause_times exist', async () => {
     const { getSessionsForDay } = await import('../db');
-    vi.mocked(getSessionsForDay)
-      .mockResolvedValueOnce([
-        {
-          id: 1,
-          start_time: '2026-03-24T09:00:00.000Z',
-          duration_seconds: 3600,
-          date: '2026-03-24',
-          pause_times: ['2026-03-24T09:15:00.000Z', '2026-03-24T09:45:00.000Z'],
-        },
-      ])
-      .mockResolvedValueOnce([]);
+    vi.mocked(getSessionsForDay).mockResolvedValueOnce([
+      {
+        id: 1,
+        start_time: '2026-03-24T09:00:00.000Z',
+        duration_seconds: 3600,
+        date: '2026-03-24',
+        pause_times: ['2026-03-24T09:15:00.000Z', '2026-03-24T09:45:00.000Z'],
+      },
+    ]);
 
-    await act(async () => {
-      render(<AnalyticsView onBack={onBack} initialDate={new Date('2026-03-24T12:00:00.000Z')} />, { wrapper });
-    });
+    render(<AnalyticsView onBack={onBack} initialDate={new Date('2026-03-24T12:00:00.000Z')} />);
 
     await waitFor(() => {
       expect(screen.getAllByTestId('interruption-crack').length).toBe(2);
@@ -168,15 +171,11 @@ describe('AnalyticsView', () => {
 
   it('renders no cracks when session has no pause_times', async () => {
     const { getSessionsForDay } = await import('../db');
-    vi.mocked(getSessionsForDay)
-      .mockResolvedValueOnce([
-        { id: 1, start_time: '2026-03-24T09:00:00.000Z', duration_seconds: 3600, date: '2026-03-24' },
-      ])
-      .mockResolvedValueOnce([]);
+    vi.mocked(getSessionsForDay).mockResolvedValueOnce([
+      { id: 1, start_time: '2026-03-24T09:00:00.000Z', duration_seconds: 3600, date: '2026-03-24' },
+    ]);
 
-    await act(async () => {
-      render(<AnalyticsView onBack={onBack} initialDate={new Date('2026-03-24T12:00:00.000Z')} />, { wrapper });
-    });
+    render(<AnalyticsView onBack={onBack} initialDate={new Date('2026-03-24T12:00:00.000Z')} />);
 
     await waitFor(() => {
       expect(screen.queryByTestId('interruption-crack')).not.toBeInTheDocument();
@@ -184,19 +183,14 @@ describe('AnalyticsView', () => {
   });
 
   it('renders one dot per 5-min bucket of completed objectives', async () => {
-    const { getSessionsForDay, getCompletedObjectivesForDay } = await import('../db');
-    vi.mocked(getSessionsForDay)
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([]);
+    const { getCompletedObjectivesForDay } = await import('../db');
     vi.mocked(getCompletedObjectivesForDay).mockResolvedValueOnce([
       { id: 1, text: 'Objective A', created_at: '2026-03-24T08:00:00.000Z', completed_at: '2026-03-24T12:01:00.000Z', sort_order: 0 },
       { id: 2, text: 'Objective B', created_at: '2026-03-24T08:00:00.000Z', completed_at: '2026-03-24T12:03:00.000Z', sort_order: 1 },
       { id: 3, text: 'Objective C', created_at: '2026-03-24T08:00:00.000Z', completed_at: '2026-03-24T13:00:00.000Z', sort_order: 2 },
     ]);
 
-    await act(async () => {
-      render(<AnalyticsView onBack={onBack} initialDate={new Date('2026-03-24T12:00:00.000Z')} />, { wrapper });
-    });
+    render(<AnalyticsView onBack={onBack} initialDate={new Date('2026-03-24T12:00:00.000Z')} />);
 
     await waitFor(() => {
       expect(screen.getAllByTestId('objective-dot').length).toBe(2);
@@ -204,15 +198,7 @@ describe('AnalyticsView', () => {
   });
 
   it('renders no dots when no objectives completed that day', async () => {
-    const { getSessionsForDay, getCompletedObjectivesForDay } = await import('../db');
-    vi.mocked(getSessionsForDay)
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([]);
-    vi.mocked(getCompletedObjectivesForDay).mockResolvedValueOnce([]);
-
-    await act(async () => {
-      render(<AnalyticsView onBack={onBack} initialDate={new Date('2026-03-24T12:00:00.000Z')} />, { wrapper });
-    });
+    render(<AnalyticsView onBack={onBack} initialDate={new Date('2026-03-24T12:00:00.000Z')} />);
 
     await waitFor(() => {
       expect(screen.queryByTestId('objective-dot')).not.toBeInTheDocument();

@@ -11,7 +11,7 @@ interface Props {
 }
 
 export const SettingsModal: FC<Props> = ({ onClose }) => {
-  const { user, name, email, avatar, updateSettings, loading } = useUser();
+  const { user, name, email, updateSettings, loading } = useUser();
   const { logout } = useAuth();
   const [debugSpeed, setDebugSpeed] = useState(1);
   const [experienceLvl, setExperienceLvl] = useState(42);

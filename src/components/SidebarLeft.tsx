@@ -169,7 +169,7 @@ interface Props {
 }
 
 export const SidebarLeft: FC<Props> = ({ onViewAnalytics, onViewIntel }) => {
-  const { user, avatar, loading } = useUser();
+  const { user, name, avatar, loading } = useUser();
   const { objectivePool, activeObjectiveId, addObjective, deleteObjective, updateObjective, updateObjectiveCategory, setActiveObjective, reorderObjectives, categories, addCategory, updateCategory, deleteCategory } = useFocus();
   const [newObjective, setNewObjective] = useState('');
   const [newCategoryId, setNewCategoryId] = useState<number | null>(null);
@@ -260,7 +260,7 @@ export const SidebarLeft: FC<Props> = ({ onViewAnalytics, onViewIntel }) => {
             )}
           </div>
           <div className={styles.details}>
-            <h3>{user?.name || 'LOADING...'}</h3>
+            <h3>{name || 'LOADING...'}</h3>
             <p>SYNC_STABLE</p>
           </div>
         </div>

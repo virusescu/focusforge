@@ -16,6 +16,23 @@ vi.mock('../db', () => ({
   getGravatarUrl: vi.fn().mockResolvedValue('https://mock-avatar.com')
 }));
 
+const STABLE_AUTH_USER = {
+  id: 1,
+  name: 'TEST_OP',
+  email: 'test@example.com',
+  avatar_url: 'https://mock-avatar.com'
+};
+
+// Mock AuthContext
+vi.mock('./AuthContext', () => ({
+  useAuth: () => ({
+    authUser: STABLE_AUTH_USER,
+    loading: false,
+    signOut: vi.fn()
+  }),
+  AuthProvider: ({ children }: { children: ReactNode }) => <div>{children}</div>
+}));
+
 const wrapper = ({ children }: { children: ReactNode }) => (
   <UserProvider>{children}</UserProvider>
 );
@@ -34,7 +51,7 @@ describe('UserContext', () => {
       expect(result.current.loading).toBe(false);
     });
 
-    expect(result.current.user?.name).toBe('TEST_OP');
+    expect(result.current.name).toBe('TEST_OP');
     expect(result.current.avatar).toBe('https://mock-avatar.com');
   });
 

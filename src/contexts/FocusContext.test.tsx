@@ -14,6 +14,10 @@ vi.mock('../utils/audio', () => ({
     playAlarm: vi.fn(),
     playGlitch: vi.fn(),
     playObjectiveAdded: vi.fn(),
+    playStart: vi.fn(),
+    playPause: vi.fn(),
+    playReboot: vi.fn(),
+    playDenied: vi.fn(),
   },
   playNeutralizeChime: vi.fn(),
   playObjectiveComplete: vi.fn(),
@@ -35,9 +39,9 @@ vi.mock('../db', () => ({
     weekTotal: 0,
     monthTotal: 0
   }),
-  saveFocusSession: (start: string, dur: number, pauses: string[]) => mockSaveSession(start, dur, pauses),
+  saveFocusSession: (userId: number, start: string, dur: number, pauses: string[]) => mockSaveSession(userId, start, dur, pauses),
   getObjectives: () => mockGetObjectives(),
-  addObjective: (text: string, categoryId?: number | null) => mockAddObjective(text, categoryId),
+  addObjective: (userId: number, text: string, categoryId?: number | null) => mockAddObjective(userId, text, categoryId),
   deleteObjective: (id: number) => mockDeleteObjective(id),
   updateObjective: vi.fn().mockResolvedValue(undefined),
   completeObjective: (id: number) => mockCompleteObjective(id),
@@ -57,6 +61,16 @@ vi.mock('./UserContext', () => ({
     loading: false,
     updateSettings: vi.fn(),
     refreshUser: vi.fn(),
+  }),
+}));
+
+const STABLE_AUTH_USER = { id: 1, name: 'TEST_OP' };
+
+// Mock AuthContext
+vi.mock('./AuthContext', () => ({
+  useAuth: () => ({
+    authUser: STABLE_AUTH_USER,
+    loading: false,
   }),
 }));
 
@@ -107,7 +121,7 @@ describe('FocusContext', () => {
       await result.current.addObjective('New Objective');
     });
 
-    expect(mockAddObjective).toHaveBeenCalledWith('New Objective', undefined);
+    expect(mockAddObjective).toHaveBeenCalledWith(1, 'New Objective', undefined);
     expect(result.current.objectivePool).toEqual([newObjective]);
   });
 
@@ -179,6 +193,7 @@ describe('FocusContext', () => {
 
     await waitFor(() => {
       expect(mockSaveSession).toHaveBeenCalledWith(
+        1,
         '2024-03-24T09:00:00.000Z',
         120,
         []
@@ -202,6 +217,7 @@ describe('FocusContext', () => {
 
     await waitFor(() => {
       expect(mockSaveSession).toHaveBeenCalledWith(
+        1,
         '2024-03-24T09:00:00.000Z',
         120,
         ['2024-03-24T09:05:00.000Z', '2024-03-24T09:12:00.000Z']

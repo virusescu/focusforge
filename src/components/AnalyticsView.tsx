@@ -141,7 +141,7 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
   const handleDelete = async (id: number) => {
     if (!authUser) return;
     soundEngine.playPause();
-    await deleteFocusSession(authUser.id, id);
+    await deleteFocusSession(id);
     await loadSessions();
     await refreshData();
   };
