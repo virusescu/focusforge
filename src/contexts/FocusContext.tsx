@@ -3,6 +3,7 @@ import type { FocusSession, DailyStat, StrategicObjective, ObjectiveCategory } f
 import { soundEngine, playObjectiveComplete } from '../utils/audio';
 import { useTimer } from '../hooks/useTimer';
 import { useUser } from './UserContext';
+import { useAuth } from './AuthContext';
 import {
   getRecentSessions,
   getDailyFocusStats,
@@ -63,6 +64,7 @@ interface FocusContextType {
 const FocusContext = createContext<FocusContextType | undefined>(undefined);
 
 export const FocusProvider = ({ children }: { children: ReactNode }) => {
+  const { authUser } = useAuth();
   const { user } = useUser();
   const { 
     seconds, 
@@ -116,13 +118,14 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
 
 
   const refreshData = useCallback(async () => {
+    if (!authUser) return;
     try {
       const [sessions, stats, globals, objectives, cats] = await Promise.all([
-        getRecentSessions(3),
-        getDailyFocusStats(21),
-        getGlobalStats(),
-        getObjectives(),
-        getCategories()
+        getRecentSessions(authUser.id, 3),
+        getDailyFocusStats(authUser.id, 21),
+        getGlobalStats(authUser.id),
+        getObjectives(authUser.id),
+        getCategories(authUser.id)
       ]);
       setRecentSessions(sessions);
       setDailyStats(stats);
@@ -134,22 +137,23 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [authUser]);
 
   useEffect(() => {
     refreshData();
   }, [refreshData]);
 
   const saveSession = useCallback(async (startTime: string, durationSeconds: number, pauseTimes: string[] = []) => {
-    if (durationSeconds < 60) return;
-    await dbSaveFocusSession(startTime, durationSeconds, pauseTimes);
+    if (durationSeconds < 60 || !authUser) return;
+    await dbSaveFocusSession(authUser.id, startTime, durationSeconds, pauseTimes);
     await refreshData();
-  }, [refreshData]);
+  }, [authUser, refreshData]);
 
   const addObjective = useCallback(async (text: string, categoryId?: number | null) => {
-    await dbAddObjective(text, categoryId);
+    if (!authUser) return;
+    await dbAddObjective(authUser.id, text, categoryId);
     await refreshData();
-  }, [refreshData]);
+  }, [authUser, refreshData]);
 
   const deleteObjective = useCallback(async (id: number) => {
     await dbDeleteObjective(id);
@@ -182,9 +186,10 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
   }, [refreshData]);
 
   const addCategory = useCallback(async (label: string, color: string) => {
-    await dbAddCategory(label, color);
+    if (!authUser) return;
+    await dbAddCategory(authUser.id, label, color);
     await refreshData();
-  }, [refreshData]);
+  }, [authUser, refreshData]);
 
   const updateCategory = useCallback(async (id: number, label: string, color: string) => {
     await dbUpdateCategory(id, label, color);
