@@ -94,10 +94,7 @@
 - **Sidebar Visuals (Objective Pool)**:
   - Each objective's bullet/pip is colored to match its category. Hard objectives get a red bullet, Normal white, Easy gray.
   - Category assignment via a small inline color-dot picker when adding or editing an objective — fast, no dropdowns, no friction.
-- **Analytics Integration**:
-  - Objective completion dots on the Day View timeline are colored by category.
-  - Kill Rate breakdown by category: "3 hard / 5 normal / 2 easy neutralized."
-  - Over time: track category completion ratios to surface patterns like "you avoid hard tasks on Fridays."
+- **Analytics Integration** *(Future — see Section 8)*
 
 ## 7. Advanced Analytical Screens (The Neuro-Visualizer)
 *Goal: Transform boring metrics into visceral, game-like visualizations that provide immediate feedback and long-term pattern recognition for the ADHD brain.*
@@ -111,4 +108,11 @@
 - **The Combo Meter (Momentum Tracking)**:
   - **Visuals**: A high-octane "Streak Counter" tracking consecutive forge days or objectives neutralized without a reboot. Reaching milestones unlocks temporary UI color shifts or new audio sets.
   - **Purpose**: Provides immediate micro-rewards for consistency, gamifying the act of showing up daily.
+
+## 8. Category-Based Analytics Integration
+*Goal: Extend objective categories into the analytics layer for deeper pattern recognition.*
+
+- **Timeline Coloring**: Objective completion dots on the Day View timeline are colored by category. Uncategorized objectives get a 1px orange outline stroke for visibility.
+- **Kill Rate Breakdown**: Kill Rate metric split by category: "3 hard / 5 normal / 2 easy neutralized."
+- **Pattern Tracking**: Over time, track category completion ratios to surface patterns like "you avoid hard tasks on Fridays."
 

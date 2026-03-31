@@ -1,4 +1,4 @@
-import { type FC, useCallback, useState, useRef, useEffect } from 'react';
+import { type FC, useCallback, useState, useRef, useEffect, useMemo } from 'react';
 import styles from './SidebarLeft.module.scss';
 import { User, Database, Cpu, HardDrive, BarChart2, Plus, X, Target, GripVertical, Edit3, Check, Activity } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
@@ -22,22 +22,30 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
-import type { StrategicObjective } from '../types';
+import type { StrategicObjective, ObjectiveCategory } from '../types';
+import { CategoryDotPicker } from './CategoryDotPicker';
+import { CategoryManagerModal } from './CategoryManagerModal';
 
 interface SortableItemProps {
   obj: StrategicObjective;
   isActive: boolean;
+  categories: ObjectiveCategory[];
   onSelect: (id: number) => void;
   onDelete: (e: React.MouseEvent, id: number) => void;
   onUpdate: (id: number, text: string) => void;
+  onCategoryChange: (id: number, categoryId: number | null) => void;
+  onManageCategories: () => void;
   onHover: () => void;
 }
 
-const SortableItem: FC<SortableItemProps> = ({ obj, isActive, onSelect, onDelete, onUpdate, onHover }) => {
+const SortableItem: FC<SortableItemProps> = ({ obj, isActive, categories, onSelect, onDelete, onUpdate, onCategoryChange, onManageCategories, onHover }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: obj.id });
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(obj.text);
+  const [showPicker, setShowPicker] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const categoryColor = categories.find(c => c.id === obj.category_id)?.color;
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -93,7 +101,25 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, onSelect, onDelete
       >
         <GripVertical size={12} />
       </button>
-      
+
+      <span
+        className={styles.categoryBullet}
+        style={{ backgroundColor: categoryColor || '#333333' }}
+        onClick={(e) => { e.stopPropagation(); setShowPicker(prev => !prev); }}
+        title="Set category"
+      />
+
+      {showPicker && (
+        <div onClick={e => e.stopPropagation()} style={{ flexShrink: 0 }}>
+          <CategoryDotPicker
+            categories={categories}
+            selectedCategoryId={obj.category_id ?? null}
+            onSelect={(catId) => onCategoryChange(obj.id, catId)}
+            onManage={onManageCategories}
+          />
+        </div>
+      )}
+
       {isEditing ? (
         <div className={styles.objectiveText} onClick={e => e.stopPropagation()}>
           <input
@@ -144,8 +170,23 @@ interface Props {
 
 export const SidebarLeft: FC<Props> = ({ onViewAnalytics, onViewIntel }) => {
   const { user, avatar, loading } = useUser();
-  const { objectivePool, activeObjectiveId, addObjective, deleteObjective, updateObjective, setActiveObjective, reorderObjectives } = useFocus();
+  const { objectivePool, activeObjectiveId, addObjective, deleteObjective, updateObjective, updateObjectiveCategory, setActiveObjective, reorderObjectives, categories, addCategory, updateCategory, deleteCategory } = useFocus();
   const [newObjective, setNewObjective] = useState('');
+  const [newCategoryId, setNewCategoryId] = useState<number | null>(null);
+  const [showNewCategoryPicker, setShowNewCategoryPicker] = useState(false);
+  const [showCategoryManager, setShowCategoryManager] = useState(false);
+
+  const newCategoryColor = categories.find(c => c.id === newCategoryId)?.color;
+
+  const objectiveCountByCategory = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const obj of objectivePool) {
+      if (obj.category_id != null) {
+        map.set(obj.category_id, (map.get(obj.category_id) || 0) + 1);
+      }
+    }
+    return map;
+  }, [objectivePool]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -179,9 +220,15 @@ export const SidebarLeft: FC<Props> = ({ onViewAnalytics, onViewIntel }) => {
     e.preventDefault();
     if (newObjective.trim()) {
       soundEngine.playClick();
-      await addObjective(newObjective.trim());
+      await addObjective(newObjective.trim(), newCategoryId);
       setNewObjective('');
+      setNewCategoryId(null);
+      setShowNewCategoryPicker(false);
     }
+  };
+
+  const handleObjectiveCategoryChange = (id: number, categoryId: number | null) => {
+    updateObjectiveCategory(id, categoryId);
   };
 
   const handleDeleteObjective = (e: React.MouseEvent, id: number) => {
@@ -284,17 +331,33 @@ export const SidebarLeft: FC<Props> = ({ onViewAnalytics, onViewIntel }) => {
       <div className="card">
         <h4 className={styles.sectionTitle}>MISSION_OBJECTIVES</h4>
         <form className={styles.objectiveInputContainer} onSubmit={handleAddObjective}>
-          <input
-            type="text"
-            className={styles.objectiveInput}
-            placeholder="Add Objective..."
-            value={newObjective}
-            onChange={(e) => setNewObjective(e.target.value)}
-            onMouseEnter={handleHover}
-          />
-          <button type="submit" className={styles.addBtn} onMouseEnter={handleHover}>
-            <Plus size={14} />
-          </button>
+          <div className={styles.inputRow}>
+            <span
+              className={styles.categoryBullet}
+              style={{ backgroundColor: newCategoryColor || '#333333' }}
+              onClick={() => setShowNewCategoryPicker(prev => !prev)}
+              title="Set category"
+            />
+            {showNewCategoryPicker && (
+              <CategoryDotPicker
+                categories={categories}
+                selectedCategoryId={newCategoryId}
+                onSelect={setNewCategoryId}
+                onManage={() => setShowCategoryManager(true)}
+              />
+            )}
+            <input
+              type="text"
+              className={styles.objectiveInput}
+              placeholder="Add Objective..."
+              value={newObjective}
+              onChange={(e) => setNewObjective(e.target.value)}
+              onMouseEnter={handleHover}
+            />
+            <button type="submit" className={styles.addBtn} onMouseEnter={handleHover}>
+              <Plus size={14} />
+            </button>
+          </div>
         </form>
 
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd} modifiers={[restrictToVerticalAxis, restrictToParentElement]}>
@@ -305,9 +368,12 @@ export const SidebarLeft: FC<Props> = ({ onViewAnalytics, onViewIntel }) => {
                   key={obj.id}
                   obj={obj}
                   isActive={activeObjectiveId === obj.id}
+                  categories={categories}
                   onSelect={handleSelectObjective}
                   onDelete={handleDeleteObjective}
                   onUpdate={handleUpdateObjective}
+                  onCategoryChange={handleObjectiveCategoryChange}
+                  onManageCategories={() => setShowCategoryManager(true)}
                   onHover={handleHover}
                 />
               ))}
@@ -318,7 +384,17 @@ export const SidebarLeft: FC<Props> = ({ onViewAnalytics, onViewIntel }) => {
           </SortableContext>
         </DndContext>
       </div>
-      
+
+      {showCategoryManager && (
+        <CategoryManagerModal
+          categories={categories}
+          onAdd={addCategory}
+          onUpdate={updateCategory}
+          onDelete={deleteCategory}
+          onClose={() => setShowCategoryManager(false)}
+          objectiveCountByCategory={objectiveCountByCategory}
+        />
+      )}
     </aside>
   );
 };

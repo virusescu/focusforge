@@ -1,0 +1,49 @@
+.picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+
+  &:hover {
+    transform: scale(1.3);
+    border-color: var(--primary);
+  }
+
+  &.selected {
+    border-color: var(--primary);
+    box-shadow: 0 0 6px var(--primary-glow);
+    transform: scale(1.3);
+  }
+}
+
+.addDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px dashed var(--text-muted);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+
+  &:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    transform: scale(1.3);
+  }
+}

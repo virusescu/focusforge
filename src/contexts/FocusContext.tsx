@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
-import type { FocusSession, DailyStat, StrategicObjective } from '../types';
+import type { FocusSession, DailyStat, StrategicObjective, ObjectiveCategory } from '../types';
 import { soundEngine, playObjectiveComplete } from '../utils/audio';
 import { useTimer } from '../hooks/useTimer';
 import { useUser } from './UserContext';
@@ -13,7 +13,12 @@ import {
   deleteObjective as dbDeleteObjective,
   updateObjective as dbUpdateObjective,
   completeObjective as dbCompleteObjective,
-  reorderObjectives as dbReorderObjectives
+  reorderObjectives as dbReorderObjectives,
+  getCategories,
+  addCategory as dbAddCategory,
+  updateCategory as dbUpdateCategory,
+  deleteCategory as dbDeleteCategory,
+  updateObjectiveCategory as dbUpdateObjectiveCategory
 } from '../db';
 
 interface FocusContextType {
@@ -29,14 +34,19 @@ interface FocusContextType {
   activeObjectiveId: number | null;
   isGlitching: boolean;
   completedObjectiveText: string | null;
+  categories: ObjectiveCategory[];
   saveSession: (startTime: string, durationSeconds: number, pauseTimes?: string[]) => Promise<void>;
   refreshData: () => Promise<void>;
-  addObjective: (text: string) => Promise<void>;
+  addObjective: (text: string, categoryId?: number | null) => Promise<void>;
   deleteObjective: (id: number) => Promise<void>;
   updateObjective: (id: number, text: string) => Promise<void>;
+  updateObjectiveCategory: (id: number, categoryId: number | null) => Promise<void>;
   setActiveObjective: (id: number | null) => void;
   neutralizeObjective: (id: number) => Promise<void>;
   reorderObjectives: (orderedIds: number[]) => Promise<void>;
+  addCategory: (label: string, color: string) => Promise<void>;
+  updateCategory: (id: number, label: string, color: string) => Promise<void>;
+  deleteCategory: (id: number) => Promise<void>;
   loading: boolean;
   timerStatus: 'idle' | 'active' | 'paused';
   // Timer state
@@ -69,6 +79,7 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
   const [dailyStats, setDailyStats] = useState<DailyStat[]>([]);
   const [globalStats, setGlobalStats] = useState<FocusContextType['globalStats']>(null);
   const [objectivePool, setObjectivePool] = useState<StrategicObjective[]>([]);
+  const [categories, setCategories] = useState<ObjectiveCategory[]>([]);
   const [activeObjectiveId, setActiveObjectiveId] = useState<number | null>(null);
   const [isGlitching, setIsGlitching] = useState(false);
   const [completedObjectiveText, setCompletedObjectiveText] = useState<string | null>(null);
@@ -106,16 +117,18 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
 
   const refreshData = useCallback(async () => {
     try {
-      const [sessions, stats, globals, objectives] = await Promise.all([
+      const [sessions, stats, globals, objectives, cats] = await Promise.all([
         getRecentSessions(3),
         getDailyFocusStats(21),
         getGlobalStats(),
-        getObjectives()
+        getObjectives(),
+        getCategories()
       ]);
       setRecentSessions(sessions);
       setDailyStats(stats);
       setGlobalStats(globals);
       setObjectivePool(objectives);
+      setCategories(cats);
     } catch (e) {
       console.error("Failed to load focus data", e);
     } finally {
@@ -133,8 +146,8 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
     await refreshData();
   }, [refreshData]);
 
-  const addObjective = useCallback(async (text: string) => {
-    await dbAddObjective(text);
+  const addObjective = useCallback(async (text: string, categoryId?: number | null) => {
+    await dbAddObjective(text, categoryId);
     await refreshData();
   }, [refreshData]);
 
@@ -162,6 +175,26 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
     });
     await dbReorderObjectives(orderedIds);
   }, []);
+
+  const updateObjectiveCategory = useCallback(async (id: number, categoryId: number | null) => {
+    await dbUpdateObjectiveCategory(id, categoryId);
+    await refreshData();
+  }, [refreshData]);
+
+  const addCategory = useCallback(async (label: string, color: string) => {
+    await dbAddCategory(label, color);
+    await refreshData();
+  }, [refreshData]);
+
+  const updateCategory = useCallback(async (id: number, label: string, color: string) => {
+    await dbUpdateCategory(id, label, color);
+    await refreshData();
+  }, [refreshData]);
+
+  const deleteCategory = useCallback(async (id: number) => {
+    await dbDeleteCategory(id);
+    await refreshData();
+  }, [refreshData]);
 
   const neutralizeObjective = useCallback(async (id: number) => {
     const obj = objectivePool.find(o => o.id === id);
@@ -211,22 +244,27 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
   }, [saveSession]);
 
   return (
-    <FocusContext.Provider value={{ 
-      recentSessions, 
-      dailyStats, 
-      globalStats, 
+    <FocusContext.Provider value={{
+      recentSessions,
+      dailyStats,
+      globalStats,
       objectivePool,
       activeObjectiveId,
       isGlitching,
       completedObjectiveText,
-      saveSession, 
-      refreshData, 
+      categories,
+      saveSession,
+      refreshData,
       addObjective,
       deleteObjective,
       updateObjective,
+      updateObjectiveCategory,
       setActiveObjective,
       neutralizeObjective,
       reorderObjectives,
+      addCategory,
+      updateCategory,
+      deleteCategory,
       loading,
       timerStatus,
       seconds,

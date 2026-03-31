@@ -1,5 +1,5 @@
 import Database from '@tauri-apps/plugin-sql';
-import type { FocusSession, DailyStat, StrategicObjective } from './types';
+import type { FocusSession, DailyStat, StrategicObjective, ObjectiveCategory } from './types';
 
 let db: Database | null = null;
 
@@ -31,6 +31,16 @@ export async function initDb() {
       start_time TEXT NOT NULL,
       duration_seconds INTEGER NOT NULL,
       date TEXT NOT NULL
+    )
+  `);
+
+  // Create objective_categories table
+  await database.execute(`
+    CREATE TABLE IF NOT EXISTS objective_categories (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      label TEXT NOT NULL,
+      color TEXT NOT NULL,
+      sort_order INTEGER DEFAULT 0
     )
   `);
 
@@ -85,6 +95,22 @@ export async function initDb() {
     await database.execute('ALTER TABLE objectives ADD COLUMN completed_at TEXT');
   } catch (e) {
     // Column already exists, ignore
+  }
+
+  // Migration for objective category_id
+  try {
+    await database.execute('ALTER TABLE objectives ADD COLUMN category_id INTEGER REFERENCES objective_categories(id)');
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
+  // Seed default categories if table is empty
+  const catCount = await database.select<{ n: number }[]>('SELECT COUNT(*) as n FROM objective_categories');
+  if (catCount[0]?.n === 0) {
+    await database.execute(
+      'INSERT INTO objective_categories (label, color, sort_order) VALUES (?, ?, ?), (?, ?, ?), (?, ?, ?)',
+      ['Hard', '#ff4444', 0, 'Normal', '#ffffff', 1, 'Easy', '#888888', 2]
+    );
   }
 
   // Migration for day_start_hour and day_end_hour
@@ -259,6 +285,40 @@ export async function getGlobalStats() {
   };
 }
 
+// Objective Category Functions
+export async function getCategories(): Promise<ObjectiveCategory[]> {
+  const database = await getDb();
+  return await database.select<ObjectiveCategory[]>(
+    'SELECT * FROM objective_categories ORDER BY sort_order ASC, id ASC'
+  );
+}
+
+export async function addCategory(label: string, color: string): Promise<number> {
+  const database = await getDb();
+  const countResult = await database.select<{ n: number }[]>('SELECT COUNT(*) as n FROM objective_categories');
+  const nextOrder = countResult[0]?.n ?? 0;
+  const result = await database.execute(
+    'INSERT INTO objective_categories (label, color, sort_order) VALUES (?, ?, ?)',
+    [label, color, nextOrder]
+  );
+  return result.lastInsertId ?? 0;
+}
+
+export async function updateCategory(id: number, label: string, color: string): Promise<void> {
+  const database = await getDb();
+  await database.execute(
+    'UPDATE objective_categories SET label = ?, color = ? WHERE id = ?',
+    [label, color, id]
+  );
+}
+
+export async function deleteCategory(id: number): Promise<void> {
+  const database = await getDb();
+  // Unset category on objectives that use this category
+  await database.execute('UPDATE objectives SET category_id = NULL WHERE category_id = ?', [id]);
+  await database.execute('DELETE FROM objective_categories WHERE id = ?', [id]);
+}
+
 // Strategic Objective Functions
 export async function getObjectives(): Promise<StrategicObjective[]> {
   const database = await getDb();
@@ -277,13 +337,13 @@ export async function reorderObjectives(orderedIds: number[]): Promise<void> {
   }
 }
 
-export async function addObjective(text: string): Promise<number> {
+export async function addObjective(text: string, categoryId?: number | null): Promise<number> {
   const database = await getDb();
   const countResult = await database.select<{ n: number }[]>('SELECT COUNT(*) as n FROM objectives');
   const nextOrder = countResult[0]?.n ?? 0;
   const result = await database.execute(
-    'INSERT INTO objectives (text, sort_order) VALUES (?, ?)',
-    [text, nextOrder]
+    'INSERT INTO objectives (text, sort_order, category_id) VALUES (?, ?, ?)',
+    [text, nextOrder, categoryId ?? null]
   );
   return result.lastInsertId ?? 0;
 }
@@ -293,11 +353,26 @@ export async function deleteObjective(id: number) {
   await database.execute('DELETE FROM objectives WHERE id = ?', [id]);
 }
 
-export async function updateObjective(id: number, text: string) {
+export async function updateObjective(id: number, text: string, categoryId?: number | null) {
+  const database = await getDb();
+  if (categoryId !== undefined) {
+    await database.execute(
+      'UPDATE objectives SET text = ?, category_id = ? WHERE id = ?',
+      [text, categoryId, id]
+    );
+  } else {
+    await database.execute(
+      'UPDATE objectives SET text = ? WHERE id = ?',
+      [text, id]
+    );
+  }
+}
+
+export async function updateObjectiveCategory(id: number, categoryId: number | null): Promise<void> {
   const database = await getDb();
   await database.execute(
-    'UPDATE objectives SET text = ? WHERE id = ?',
-    [text, id]
+    'UPDATE objectives SET category_id = ? WHERE id = ?',
+    [categoryId, id]
   );
 }
 

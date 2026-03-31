@@ -37,10 +37,16 @@ vi.mock('../db', () => ({
   }),
   saveFocusSession: (start: string, dur: number, pauses: string[]) => mockSaveSession(start, dur, pauses),
   getObjectives: () => mockGetObjectives(),
-  addObjective: (text: string) => mockAddObjective(text),
+  addObjective: (text: string, categoryId?: number | null) => mockAddObjective(text, categoryId),
   deleteObjective: (id: number) => mockDeleteObjective(id),
+  updateObjective: vi.fn().mockResolvedValue(undefined),
   completeObjective: (id: number) => mockCompleteObjective(id),
   reorderObjectives: vi.fn().mockResolvedValue(undefined),
+  getCategories: vi.fn().mockResolvedValue([]),
+  addCategory: vi.fn().mockResolvedValue(0),
+  updateCategory: vi.fn().mockResolvedValue(undefined),
+  deleteCategory: vi.fn().mockResolvedValue(undefined),
+  updateObjectiveCategory: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Mock UserContext
@@ -101,7 +107,7 @@ describe('FocusContext', () => {
       await result.current.addObjective('New Objective');
     });
 
-    expect(mockAddObjective).toHaveBeenCalledWith('New Objective');
+    expect(mockAddObjective).toHaveBeenCalledWith('New Objective', undefined);
     expect(result.current.objectivePool).toEqual([newObjective]);
   });
 

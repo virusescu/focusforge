@@ -203,8 +203,8 @@ describe('db utility functions', () => {
       mockExecute.mockResolvedValueOnce({ lastInsertId: 123 });
       const id = await addObjective('Test Objective');
       expect(mockExecute).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT INTO objectives (text, sort_order) VALUES (?, ?)'),
-        ['Test Objective', 0]
+        expect.stringContaining('INSERT INTO objectives (text, sort_order, category_id) VALUES (?, ?, ?)'),
+        ['Test Objective', 0, null]
       );
       expect(id).toBe(123);
     });

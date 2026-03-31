@@ -33,10 +33,18 @@ export interface DailyStat {
   totalSeconds: number;
 }
 
+export interface ObjectiveCategory {
+  id: number;
+  label: string;
+  color: string;
+  sort_order: number;
+}
+
 export interface StrategicObjective {
   id: number;
   text: string;
   created_at: string;
   completed_at?: string;
   sort_order?: number;
+  category_id?: number | null;
 }

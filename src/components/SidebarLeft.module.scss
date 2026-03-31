@@ -150,8 +150,15 @@
 
 .objectiveInputContainer {
   display: flex;
-  gap: 0.5rem;
+  flex-direction: column;
+  gap: 0.4rem;
   margin-bottom: 1rem;
+
+  .inputRow {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
 
   .objectiveInput {
     flex: 1;
@@ -257,6 +264,27 @@
     font-weight: bold;
     color: var(--primary);
   }
+}
+
+.categoryBullet {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+
+  &:hover {
+    transform: scale(1.4);
+  }
+}
+
+.editContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  flex: 1;
+  overflow: hidden;
 }
 
 .objectiveText {
