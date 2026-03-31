@@ -259,11 +259,17 @@
 
   &.activeObjective {
     border-color: var(--primary);
-    background: var(--primary-muted);
     box-shadow: inset 0 0 10px var(--primary-glow);
     font-weight: bold;
     color: var(--primary);
+    animation: activePulse 3s infinite ease-in-out;
   }
+}
+
+@keyframes activePulse {
+  0% { background-color: rgba(0, 0, 0, 0.8); }
+  50% { background-color: rgba(40, 40, 40, 0.8); }
+  100% { background-color: rgba(0, 0, 0, 0.8); }
 }
 
 .categoryBullet {
@@ -273,12 +279,10 @@
   flex-shrink: 0;
   cursor: pointer;
   transition: all 0.15s ease;
-  border: 1px solid rgba(255, 255, 255, 0.2);
   margin-right: 0.75rem;
 
   &:hover {
     transform: scale(1.3);
-    border-color: rgba(255, 255, 255, 0.5);
   }
 }
 

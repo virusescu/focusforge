@@ -477,7 +477,7 @@ export async function getCompletedObjectivesForDay(userId: number, date: string,
   })();
 
   const result = await database.execute({
-    sql: `SELECT id, text, completed_at FROM objectives
+    sql: `SELECT id, text, completed_at, category_id FROM objectives
           WHERE user_id = ? AND completed_at IS NOT NULL
             AND datetime(completed_at, 'localtime') >= ? || ' ' || ?
             AND datetime(completed_at, 'localtime') < ? || ' ' || ?
@@ -490,6 +490,7 @@ export async function getCompletedObjectivesForDay(userId: number, date: string,
     text: row.text as string,
     created_at: '',
     completed_at: row.completed_at as string,
+    category_id: row.category_id as number | null,
   }));
 }
 

@@ -140,7 +140,6 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, categories, onSele
       ) : (
         <>
           <div className={styles.objectiveText}>
-            {isActive && <Target size={12} className={styles.targetIcon} />}
             <span>{obj.text}</span>
           </div>
           <button
@@ -178,6 +177,13 @@ export const SidebarLeft: FC<Props> = ({ onViewAnalytics, onViewIntel }) => {
   const [newCategoryId, setNewCategoryId] = useState<number | null>(null);
   const [showNewCategoryPicker, setShowNewCategoryPicker] = useState(false);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
+
+  // Default newCategoryId to the first available category
+  useEffect(() => {
+    if (newCategoryId === null && categories.length > 0) {
+      setNewCategoryId(categories[0].id);
+    }
+  }, [categories, newCategoryId]);
 
   const newCategoryColor = categories.find(c => c.id === newCategoryId)?.color;
 

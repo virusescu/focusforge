@@ -18,10 +18,11 @@ interface ObjectiveDot {
   objectives: StrategicObjective[];
   leftPercent: number;
   clamped: boolean;
+  color: string;
 }
 
 export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
-  const { globalStats, refreshData } = useFocus();
+  const { globalStats, refreshData, categories } = useFocus();
   const { user } = useUser();
   const { authUser } = useAuth();
   const [currentDate, setCurrentDate] = useState(initialDate || new Date());
@@ -33,14 +34,130 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
   const [showHelp, setShowHelp] = useState(false);
   const [killRate, setKillRate] = useState<{ day: number; week: number; allTime: number }>({ day: 0, week: 0, allTime: 0 });
   const sessionRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Zoom state (1.0 = full width, higher = zoomed in)
+  const [zoom, setZoom] = useState(1.0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+  const [isAnimating, setIsAnimating] = useState(false);
 
   const startHourSetting = user?.day_start_hour ?? 8;
   const endHourSetting = user?.day_end_hour ?? 2;
 
-  // Configuration for dynamic time scale
-  const START_HOUR = startHourSetting;
-  const END_HOUR = endHourSetting <= startHourSetting ? endHourSetting + 24 : endHourSetting;
-  const TOTAL_HOURS = END_HOUR - START_HOUR;
+  // Fixed 24-hour cycle from 00:00 to 00:00 (next day)
+  const START_HOUR = 0;
+  const END_HOUR = 24;
+  const TOTAL_HOURS = 24;
+
+  const animateZoom = (targetZoom: number, mouseOffsetX: number) => {
+    if (isAnimating) return;
+    
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const startZoomValue = zoom;
+    const startScrollLeft = container.scrollLeft;
+    
+    // Calculate the point in time (0-24) we are looking at under the mouse
+    const virtualX = (startScrollLeft + mouseOffsetX) / startZoomValue;
+    
+    setIsAnimating(true);
+    const duration = 1000; // 1 second
+    const startTime = performance.now();
+
+    const step = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      // easeInOutQuad
+      const eased = progress < 0.5 
+        ? 2 * progress * progress 
+        : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+      const currentZoom = startZoomValue + (targetZoom - startZoomValue) * eased;
+      setZoom(currentZoom);
+
+      // Sync scroll immediately in the same frame
+      // scrollLeft = virtualX * currentZoom - mouseOffsetX
+      container.scrollLeft = (virtualX * currentZoom) - mouseOffsetX;
+
+      if (progress < 1) {
+        requestAnimationFrame(step);
+      } else {
+        setIsAnimating(false);
+      }
+    };
+
+    requestAnimationFrame(step);
+  };
+
+  const handleWheel = (e: React.WheelEvent) => {
+    if (e.ctrlKey) {
+      e.preventDefault();
+      if (isAnimating) return;
+
+      const container = scrollContainerRef.current;
+      if (!container) return;
+
+      const isZoomingIn = e.deltaY < 0;
+      const targetZoom = isZoomingIn ? 6.0 : 1.0;
+
+      if (targetZoom !== zoom) {
+        const rect = container.getBoundingClientRect();
+        const offsetX = e.clientX - rect.left;
+        animateZoom(targetZoom, offsetX);
+      }
+    }
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0 || isAnimating) return; // Only left click
+    setIsDragging(true);
+    setStartX(e.pageX - (scrollContainerRef.current?.offsetLeft || 0));
+    setScrollLeft(scrollContainerRef.current?.scrollLeft || 0);
+  };
+
+  const handleMouseLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || isAnimating) return;
+    e.preventDefault();
+    const x = e.pageX - (scrollContainerRef.current?.offsetLeft || 0);
+    const walk = (x - startX) * 1.5; // Scroll speed
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollLeft = scrollLeft - walk;
+    }
+  };
+
+  // Remove the previous useEffect hook that used zoomAnchorRef
+
+  // Calculate active range for highlighting
+  const activeRange = useMemo(() => {
+    const start = startHourSetting;
+    const end = endHourSetting;
+    
+    if (start === end) return null;
+    
+    // If end is after start (e.g. 8 to 17)
+    if (end > start) {
+      return { left: (start / 24) * 100, width: ((end - start) / 24) * 100 };
+    }
+    
+    // If end wraps around midnight (e.g. 20 to 2)
+    // We show two highlights for the full 24h view
+    return [
+      { left: (start / 24) * 100, width: ((24 - start) / 24) * 100 },
+      { left: 0, width: (end / 24) * 100 }
+    ];
+  }, [startHourSetting, endHourSetting]);
 
   // Auto-scroll to highlighted session
   useEffect(() => {
@@ -60,16 +177,16 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
   const loadSessions = useCallback(async () => {
     if (!authUser) return;
     setLoading(true);
-    // Use local date string YYYY-MM-DD instead of UTC-based toISOString
     const year = currentDate.getFullYear();
     const month = String(currentDate.getMonth() + 1).padStart(2, '0');
     const day = String(currentDate.getDate()).padStart(2, '0');
     const dateStr = `${year}-${month}-${day}`;
     
     try {
+      // Fetch data for the full day (0-24)
       const [data, completed, kr] = await Promise.all([
-        getSessionsForDay(authUser.id, dateStr, startHourSetting, endHourSetting),
-        getCompletedObjectivesForDay(authUser.id, dateStr, startHourSetting, endHourSetting),
+        getSessionsForDay(authUser.id, dateStr, 0, 24),
+        getCompletedObjectivesForDay(authUser.id, dateStr, 0, 24),
         getKillRate(authUser.id),
       ]);
       setSessions(data);
@@ -80,7 +197,7 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
     } finally {
       setLoading(false);
     }
-  }, [currentDate, startHourSetting, endHourSetting, authUser]);
+  }, [currentDate, authUser]);
 
   useEffect(() => {
     loadSessions();
@@ -88,7 +205,7 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
 
   const changeDay = useCallback((delta: number) => {
     soundEngine.playClick();
-    setLoading(true); // Set loading immediately to avoid flash of old data
+    setLoading(true);
     setCurrentDate(prev => {
       const next = new Date(prev);
       next.setDate(next.getDate() + delta);
@@ -98,7 +215,7 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
 
   const jumpToToday = useCallback(() => {
     soundEngine.playClick();
-    setLoading(true); // Set loading immediately
+    setLoading(true);
     setCurrentDate(new Date());
   }, []);
 
@@ -184,21 +301,14 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
     const diffDays = Math.round((sessionLocalDate.getTime() - viewLocalDate.getTime()) / (1000 * 60 * 60 * 24));
 
     let localHours = sessionDate.getHours() + sessionDate.getMinutes() / 60 + sessionDate.getSeconds() / 3600;
-    if (diffDays === 1) localHours += 24;
-    else if (diffDays === -1) localHours -= 24;
-    else if (diffDays !== 0) return null;
+    if (diffDays !== 0) return null;
 
     const startOffset = localHours - START_HOUR;
     const durationOffset = durationSeconds / 3600;
     
-    const visibleStart = Math.max(startOffset, 0);
-    const visibleEnd = Math.min(startOffset + durationOffset, TOTAL_HOURS);
-    
-    if (visibleStart >= TOTAL_HOURS || visibleEnd <= 0) return null;
-
     return {
-      left: `${(visibleStart / TOTAL_HOURS) * 100}%`,
-      width: `${((visibleEnd - visibleStart) / TOTAL_HOURS) * 100}%`
+      left: `${(startOffset / TOTAL_HOURS) * 100}%`,
+      width: `${(durationOffset / TOTAL_HOURS) * 100}%`
     };
   };
 
@@ -213,33 +323,43 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
       const objLocalDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
       const diffDays = Math.round((objLocalDate.getTime() - viewLocalDate.getTime()) / (1000 * 60 * 60 * 24));
 
+      if (diffDays !== 0) continue;
+
       let localHours = d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600;
-      if (diffDays === 1) localHours += 24;
-      else if (diffDays === -1) localHours -= 24;
-
-      const clamped = localHours < START_HOUR || localHours >= END_HOUR;
-      const clampedLeft = localHours < START_HOUR;
-      const leftPercent = clamped
-        ? clampedLeft ? 0 : 100
-        : ((localHours - START_HOUR) / TOTAL_HOURS) * 100;
-
-      const bucketKey = clamped
-        ? clampedLeft ? 'clamped-left' : 'clamped-right'
-        : `bucket-${Math.floor((localHours - START_HOUR) * 60 / 5)}`;
+      const leftPercent = (localHours / 24) * 100;
+      const bucketKey = `bucket-${Math.floor(localHours * 60 / 5)}`;
 
       if (!groups.has(bucketKey)) groups.set(bucketKey, []);
-      groups.get(bucketKey)!.push({ obj, leftPercent, clamped });
+      groups.get(bucketKey)!.push({ obj, leftPercent, clamped: false });
     }
 
-    return Array.from(groups.entries()).map(([key, items]) => ({
-      key,
-      objectives: items.map(i => i.obj),
-      leftPercent: items[0].leftPercent,
-      clamped: items[0].clamped,
-    }));
-  }, [completedObjectives, currentDate, START_HOUR, END_HOUR, TOTAL_HOURS]);
+    return Array.from(groups.entries()).map(([key, items]) => {
+      const firstObj = items[0].obj;
+      const catColor = categories.find(c => c.id === firstObj.category_id)?.color || '#333333';
+      
+      return {
+        key,
+        objectives: items.map(i => i.obj),
+        leftPercent: items[0].leftPercent,
+        clamped: false,
+        color: catColor,
+      };
+    });
+  }, [completedObjectives, currentDate, categories]);
 
-  const hoursArray = Array.from({ length: TOTAL_HOURS + 1 }, (_, i) => START_HOUR + i);
+  const hoursArray = Array.from({ length: 24 }, (_, i) => i);
+  
+  // Sub-hour markers (15 min intervals) visible when zoomed in
+  const subHourMarkers = useMemo(() => {
+    if (zoom < 3) return [];
+    const markers = [];
+    for (let h = 0; h < 24; h++) {
+      for (let m = 15; m < 60; m += 15) {
+        markers.push({ h, m, pos: ((h + m / 60) / 24) * 100 });
+      }
+    }
+    return markers;
+  }, [zoom]);
 
   return (
     <div className={styles.analyticsContainer}>
@@ -297,87 +417,110 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
           </div>
         </div>
 
-        <div className={styles.dayView}>
-          <div className={styles.timeRuler}>
-            {hoursArray.map((h, i) => (
-              <div key={i} className={styles.hourMarker} style={{ left: `${((h - START_HOUR) / TOTAL_HOURS) * 100}%` }}>
-                <span>{(h % 24).toString().padStart(2, '0')}:00</span>
-              </div>
+        <div 
+          className={styles.dayView} 
+          onWheel={handleWheel}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
+          onMouseUp={handleMouseUp}
+          ref={scrollContainerRef}
+        >
+          <div className={styles.zoomContent} style={{ width: `${zoom * 100}%` }}>
+            {/* Active Range Highlight */}
+            {activeRange && (Array.isArray(activeRange) ? activeRange : [activeRange]).map((range, i) => (
+              <div 
+                key={i}
+                className={styles.activeHighlight}
+                style={{ left: `${range.left}%`, width: `${range.width}%` }}
+              />
             ))}
-          </div>
 
-          <div className={styles.visualizerArea}>
-            {loading ? (
-              <div className={styles.loading}>SYNCING_NEURAL_RECORDS...</div>
-            ) : (
-              <>
-                <div className={styles.track}>
-                  {sessions.length === 0 ? (
-                    <div className={styles.noData}>NO_SESSIONS_RECORDED_FOR_THIS_PERIOD</div>
-                  ) : (
-                    sessions.map(s => {
-                      const pos = getPosition(s.start_time, s.duration_seconds);
-                      if (!pos) return null;
-                      const isHighlighted = hoveredSessionId === s.id;
-                      const sessionStartMs = new Date(s.start_time).getTime();
-                      const sessionDurationMs = s.duration_seconds * 1000;
-                      return (
-                        <div
-                          key={s.id}
-                          className={`${styles.sessionBlock} ${isHighlighted ? styles.highlighted : ''}`}
-                          style={pos}
-                          onMouseEnter={() => handleMouseEnterSession(s.id)}
-                          onMouseLeave={() => setHoveredSessionId(null)}
-                          title={`${new Date(s.start_time).toLocaleTimeString()} - ${Math.floor(s.duration_seconds / 60)}m`}
-                        >
-                          {s.pause_times?.map((pauseTime, i) => {
-                            const fraction = (new Date(pauseTime).getTime() - sessionStartMs) / sessionDurationMs;
-                            if (fraction <= 0 || fraction >= 1) return null;
-                            return (
-                              <div
-                                key={i}
-                                data-testid="interruption-crack"
-                                className={styles.crack}
-                                style={{ left: `${fraction * 100}%` }}
-                              />
-                            );
-                          })}
-                        </div>
-                      );
-                    })
-                  )}
+            <div className={`${styles.timeRuler} ${isAnimating ? styles.animating : ''}`}>
+              {hoursArray.map((h, i) => (
+                <div key={`h-${i}`} className={styles.hourMarker} style={{ left: `${(h / 24) * 100}%` }}>
+                  <span>{(h % 24).toString().padStart(2, '0')}:00</span>
                 </div>
+              ))}
+              {subHourMarkers.map((m, i) => (
+                <div key={`m-${i}`} className={styles.minuteMarker} style={{ left: `${m.pos}%` }} />
+              ))}
+            </div>
 
-                <div className={styles.objectiveTrack}>
-                  {objectiveDots.map(dot => (
-                    <div
-                      key={dot.key}
-                      data-testid="objective-dot"
-                      className={`${styles.objectiveDot} ${dot.clamped ? styles.clamped : ''}`}
-                      style={{ left: `${dot.leftPercent}%` }}
-                      onMouseEnter={() => setHoveredDotKey(dot.key)}
-                      onMouseLeave={() => setHoveredDotKey(null)}
-                    >
-                      {hoveredDotKey === dot.key && (
-                        <div className={`${styles.dotTooltip} ${
-                          dot.leftPercent < 15 ? styles.alignLeft : 
-                          dot.leftPercent > 85 ? styles.alignRight : 
-                          styles.alignCenter
-                        }`}>
-                          {dot.objectives.map(obj => (
-                            <div key={obj.id} className={styles.dotTooltipRow}>
-                              <span className={styles.dotTooltipTime}>
-                                {new Date(obj.completed_at!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
-                              </span>
-                              <span className={styles.dotTooltipItem}>{obj.text}</span>
-                            </div>
-                          ))}                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
+            <div className={styles.visualizerArea}>
+              {loading ? (
+                <div className={styles.loading}>SYNCING_NEURAL_RECORDS...</div>
+              ) : (
+                <>
+                  <div className={styles.track}>
+                    {sessions.length === 0 ? (
+                      <div className={styles.noData}>NO_SESSIONS_RECORDED_FOR_THIS_PERIOD</div>
+                    ) : (
+                      sessions.map(s => {
+                        const pos = getPosition(s.start_time, s.duration_seconds);
+                        if (!pos) return null;
+                        const isHighlighted = hoveredSessionId === s.id;
+                        const sessionStartMs = new Date(s.start_time).getTime();
+                        const sessionDurationMs = s.duration_seconds * 1000;
+                        return (
+                          <div
+                            key={s.id}
+                            className={`${styles.sessionBlock} ${isHighlighted ? styles.highlighted : ''}`}
+                            style={pos}
+                            onMouseEnter={() => handleMouseEnterSession(s.id)}
+                            onMouseLeave={() => setHoveredSessionId(null)}
+                            title={`${new Date(s.start_time).toLocaleTimeString()} - ${Math.floor(s.duration_seconds / 60)}m`}
+                          >
+                            {s.pause_times?.map((pauseTime, i) => {
+                              const fraction = (new Date(pauseTime).getTime() - sessionStartMs) / sessionDurationMs;
+                              if (fraction <= 0 || fraction >= 1) return null;
+                              return (
+                                <div
+                                  key={i}
+                                  data-testid="interruption-crack"
+                                  className={styles.crack}
+                                  style={{ left: `${fraction * 100}%` }}
+                                />
+                              );
+                            })}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  <div className={styles.objectiveTrack}>
+                    {objectiveDots.map(dot => (
+                      <div
+                        key={dot.key}
+                        data-testid="objective-dot"
+                        className={styles.objectiveDot}
+                        style={{ left: `${dot.leftPercent}%`, backgroundColor: dot.color }}
+                        onMouseEnter={() => setHoveredDotKey(dot.key)}
+                        onMouseLeave={() => setHoveredDotKey(null)}
+                      >
+                        {hoveredDotKey === dot.key && (
+                          <div className={`${styles.dotTooltip} ${
+                            dot.leftPercent < 15 ? styles.alignLeft : 
+                            dot.leftPercent > 85 ? styles.alignRight : 
+                            styles.alignCenter
+                          }`}>
+                            {dot.objectives.map(obj => (
+                              <div key={obj.id} className={styles.dotTooltipRow}>
+                                <span className={styles.dotTooltipTime}>
+                                  {new Date(obj.completed_at!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
+                                </span>
+                                <span className={styles.dotTooltipItem}>{obj.text}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -387,18 +530,7 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
           <h4>FORGE_INTENSITY_LOG</h4>
           <div className={styles.sessionList}>
             {sessions.map(s => {
-              const sessionDate = new Date(s.start_time);
-              const viewDate = new Date(currentDate);
-              const sessionLocalDate = new Date(sessionDate.getFullYear(), sessionDate.getMonth(), sessionDate.getDate());
-              const viewLocalDate = new Date(viewDate.getFullYear(), viewDate.getMonth(), viewDate.getDate());
-              const diffDays = Math.round((sessionLocalDate.getTime() - viewLocalDate.getTime()) / (1000 * 60 * 60 * 24));
-
-              let localStart = sessionDate.getHours() + sessionDate.getMinutes() / 60 + sessionDate.getSeconds() / 3600;
-              if (diffDays === 1) localStart += 24;
-              else if (diffDays === -1) localStart -= 24;
-              
-              const localEnd = localStart + (s.duration_seconds / 3600);
-              const isOffTimeline = localEnd <= START_HOUR || localStart >= END_HOUR;
+              const isHighlighted = hoveredSessionId === s.id;
 
               return (
                 <div
@@ -407,7 +539,7 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
                     if (el) sessionRefs.current.set(s.id, el);
                     else sessionRefs.current.delete(s.id);
                   }}
-                  className={`${styles.sessionItem} ${hoveredSessionId === s.id ? styles.itemHovered : ''} ${isOffTimeline ? styles.offTimeline : ''}`}
+                  className={`${styles.sessionItem} ${isHighlighted ? styles.itemHovered : ''}`}
                   onMouseEnter={() => handleMouseEnterSession(s.id)}
                   onMouseLeave={() => setHoveredSessionId(null)}
                 >
