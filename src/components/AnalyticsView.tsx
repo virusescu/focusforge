@@ -229,6 +229,7 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if (e.key === 'ArrowLeft') {
         changeDay(-1);
       } else if (e.key === 'ArrowRight') {

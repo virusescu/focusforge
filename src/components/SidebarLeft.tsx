@@ -1,6 +1,6 @@
 import { type FC, useCallback, useState, useRef, useEffect, useMemo } from 'react';
 import styles from './SidebarLeft.module.scss';
-import { User, Database, Cpu, HardDrive, BarChart2, Plus, X, Target, GripVertical, Edit3, Check, Activity } from 'lucide-react';
+import { User, Database, Cpu, HardDrive, BarChart2, Plus, X, GripVertical, Edit3, Check, Activity } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 import { useFocus } from '../contexts/FocusContext';
 import { soundEngine } from '../utils/audio';

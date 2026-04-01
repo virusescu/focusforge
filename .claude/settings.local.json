@@ -22,7 +22,9 @@
       "Bash(npm list:*)",
       "WebFetch(domain:github.com)",
       "Bash(npx tsc:*)",
-      "Bash(ls -lh src/components/IntelligenceHub*)"
+      "Bash(ls -lh src/components/IntelligenceHub*)",
+      "Bash(grep -iE \"\\\\.\\(tsx|ts\\)$\")",
+      "Bash(npx vite:*)"
     ]
   }
 }
