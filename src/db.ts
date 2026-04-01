@@ -265,6 +265,15 @@ export async function deleteFocusSession(id: number) {
   await database.execute({ sql: 'DELETE FROM focus_sessions WHERE id = ?', args: [id] });
 }
 
+export async function updateFocusSession(id: number, startTime: string, durationSeconds: number) {
+  const database = getDb();
+  const date = startTime.split('T')[0];
+  await database.execute({
+    sql: 'UPDATE focus_sessions SET start_time = ?, duration_seconds = ?, date = ? WHERE id = ?',
+    args: [startTime, durationSeconds, date, id],
+  });
+}
+
 export async function getGlobalStats(userId: number) {
   const database = getDb();
 
@@ -443,6 +452,14 @@ export async function updateObjectiveCategory(id: number, categoryId: number | n
   await database.execute({
     sql: 'UPDATE objectives SET category_id = ? WHERE id = ?',
     args: [categoryId, id],
+  });
+}
+
+export async function updateObjectiveCompletedAt(id: number, completedAt: string): Promise<void> {
+  const database = getDb();
+  await database.execute({
+    sql: 'UPDATE objectives SET completed_at = ? WHERE id = ?',
+    args: [completedAt, id],
   });
 }
 

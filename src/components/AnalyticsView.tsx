@@ -1,12 +1,14 @@
 import { type FC, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import styles from './AnalyticsView.module.scss';
-import { ChevronLeft, ChevronRight, ArrowLeft, BarChart2, X, HelpCircle } from 'lucide-react';
-import { getSessionsForDay, deleteFocusSession, getCompletedObjectivesForDay, getKillRate } from '../db';
+import { ChevronLeft, ChevronRight, ArrowLeft, BarChart2, X, HelpCircle, Edit3, Check } from 'lucide-react';
+import { getSessionsForDay, deleteFocusSession, updateFocusSession, getCompletedObjectivesForDay, getKillRate, deleteObjective as dbDeleteObjective, updateObjective as dbUpdateObjective, updateObjectiveCompletedAt as dbUpdateObjectiveCompletedAt, addCategory as dbAddCategory, updateCategory as dbUpdateCategory, deleteCategory as dbDeleteCategory } from '../db';
 import { useFocus } from '../contexts/FocusContext';
 import { useUser } from '../contexts/UserContext';
 import { useAuth } from '../contexts/AuthContext';
 import type { FocusSession, StrategicObjective } from '../types';
 import { soundEngine } from '../utils/audio';
+import { CompletedObjectivesModal } from './CompletedObjectivesModal';
+import { CategoryManagerModal } from './CategoryManagerModal';
 
 interface Props {
   onBack: () => void;
@@ -33,6 +35,11 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
   const [hoveredDotKey, setHoveredDotKey] = useState<string | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   const [killRate, setKillRate] = useState<{ day: number; week: number; allTime: number }>({ day: 0, week: 0, allTime: 0 });
+  const [selectedDotKey, setSelectedDotKey] = useState<string | null>(null);
+  const [editingSessionId, setEditingSessionId] = useState<number | null>(null);
+  const [editStartTime, setEditStartTime] = useState('');
+  const [editEndTime, setEditEndTime] = useState('');
+  const [showCategoryManager, setShowCategoryManager] = useState(false);
   const sessionRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -48,7 +55,6 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
 
   // Fixed 24-hour cycle from 00:00 to 00:00 (next day)
   const START_HOUR = 0;
-  const END_HOUR = 24;
   const TOTAL_HOURS = 24;
 
   const animateZoom = (targetZoom: number, mouseOffsetX: number) => {
@@ -263,6 +269,61 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
     await refreshData();
   };
 
+  const toDatetimeLocal = (date: Date) => {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  };
+
+  const handleDotClick = (dotKey: string) => {
+    soundEngine.playClick();
+    setSelectedDotKey(dotKey);
+  };
+
+  const handleDeleteCompletedObjective = async (id: number) => {
+    await dbDeleteObjective(id);
+    await loadSessions();
+    await refreshData();
+  };
+
+  const handleUpdateCompletedObjective = async (id: number, text: string, categoryId?: number | null) => {
+    await dbUpdateObjective(id, text, categoryId);
+    await loadSessions();
+    await refreshData();
+  };
+
+  const handleUpdateCompletedObjectiveTime = async (id: number, completedAt: string) => {
+    await dbUpdateObjectiveCompletedAt(id, completedAt);
+    await loadSessions();
+    await refreshData();
+  };
+
+  const handleEditSession = (session: FocusSession) => {
+    soundEngine.playClick();
+    setEditingSessionId(session.id);
+    const start = new Date(session.start_time);
+    const end = new Date(start.getTime() + session.duration_seconds * 1000);
+    setEditStartTime(toDatetimeLocal(start));
+    setEditEndTime(toDatetimeLocal(end));
+  };
+
+  const handleSaveSession = async () => {
+    if (!editingSessionId) return;
+    const startDate = new Date(editStartTime);
+    const endDate = new Date(editEndTime);
+    const durationSeconds = Math.floor((endDate.getTime() - startDate.getTime()) / 1000);
+    if (durationSeconds <= 0) return;
+    await updateFocusSession(editingSessionId, startDate.toISOString(), durationSeconds);
+    setEditingSessionId(null);
+    await loadSessions();
+    await refreshData();
+    soundEngine.playClick();
+  };
+
+  const handleCancelEditSession = () => {
+    soundEngine.playClick();
+    setEditingSessionId(null);
+  };
+
   const diagnostics = useMemo(() => {
     if (sessions.length === 0) return null;
 
@@ -346,6 +407,20 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
       };
     });
   }, [completedObjectives, currentDate, categories]);
+
+  // Derived: objectives for the selected dot
+  const selectedDotObjectives = useMemo(() => {
+    if (!selectedDotKey) return [];
+    const dot = objectiveDots.find(d => d.key === selectedDotKey);
+    return dot?.objectives || [];
+  }, [selectedDotKey, objectiveDots]);
+
+  // Auto-close modal when all objectives in the selected dot are deleted
+  useEffect(() => {
+    if (selectedDotKey && selectedDotObjectives.length === 0) {
+      setSelectedDotKey(null);
+    }
+  }, [selectedDotKey, selectedDotObjectives]);
 
   const hoursArray = Array.from({ length: 24 }, (_, i) => i);
   
@@ -496,11 +571,12 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
                     style={{ left: `${dot.leftPercent}%`, backgroundColor: dot.color }}
                     onMouseEnter={() => setHoveredDotKey(dot.key)}
                     onMouseLeave={() => setHoveredDotKey(null)}
+                    onClick={() => handleDotClick(dot.key)}
                   >
                     {hoveredDotKey === dot.key && (
                       <div className={`${styles.dotTooltip} ${
-                        dot.leftPercent < 15 ? styles.alignLeft : 
-                        dot.leftPercent > 85 ? styles.alignRight : 
+                        dot.leftPercent < 15 ? styles.alignLeft :
+                        dot.leftPercent > 85 ? styles.alignRight :
                         styles.alignCenter
                       }`}>
                         {dot.objectives.map(obj => (
@@ -527,6 +603,7 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
           <div className={styles.sessionList}>
             {sessions.map(s => {
               const isHighlighted = hoveredSessionId === s.id;
+              const isEditingThis = editingSessionId === s.id;
 
               return (
                 <div
@@ -539,24 +616,68 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
                   onMouseEnter={() => handleMouseEnterSession(s.id)}
                   onMouseLeave={() => setHoveredSessionId(null)}
                 >
-                  <div className={styles.sessionMain}>
-                    <span className={styles.time}>{new Date(s.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                    <span className={styles.duration}>{Math.floor(s.duration_seconds / 60)}m FORGE</span>
-                    {(s.pause_times?.length ?? 0) > 0 && (
-                      <span className={styles.interruptCount}>{s.pause_times!.length} INT</span>
-                    )}
-                  </div>
-                  <button
-                    className={styles.deleteBtn}
-                    onMouseEnter={handleHover}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(s.id);
-                    }}
-                    title="DELETE_RECORD"
-                  >
-                    <X size={14} />
-                  </button>
+                  {isEditingThis ? (
+                    <div className={styles.sessionEditForm}>
+                      <div className={styles.editRow}>
+                        <label>START:</label>
+                        <input
+                          type="datetime-local"
+                          value={editStartTime}
+                          onChange={e => setEditStartTime(e.target.value)}
+                          className={styles.dateTimeInput}
+                        />
+                      </div>
+                      <div className={styles.editRow}>
+                        <label>END:</label>
+                        <input
+                          type="datetime-local"
+                          value={editEndTime}
+                          onChange={e => setEditEndTime(e.target.value)}
+                          className={styles.dateTimeInput}
+                        />
+                      </div>
+                      <div className={styles.editActions}>
+                        <button onClick={handleSaveSession} title="SAVE">
+                          <Check size={12} />
+                        </button>
+                        <button onClick={handleCancelEditSession} title="CANCEL">
+                          <X size={12} />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className={styles.sessionMain}>
+                        <span className={styles.time}>{new Date(s.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        <span className={styles.duration}>{Math.floor(s.duration_seconds / 60)}m FORGE</span>
+                        {(s.pause_times?.length ?? 0) > 0 && (
+                          <span className={styles.interruptCount}>{s.pause_times!.length} INT</span>
+                        )}
+                      </div>
+                      <button
+                        className={styles.editSessionBtn}
+                        onMouseEnter={handleHover}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditSession(s);
+                        }}
+                        title="EDIT_SESSION"
+                      >
+                        <Edit3 size={14} />
+                      </button>
+                      <button
+                        className={styles.deleteBtn}
+                        onMouseEnter={handleHover}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(s.id);
+                        }}
+                        title="DELETE_RECORD"
+                      >
+                        <X size={14} />
+                      </button>
+                    </>
+                  )}
                 </div>
               );
             })}
@@ -649,6 +770,39 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
           </div>
         </div>
       </div>
+
+      {selectedDotKey && selectedDotObjectives.length > 0 && (
+        <CompletedObjectivesModal
+          objectives={selectedDotObjectives}
+          categories={categories}
+          onDelete={handleDeleteCompletedObjective}
+          onUpdate={handleUpdateCompletedObjective}
+          onUpdateTime={handleUpdateCompletedObjectiveTime}
+          onClose={() => setSelectedDotKey(null)}
+          onManageCategories={() => setShowCategoryManager(true)}
+        />
+      )}
+
+      {showCategoryManager && (
+        <CategoryManagerModal
+          categories={categories}
+          onAdd={async (label: string, color: string) => {
+            if (!authUser) return;
+            await dbAddCategory(authUser.id, label, color);
+            await refreshData();
+          }}
+          onUpdate={async (id: number, label: string, color: string) => {
+            await dbUpdateCategory(id, label, color);
+            await refreshData();
+          }}
+          onDelete={async (id: number) => {
+            await dbDeleteCategory(id);
+            await refreshData();
+          }}
+          onClose={() => setShowCategoryManager(false)}
+          objectiveCountByCategory={new Map()}
+        />
+      )}
     </div>
   );
 };

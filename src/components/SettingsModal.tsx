@@ -1,10 +1,10 @@
 import { type FC, useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import styles from './SettingsModal.module.scss';
-import { X, Check, LogOut } from 'lucide-react';
+import { X, Check, LogOut, Volume2 } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 import { useAuth } from '../contexts/AuthContext';
-import { soundEngine } from '../utils/audio';
+import { soundEngine, playObjectiveComplete } from '../utils/audio';
 
 interface Props {
   onClose: () => void;
@@ -68,7 +68,19 @@ export const SettingsModal: FC<Props> = ({ onClose }) => {
     <div className={styles.overlay} onClick={handleCancel}>
       <div className={styles.modal} onClick={e => e.stopPropagation()}>
         <div className={styles.header}>
-          <h2>SYSTEM_SETTINGS</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <h2>SYSTEM_SETTINGS</h2>
+            <button
+              className={styles.soundTestBtn}
+              onClick={(e) => {
+                e.stopPropagation();
+                playObjectiveComplete();
+              }}
+              title="TEST_AUDIO"
+            >
+              <Volume2 size={14} />
+            </button>
+          </div>
           <button className={styles.closeBtn} onClick={handleCancel}>
             <X size={20} />
           </button>

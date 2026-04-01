@@ -500,6 +500,25 @@
       margin-left: auto;
     }
 
+    .editSessionBtn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.25rem;
+      border-radius: 4px;
+      opacity: 0;
+      transition: all 0.2s ease;
+
+      &:hover {
+        color: var(--primary);
+        background: rgba(238, 104, 43, 0.1);
+      }
+    }
+
     .deleteBtn {
       background: transparent;
       border: none;
@@ -518,6 +537,82 @@
         background: rgba(248, 113, 113, 0.1);
       }
     }
+
+    &:hover .editSessionBtn {
+      opacity: 1;
+    }
+  }
+}
+
+.sessionEditForm {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  flex-wrap: wrap;
+
+  .editRow {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+
+    label {
+      font-size: 0.6rem;
+      color: var(--text-muted);
+      letter-spacing: 0.05em;
+      white-space: nowrap;
+    }
+  }
+
+  .editActions {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-left: auto;
+
+    button {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      padding: 0.25rem;
+      border-radius: 4px;
+      transition: all 0.2s ease;
+
+      &:first-child:hover {
+        color: var(--primary);
+        border-color: var(--primary);
+        background: rgba(238, 104, 43, 0.1);
+      }
+
+      &:last-child:hover {
+        color: #f87171;
+        border-color: #f87171;
+        background: rgba(248, 113, 113, 0.1);
+      }
+    }
+  }
+}
+
+.dateTimeInput {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  padding: 0.2rem 0.4rem;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+
+  &:focus {
+    outline: none;
+    border-color: var(--primary);
+    background: rgba(var(--primary-rgb), 0.05);
+  }
+
+  &::-webkit-calendar-picker-indicator {
+    filter: invert(0.7);
+    cursor: pointer;
   }
 }
 
