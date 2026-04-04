@@ -39,7 +39,7 @@ FocusForge is a high-performance productivity HUD (Heads-Up Display) built with 
 - **Frontend**: React 19, TypeScript, Vite 8
 - **Backend**: Tauri 2 (Rust)
 - **Database**: Turso (Cloud SQLite)
-- **Audio**: Custom Web Audio Synthesis
+- **Audio**: Custom Web Audio Synthesis + AI-generated MP3 files (Suno)
 - **Styling**: SCSS (CSS Modules)
 - **Testing**: Vitest, React Testing Library
 
