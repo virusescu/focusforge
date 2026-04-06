@@ -5,6 +5,32 @@ import { WindowControls } from './WindowControls';
 import { SettingsModal } from './SettingsModal';
 import { soundEngine } from '../utils/audio';
 import { useFocus } from '../contexts/FocusContext';
+import { useGame } from '../contexts/GameContext';
+
+function GameIndicators() {
+  const { coins, currentStreakDays, season, seasonDaysRemaining, rewardToast } = useGame();
+
+  return (
+    <div className={styles.gameIndicators}>
+      <span className={`${styles.coinCount} ${rewardToast ? styles.coinPulse : ''}`}>
+        ⟐ {Math.floor(coins).toLocaleString()}
+      </span>
+      <div className={styles.streakBars}>
+        {[0, 1, 2, 3].map(i => (
+          <span
+            key={i}
+            className={`${styles.streakBar} ${i < currentStreakDays ? styles.streakFilled : ''} ${currentStreakDays >= 4 ? styles.streakComplete : ''}`}
+          />
+        ))}
+      </div>
+      {season && (
+        <span className={`${styles.seasonTimer} ${seasonDaysRemaining <= 7 ? styles.seasonUrgent : ''}`}>
+          S{season.season_number} · {seasonDaysRemaining}d
+        </span>
+      )}
+    </div>
+  );
+}
 
 export const Header: FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -47,6 +73,8 @@ export const Header: FC = () => {
       </div>
 
       <div className={styles.right}>
+        <GameIndicators />
+        <div className={styles.divider} />
         <div className={styles.icons}>
           <Shield size={16} />
           <Radio size={16} />

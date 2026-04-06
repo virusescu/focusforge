@@ -1,6 +1,6 @@
 import { type FC, useCallback, useState, useRef, useEffect, useMemo } from 'react';
 import styles from './SidebarLeft.module.scss';
-import { User, Database, Cpu, HardDrive, BarChart2, Plus, X, GripVertical, Edit3, Check, Activity } from 'lucide-react';
+import { User, Database, Cpu, HardDrive, BarChart2, Plus, X, GripVertical, Edit3, Check, Activity, Gem } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 import { useFocus } from '../contexts/FocusContext';
 import { soundEngine } from '../utils/audio';
@@ -168,9 +168,10 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, categories, onSele
 interface Props {
   onViewAnalytics?: () => void;
   onViewIntel?: () => void;
+  onViewVault?: () => void;
 }
 
-export const SidebarLeft: FC<Props> = ({ onViewAnalytics, onViewIntel }) => {
+export const SidebarLeft: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVault }) => {
   const { user, name, avatar, loading } = useUser();
   const { objectivePool, activeObjectiveId, addObjective, deleteObjective, updateObjective, updateObjectiveCategory, setActiveObjective, reorderObjectives, categories, addCategory, updateCategory, deleteCategory } = useFocus();
   const [newObjective, setNewObjective] = useState('');
@@ -220,6 +221,11 @@ export const SidebarLeft: FC<Props> = ({ onViewAnalytics, onViewIntel }) => {
     soundEngine.playTab();
     onViewIntel?.();
   }, [onViewIntel]);
+
+  const handleVaultClick = useCallback(() => {
+    soundEngine.playClick();
+    onViewVault?.();
+  }, [onViewVault]);
 
   const handleHover = () => {
     soundEngine.playHover();
@@ -333,6 +339,16 @@ export const SidebarLeft: FC<Props> = ({ onViewAnalytics, onViewIntel }) => {
           >
             <Activity size={14} />
             <span>INTELLIGENCE_HUB</span>
+          </button>
+        )}
+        {onViewVault && (
+          <button
+            className={styles.vaultBtn}
+            onClick={handleVaultClick}
+            onMouseEnter={handleHover}
+          >
+            <Gem size={14} />
+            <span>FORGE_VAULT</span>
           </button>
         )}
       </div>

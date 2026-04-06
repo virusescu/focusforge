@@ -124,3 +124,67 @@
   font-weight: 600;
   pointer-events: none;
 }
+
+// ─── Game Indicators ────────────────────────────────────────────
+
+.gameIndicators {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.coinCount {
+  color: #f0c040;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  transition: transform 0.3s;
+  text-shadow: 0 0 6px rgba(240, 192, 64, 0.3);
+}
+
+.coinPulse {
+  animation: coinBounce 0.4s ease-out;
+}
+
+@keyframes coinBounce {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+.streakBars {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+
+.streakBar {
+  width: 12px;
+  height: 4px;
+  background: var(--text-muted);
+  border-radius: 1px;
+  transition: all 0.3s ease;
+}
+
+.streakFilled {
+  background: var(--primary);
+  box-shadow: 0 0 4px var(--primary-glow);
+}
+
+.streakComplete {
+  background: var(--secondary);
+  box-shadow: 0 0 6px var(--secondary-glow);
+}
+
+.seasonTimer {
+  color: var(--text-secondary);
+  font-size: 0.65rem;
+  font-family: var(--font-mono);
+  letter-spacing: 0.05em;
+}
+
+.seasonUrgent {
+  color: var(--primary);
+  text-shadow: 0 0 6px var(--primary-glow);
+}

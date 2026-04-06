@@ -1,0 +1,94 @@
+.toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000;
+  background: var(--bg-card);
+  backdrop-filter: var(--glass);
+  border: 1px solid var(--border);
+  border-left: 3px solid #f0c040;
+  border-radius: 8px;
+  padding: 16px 20px;
+  min-width: 260px;
+  max-width: 320px;
+  animation: slideIn 0.3s ease-out;
+  font-family: var(--font-mono);
+}
+
+.exiting {
+  opacity: 0;
+  transform: translateX(20px);
+  transition: all 0.5s ease-in;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(120%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.title {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  letter-spacing: 1.5px;
+  margin-bottom: 8px;
+}
+
+.coinLine {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.coinAmount {
+  font-size: 1.25rem;
+  color: #f0c040;
+  font-weight: 600;
+  text-shadow: 0 0 8px rgba(240, 192, 64, 0.4);
+}
+
+.bonusTag {
+  font-size: 0.6rem;
+  color: var(--secondary);
+  text-shadow: 0 0 4px var(--secondary-glow);
+}
+
+.multiplierLine {
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  margin-bottom: 2px;
+}
+
+.penaltyTag {
+  color: #fb923c;
+}
+
+.streakLine {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  margin-top: 6px;
+}
+
+.streakComplete {
+  color: var(--primary);
+  text-shadow: 0 0 6px var(--primary-glow);
+  font-weight: 600;
+}
+
+.dailyLine {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.dailyComplete {
+  color: var(--secondary);
+  text-shadow: 0 0 8px var(--secondary-glow);
+  font-weight: 600;
+}

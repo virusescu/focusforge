@@ -213,6 +213,123 @@ class SoundEngine {
     playTone(1320, 2640, 0.05, 0.15, 0.06);
     playTone(1760, 3520, 0.1, 0.2, 0.04);
   }
+
+  // ─── Game Economy Sounds ──────────────────────────────────────
+
+  playCoinEarned() {
+    const ctx = this.init();
+    const t = ctx.currentTime;
+
+    // Two stacked sine oscillators for metallic chime
+    const osc1 = ctx.createOscillator();
+    const osc2 = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(1200, t);
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(1800, t);
+
+    gain.gain.setValueAtTime(0.06, t);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.08);
+
+    osc1.connect(gain);
+    osc2.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc1.start(t);
+    osc2.start(t);
+    osc1.stop(t + 0.08);
+    osc2.stop(t + 0.08);
+  }
+
+  playPurchase() {
+    const ctx = this.init();
+    const t = ctx.currentTime;
+    const playTone = (freq: number, start: number, dur: number) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(freq, t + start);
+      gain.gain.setValueAtTime(0.05, t + start);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + start + dur);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t + start);
+      osc.stop(t + start + dur);
+    };
+    playTone(880, 0, 0.1);
+    playTone(660, 0.08, 0.12);
+  }
+
+  playStreakMilestone() {
+    const ctx = this.init();
+    const t = ctx.currentTime;
+    const notes = [440, 550, 660, 880];
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, t + i * 0.07);
+      gain.gain.setValueAtTime(0.08, t + i * 0.07);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.07 + 0.1);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t + i * 0.07);
+      osc.stop(t + i * 0.07 + 0.1);
+    });
+  }
+
+  playDailyBonusUnlocked() {
+    const ctx = this.init();
+    const t = ctx.currentTime;
+    [1000, 1500].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, t + i * 0.06);
+      gain.gain.setValueAtTime(0.07, t + i * 0.06);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.06 + 0.05);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t + i * 0.06);
+      osc.stop(t + i * 0.06 + 0.05);
+    });
+  }
+
+  playSeasonComplete() {
+    const ctx = this.init();
+    const t = ctx.currentTime;
+
+    // Chord: 440 + 660 + 880 with swell
+    [440, 660, 880].forEach(freq => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, t);
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.1, t + 0.5);
+      gain.gain.setValueAtTime(0.1, t + 1.0);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 1.5);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 1.5);
+    });
+
+    // Sub-bass hit
+    const sub = ctx.createOscillator();
+    const subGain = ctx.createGain();
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(80, t);
+    subGain.gain.setValueAtTime(0, t);
+    subGain.gain.linearRampToValueAtTime(0.15, t + 0.05);
+    subGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.8);
+    sub.connect(subGain);
+    subGain.connect(ctx.destination);
+    sub.start(t);
+    sub.stop(t + 0.8);
+  }
 }
 
 export const soundEngine = new SoundEngine();

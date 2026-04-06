@@ -12,12 +12,16 @@ import { useFocus } from './contexts/FocusContext';
 import { useAuth } from './contexts/AuthContext';
 import { UserProvider } from './contexts/UserContext';
 import { FocusProvider } from './contexts/FocusContext';
+import { GameProvider } from './contexts/GameContext';
 import { NavigationGuard } from './components/NavigationGuard';
+import { RewardToast } from './components/RewardToast';
+import { SeasonTransitionModal } from './components/SeasonTransitionModal';
+import { VaultPage } from './components/VaultPage';
 
 function HudApp() {
-  const [view, setView] = useState<'hud' | 'analytics' | 'intel'>('hud');
+  const [view, setView] = useState<'hud' | 'analytics' | 'intel' | 'vault'>('hud');
   const [analyticsDate, setAnalyticsDate] = useState<Date>(new Date());
-  const [pendingNavigation, setPendingNavigation] = useState<{ target: 'analytics' | 'intel'; dateStr?: string } | null>(null);
+  const [pendingNavigation, setPendingNavigation] = useState<{ target: 'analytics' | 'intel' | 'vault'; dateStr?: string } | null>(null);
   const { timerStatus, resetTimer } = useFocus();
 
   const handleViewAnalytics = (dateStr?: string) => {
@@ -42,6 +46,14 @@ function HudApp() {
     setView('intel');
   };
 
+  const handleViewVault = () => {
+    if (timerStatus !== 'idle') {
+      setPendingNavigation({ target: 'vault' });
+      return;
+    }
+    setView('vault');
+  };
+
   const handleConfirmNavigation = () => {
     if (!pendingNavigation) return;
     resetTimer();
@@ -53,6 +65,8 @@ function HudApp() {
         setAnalyticsDate(new Date());
       }
       setView('analytics');
+    } else if (pendingNavigation.target === 'vault') {
+      setView('vault');
     } else {
       setView('intel');
     }
@@ -64,17 +78,20 @@ function HudApp() {
   };
 
   return (
+  <>
     <div className="hud-container">
       <GlitchOverlay />
       <Header />
       {view === 'hud' ? (
         <>
-          <SidebarLeft onViewAnalytics={() => handleViewAnalytics()} onViewIntel={handleViewIntel} />
-          <MainDisplay onViewAnalytics={() => handleViewAnalytics()} onViewIntel={handleViewIntel} />
+          <SidebarLeft onViewAnalytics={() => handleViewAnalytics()} onViewIntel={handleViewIntel} onViewVault={handleViewVault} />
+          <MainDisplay onViewAnalytics={() => handleViewAnalytics()} onViewIntel={handleViewIntel} onViewVault={handleViewVault} />
           <SidebarRight onViewAnalytics={(date) => handleViewAnalytics(date)} />
         </>
       ) : view === 'analytics' ? (
         <AnalyticsView initialDate={analyticsDate} onBack={() => setView('hud')} />
+      ) : view === 'vault' ? (
+        <VaultPage onBack={() => setView('hud')} />
       ) : (
         <IntelligenceHub onBack={() => setView('hud')} />
       )}
@@ -87,6 +104,9 @@ function HudApp() {
         />
       )}
     </div>
+    <RewardToast />
+    <SeasonTransitionModal />
+  </>
   );
 }
 
@@ -108,7 +128,9 @@ function App() {
   return (
     <UserProvider>
       <FocusProvider>
-        <AppContent />
+        <GameProvider>
+          <AppContent />
+        </GameProvider>
       </FocusProvider>
     </UserProvider>
   );

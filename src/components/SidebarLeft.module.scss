@@ -97,6 +97,36 @@
   }
 }
 
+.vaultBtn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: transparent;
+  border: 1px solid #f0c040;
+  color: #f0c040;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: bold;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 0.5rem;
+  box-shadow: 0 0 5px rgba(240, 192, 64, 0.1);
+
+  &:hover {
+    background: rgba(240, 192, 64, 0.1);
+    box-shadow: 0 0 15px rgba(240, 192, 64, 0.3);
+    transform: translateY(-1px);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+}
+
 .stats {
   display: flex;
   flex-direction: column;
