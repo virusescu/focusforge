@@ -1,0 +1,11 @@
+{
+  "version": "0.1.2",
+  "notes": "Initial release.",
+  "pub_date": "2026-04-07T00:00:00Z",
+  "platforms": {
+    "windows-x86_64": {
+      "url": "",
+      "signature": ""
+    }
+  }
+}
