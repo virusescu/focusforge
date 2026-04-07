@@ -12,11 +12,12 @@ vi.mock('@libsql/client', () => ({
   }),
 }));
 
-import { saveFocusSession, getRecentSessions, deleteFocusSession, getObjectives, addObjective, deleteObjective, completeObjective, getKillRate, getAllSessions, getFragmentationStats } from './db';
+import { initDbClient, saveFocusSession, getRecentSessions, deleteFocusSession, getObjectives, addObjective, deleteObjective, completeObjective, getKillRate, getAllSessions, getFragmentationStats } from './db';
 
 describe('db utility functions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    initDbClient('libsql://test.turso.io', 'test-token');
   });
 
   describe('Focus Session Methods', () => {

@@ -21,10 +21,18 @@ if ($tauriRaw -match '"version":\s*"(\d+)\.(\d+)\.(\d+)"') {
     $tauriRaw = $tauriRaw -replace '"version":\s*"\d+\.\d+\.\d+"', "`"version`": `"$newVersion`""
     Set-Content $tauriConfPath $tauriRaw -NoNewline
 
-    # Update Cargo.toml
-    $cargoRaw = Get-Content $cargoPath -Raw
-    $cargoRaw = $cargoRaw -replace 'version = "\d+\.\d+\.\d+"', "version = `"$newVersion`""
-    Set-Content $cargoPath $cargoRaw -NoNewline
+    # Update Cargo.toml — only the [package] version (first occurrence)
+    $cargoLines = Get-Content $cargoPath
+    $replaced = $false
+    $cargoLines = $cargoLines | ForEach-Object {
+        if (-not $replaced -and $_ -match '^version = "\d+\.\d+\.\d+"') {
+            $replaced = $true
+            "version = `"$newVersion`""
+        } else {
+            $_
+        }
+    }
+    Set-Content $cargoPath $cargoLines
 
     # Update package.json
     $pkgRaw = Get-Content $pkgPath -Raw

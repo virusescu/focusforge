@@ -8,6 +8,7 @@ import { AnalyticsView } from './components/AnalyticsView';
 import { IntelligenceHub } from './components/IntelligenceHub';
 import { GlitchOverlay } from './components/GlitchOverlay';
 import { LoginScreen } from './components/LoginScreen';
+import { SetupScreen } from './components/SetupScreen';
 import { useFocus } from './contexts/FocusContext';
 import { useAuth } from './contexts/AuthContext';
 import { UserProvider } from './contexts/UserContext';
@@ -111,7 +112,7 @@ function HudApp() {
 }
 
 function App() {
-  const { authUser, loading } = useAuth();
+  const { authUser, needsSetup, loading } = useAuth();
 
   if (loading) {
     return (
@@ -121,8 +122,12 @@ function App() {
     );
   }
 
-  if (!authUser) {
+  if (!authUser && !needsSetup) {
     return <LoginScreen />;
+  }
+
+  if (needsSetup) {
+    return <SetupScreen />;
   }
 
   return (

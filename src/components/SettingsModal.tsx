@@ -105,18 +105,6 @@ export const SettingsModal: FC<Props> = ({ onClose }) => {
               style={{ opacity: 0.6 }}
             />
           </div>
-          <div className={styles.field}>
-            <label>EXPERIENCE_LVL</label>
-            <input
-              type="number"
-              value={experienceLvl}
-              onChange={e => setExperienceLvl(Number(e.target.value))}
-              placeholder="Enter level..."
-              min="1"
-              autoFocus
-            />
-          </div>
-
           <div className={styles.row}>
             <div className={styles.field}>
               <label>DAY_START_HOUR (0-23)</label>

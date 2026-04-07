@@ -4,12 +4,14 @@ import { getQuarter, getSeasonDates, getSeasonLabel, getSeasonName, getSeasonBad
 
 let db: Client | null = null;
 
+export function initDbClient(url: string, authToken: string) {
+  db = createClient({ url, authToken });
+}
+
 export function getDb(): Client {
-  if (db) return db;
-  db = createClient({
-    url: import.meta.env.VITE_TURSO_DATABASE_URL,
-    authToken: import.meta.env.VITE_TURSO_AUTH_TOKEN,
-  });
+  if (!db) {
+    throw new Error('Database not initialized. Call initDbClient() first.');
+  }
   return db;
 }
 

@@ -14,8 +14,8 @@
       {
         "label": "main",
         "title": "Focus Forge",
-        "width": 1280,
-        "height": 800,
+        "width": 1520,
+        "height": 960,
         "resizable": true,
         "fullscreen": false,
         "decorations": false,
