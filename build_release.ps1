@@ -3,6 +3,13 @@ Write-Host "   FocusForge - Build Release Bundle" -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host ""
 
+# --- Clean old bundles ---
+$bundlePath = Join-Path $PSScriptRoot "src-tauri\target\release\bundle"
+if (Test-Path $bundlePath) {
+    Write-Host "Cleaning old build artifacts..." -ForegroundColor Yellow
+    Remove-Item -Path $bundlePath -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 # --- Robust .env loading (handles multi-line keys) ---
 $envFile = Join-Path $PSScriptRoot ".env"
 if (Test-Path $envFile) {
@@ -49,7 +56,7 @@ Write-Host "Release build complete!" -ForegroundColor Green
 Write-Host ""
 
 # --- Find and optionally run installer ---
-$installer = Get-ChildItem -Path $bundlePath -Filter "*-setup.exe" -Recurse | Select-Object -First 1
+$installer = Get-ChildItem -Path $bundlePath -Filter "*-setup.exe" -Recurse | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 
 if ($installer) {
     Write-Host "Generated Installer: $($installer.Name)" -ForegroundColor Cyan
