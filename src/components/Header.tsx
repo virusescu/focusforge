@@ -37,6 +37,7 @@ export const Header: FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [appVersion, setAppVersion] = useState('...');
   const { timerStatus } = useFocus();
+  const { currentTitle } = useGame();
 
   useEffect(() => {
     getVersion().then(setAppVersion).catch(() => setAppVersion('dev'));
@@ -69,8 +70,8 @@ export const Header: FC = () => {
         </div>
         <div className={styles.divider} />
         <div className={styles.rank}>
-          <span className={styles.label}>OPERATOR_RANK</span>
-          <span className={styles.value}>LEAD_ENGINEER</span>
+          <span className={styles.label}>PRESTIGE_RANK</span>
+          <span className={styles.value}>{currentTitle?.display_name ?? 'UNRANKED'}</span>
         </div>
       </div>
 
