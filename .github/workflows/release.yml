@@ -1,0 +1,95 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build and release
+        id: tauri
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: FocusForge ${{ github.ref_name }}
+          releaseBody: Release ${{ github.ref_name }}
+          releaseDraft: false
+          prerelease: false
+
+      - name: Generate update.json
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart('v')
+          $repo = "virusescu/focusforge"
+          $tag = "${{ github.ref_name }}"
+
+          # Get release assets
+          $release = gh api repos/$repo/releases/tags/$tag | ConvertFrom-Json
+
+          # Find the .nsis.zip asset and its .sig
+          $zipAsset = $release.assets | Where-Object { $_.name -like "*.nsis.zip" } | Select-Object -First 1
+          $sigAsset  = $release.assets | Where-Object { $_.name -like "*.nsis.zip.sig" } | Select-Object -First 1
+
+          if (-not $zipAsset -or -not $sigAsset) {
+            Write-Error "Could not find nsis.zip or .sig asset in release"
+            exit 1
+          }
+
+          $zipUrl = $zipAsset.browser_download_url
+
+          # Download the .sig file contents
+          $sigContent = gh api $sigAsset.url --header "Accept: application/octet-stream"
+
+          $pubDate = (Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")
+
+          $updateJson = @{
+            version = $version
+            notes   = "Release v$version"
+            pub_date = $pubDate
+            platforms = @{
+              "windows-x86_64" = @{
+                url       = $zipUrl
+                signature = $sigContent
+              }
+            }
+          } | ConvertTo-Json -Depth 5
+
+          Set-Content -Path "update.json" -Value $updateJson -NoNewline
+          Write-Host "Generated update.json for v$version"
+
+      - name: Commit update.json
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add update.json
+          git commit -m "chore: update update.json for ${{ github.ref_name }}"
+          git push origin HEAD:master
