@@ -60,6 +60,8 @@ Monitor the build at `github.com/virusescu/focusforge/actions`. The finished ins
 | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Key password |
 | `VITE_GOOGLE_CLIENT_ID` | Baked into the build for OAuth |
 | `VITE_GOOGLE_CLIENT_SECRET` | Baked into the build for OAuth |
+| `TELEGRAM_BOT_TOKEN` | Telegram bot token for release notifications |
+| `TELEGRAM_CHAT_ID` | Telegram chat ID to receive notifications |
 
 ### OTA Updates
 

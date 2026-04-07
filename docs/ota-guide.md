@@ -30,6 +30,8 @@ Add these secrets:
 | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | The password you chose when generating the key |
 | `VITE_GOOGLE_CLIENT_ID` | Your Google OAuth client ID |
 | `VITE_GOOGLE_CLIENT_SECRET` | Your Google OAuth client secret |
+| `TELEGRAM_BOT_TOKEN` | Token from @BotFather (e.g. `123456789:ABCdef...`) |
+| `TELEGRAM_CHAT_ID` | Your Telegram chat ID (get it from `https://api.telegram.org/botYOUR_TOKEN/getUpdates`) |
 
 ---
 
