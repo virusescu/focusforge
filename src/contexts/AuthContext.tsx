@@ -94,7 +94,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // Turso credentials already exist — proceed normally
     initDbClient(storedUrl, storedToken);
-    setTursoUrl(storedUrl);
     await initDb();
     const user = await upsertUser(userInfo.sub, userInfo.email, userInfo.name, userInfo.picture);
     await seedDefaultCategories(user.id);
