@@ -45,6 +45,25 @@ jobs:
           Set-Content -Path $keyPath -Value $keyContent -NoNewline
           echo "SIGNING_KEY_PATH=$keyPath" | Out-File -FilePath $env:GITHUB_ENV -Append
 
+      - name: Create GitHub Release
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --repo virusescu/focusforge \
+            --title "FocusForge ${{ github.ref_name }}" \
+            --notes "Release ${{ github.ref_name }}"
+
+      - name: Get release ID
+        id: get_release
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ID=$(gh release view "${{ github.ref_name }}" --repo virusescu/focusforge --json id --jq '.id')
+          echo "release_id=$ID" >> $GITHUB_OUTPUT
+
       - name: Build and release
         id: tauri
         uses: tauri-apps/tauri-action@v0
@@ -53,17 +72,9 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ env.SIGNING_KEY_PATH }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: FocusForge ${{ github.ref_name }}
-          releaseBody: Release ${{ github.ref_name }}
+          releaseId: ${{ steps.get_release.outputs.release_id }}
           releaseDraft: false
           prerelease: false
-
-      - name: List bundle output
-        shell: pwsh
-        run: |
-          Write-Host "=== Bundle directory contents ==="
-          Get-ChildItem -Path "src-tauri/target/release/bundle" -Recurse | ForEach-Object { Write-Host $_.FullName }
 
       - name: Upload updater artifacts
         shell: pwsh
