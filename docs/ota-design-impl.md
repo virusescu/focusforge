@@ -7,23 +7,23 @@ Use this file to track progress. Check off items as they are completed. If the s
 ## Progress Checklist
 
 ### One-Time Manual Setup (YOU do this)
-- [ ] Generate signing keys (`npm run tauri signer generate -- -w ~/.tauri/focusforge.key`)
-- [ ] Add `TAURI_SIGNING_PRIVATE_KEY` secret to GitHub repo
-- [ ] Add `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` secret to GitHub repo
-- [ ] Embed public key + endpoint into `tauri.conf.json` (see `docs/ota-guide.md`)
+- [x] Generate signing keys (`npm run tauri signer generate -- -w ~/.tauri/focusforge.key`)
+- [x] Add `TAURI_SIGNING_PRIVATE_KEY` secret to GitHub repo
+- [x] Add `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` secret to GitHub repo
+- [x] Embed public key + endpoint into `tauri.conf.json` (see `docs/ota-guide.md`)
 
 ### Implementation (Claude does this)
-- [ ] Add `tauri-plugin-updater` to `src-tauri/Cargo.toml`
-- [ ] Register updater plugin in `src-tauri/src/lib.rs`
-- [ ] Add `plugins.updater` config to `src-tauri/tauri.conf.json` (pubkey placeholder + endpoint)
-- [ ] Add `@tauri-apps/plugin-updater` and `@tauri-apps/plugin-process` npm packages
-- [ ] Create update check hook in frontend (startup, shows prompt dialog)
-- [ ] Create `UpdatePrompt` component (version info + Update Now / Skip buttons)
-- [ ] Wire `UpdatePrompt` into `App.tsx` or root component
-- [ ] Modify `deploy_release.ps1` — replace local build with git tag + push
-- [ ] Create `.github/workflows/release.yml`
-- [ ] Create initial `update.json` in repo root (empty/placeholder for v0.1.2)
-- [ ] Commit everything
+- [x] Add `tauri-plugin-updater` to `src-tauri/Cargo.toml`
+- [x] Register updater plugin in `src-tauri/src/lib.rs`
+- [x] Add `plugins.updater` config to `src-tauri/tauri.conf.json` (pubkey placeholder + endpoint)
+- [x] Add `@tauri-apps/plugin-updater` and `@tauri-apps/plugin-process` npm packages
+- [x] Create update check hook in frontend (startup, shows prompt dialog)
+- [x] Create `UpdatePrompt` component (version info + Update Now / Skip buttons)
+- [x] Wire `UpdatePrompt` into `App.tsx` or root component
+- [x] Modify `deploy_release.ps1` — replace local build with git tag + push
+- [x] Create `.github/workflows/release.yml`
+- [x] Create initial `update.json` in repo root (empty/placeholder for v0.1.2)
+- [x] Commit everything
 
 ---
 
