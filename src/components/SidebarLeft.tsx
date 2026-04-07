@@ -173,7 +173,7 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, categories, onSele
 export const SidebarLeft: FC = () => {
   const { name, avatar, loading } = useUser();
   const { objectivePool, activeObjectiveId, addObjective, deleteObjective, updateObjective, updateObjectiveCategory, setActiveObjective, reorderObjectives, categories, addCategory, updateCategory, deleteCategory } = useFocus();
-  const { sessionsToday, dailyBonusActive, currentStreakDays, totalCoinsEarned } = useGame();
+  const { sessionsToday, dailyBonusActive, currentStreakDays, streakMultiplier, totalCoinsEarned } = useGame();
   const [newObjective, setNewObjective] = useState('');
   const [newCategoryId, setNewCategoryId] = useState<number | null>(null);
   const [showNewCategoryPicker, setShowNewCategoryPicker] = useState(false);
@@ -266,29 +266,39 @@ export const SidebarLeft: FC = () => {
         </div>
         
         <div className={styles.stats}>
-          <div className={styles.statItem}>
-            <div className={styles.statInfo}>
-              <div className={styles.statLabel}>
-                <Zap size={12} />
-                <span>DAILY_CHALLENGE</span>
+          <div className={styles.multiplierRow}>
+            {(() => {
+              const dailyMult = dailyBonusActive ? 2.0 : 1.0;
+              const combined = streakMultiplier * dailyMult;
+              const isBase = combined <= 1;
+              return (
+                <div className={`${styles.multiplierDisplay} ${isBase ? styles.multiplierInactive : ''}`}>
+                  <span className={styles.multiplierValue}>{isBase ? '—' : `${combined.toFixed(2)}x`}</span>
+                  <span className={styles.multiplierLabel}>MULTIPLIER</span>
+                </div>
+              );
+            })()}
+            <div className={styles.compactStats}>
+              <div className={styles.compactItem}>
+                <div className={styles.compactInfo}>
+                  <Zap size={10} />
+                  <span>DAILY</span>
+                  <span className={styles.compactValue}>{dailyBonusActive ? '2x' : `${Math.min(sessionsToday, 3)}/3`}</span>
+                </div>
+                <div className={styles.progressBar}>
+                  <div className={`${styles.progressFill} ${dailyBonusActive ? styles.progressActive : ''}`} style={{ width: `${Math.min(sessionsToday / 3, 1) * 100}%` }} />
+                </div>
               </div>
-              <span className={styles.statValue}>{dailyBonusActive ? '2x' : `${Math.min(sessionsToday, 3)}/3`}</span>
-            </div>
-            <div className={styles.progressBar}>
-              <div className={`${styles.progressFill} ${dailyBonusActive ? styles.progressActive : ''}`} style={{ width: `${Math.min(sessionsToday / 3, 1) * 100}%` }} />
-            </div>
-          </div>
-
-          <div className={styles.statItem}>
-            <div className={styles.statInfo}>
-              <div className={styles.statLabel}>
-                <Flame size={12} />
-                <span>STREAK_STATUS</span>
+              <div className={styles.compactItem}>
+                <div className={styles.compactInfo}>
+                  <Flame size={10} />
+                  <span>STREAK</span>
+                  <span className={styles.compactValue}>{currentStreakDays}/4</span>
+                </div>
+                <div className={styles.progressBar}>
+                  <div className={styles.progressFill} style={{ width: `${(currentStreakDays / 4) * 100}%` }} />
+                </div>
               </div>
-              <span className={styles.statValue}>DAY {currentStreakDays}/4</span>
-            </div>
-            <div className={styles.progressBar}>
-              <div className={styles.progressFill} style={{ width: `${(currentStreakDays / 4) * 100}%` }} />
             </div>
           </div>
 

@@ -91,10 +91,27 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
   // Derived values
   const coins = gameState?.coins ?? 0;
   const totalCoinsEarned = gameState?.total_coins_earned ?? 0;
-  const currentStreakDays = gameState?.current_streak_days ?? 0;
   const streaksCompletedThisSeason = gameState?.streaks_completed ?? 0;
-  const sessionsToday = gameState?.sessions_today ?? 0;
   const dailyBonusActive = (gameState?.daily_bonus_active ?? 0) === 1;
+
+  // Effective streak: only show non-zero if streak was earned/extended today
+  // The streak advances when daily challenge is completed, setting streak_last_date to today
+  // If streak_last_date is from a previous day, show 0 — the handler will set it fresh
+  const currentStreakDays = (() => {
+    const raw = gameState?.current_streak_days ?? 0;
+    if (raw === 0 || !gameState?.streak_last_date) return 0;
+    const todayStr = formatDateStr(new Date());
+    if (gameState.streak_last_date === todayStr) return raw;
+    return 0;
+  })();
+
+  // Reset sessions_today if it's a stale date
+  const sessionsToday = (() => {
+    const todayStr = formatDateStr(new Date());
+    if (gameState?.sessions_today_date !== todayStr) return 0;
+    return gameState?.sessions_today ?? 0;
+  })();
+
   const streakMultiplier = getStreakMultiplier(currentStreakDays);
   const seasonDaysRemaining = season ? getSeasonDaysRemaining(season.end_date) : 0;
 
