@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "0.1.11"
+version = "0.1.30"
 description = "FocusForge"
 authors = ["virusescu"]
 license = ""

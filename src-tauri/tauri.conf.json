@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "focusforge",
-  "version": "0.1.11",
+  "version": "0.1.30",
   "identifier": "com.virusescu.focusforge",
   "build": {
     "frontendDist": "../dist",
