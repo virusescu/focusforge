@@ -1,4 +1,4 @@
-import { type FC, useState, useCallback } from 'react';
+import { type FC, useState, useEffect, useCallback } from 'react';
 import styles from './Header.module.scss';
 import { Shield, Radio, Wifi, Settings } from 'lucide-react';
 import { WindowControls } from './WindowControls';
@@ -6,6 +6,7 @@ import { SettingsModal } from './SettingsModal';
 import { soundEngine } from '../utils/audio';
 import { useFocus } from '../contexts/FocusContext';
 import { useGame } from '../contexts/GameContext';
+import { getVersion } from '@tauri-apps/api/app';
 
 function GameIndicators() {
   const { coins, currentStreakDays, season, seasonDaysRemaining, rewardToast } = useGame();
@@ -34,7 +35,12 @@ function GameIndicators() {
 
 export const Header: FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [appVersion, setAppVersion] = useState('...');
   const { timerStatus } = useFocus();
+
+  useEffect(() => {
+    getVersion().then(setAppVersion).catch(() => setAppVersion('dev'));
+  }, []);
 
   const handleOpenSettings = useCallback(() => {
     soundEngine.playClick();
@@ -81,7 +87,7 @@ export const Header: FC = () => {
           <Wifi size={16} />
         </div>
         <div className={styles.divider} />
-        <div className={styles.version}>V-0.0.69</div>
+        <div className={styles.version}>V-{appVersion}</div>
         <div className={styles.divider} />
         <button 
           className={styles.settingsBtn} 

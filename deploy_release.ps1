@@ -2,7 +2,47 @@ Write-Host "============================================" -ForegroundColor Cyan
 Write-Host "   FocusForge - Build Release Bundle" -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "Building Tauri app in release mode..." -ForegroundColor Yellow
+
+# --- Auto-increment patch version ---
+$tauriConfPath = "src-tauri\tauri.conf.json"
+$cargoPath = "src-tauri\Cargo.toml"
+$pkgPath = "package.json"
+
+$tauriRaw = Get-Content $tauriConfPath -Raw
+if ($tauriRaw -match '"version":\s*"(\d+)\.(\d+)\.(\d+)"') {
+    $major = $Matches[1]
+    $minor = $Matches[2]
+    $patch = [int]$Matches[3] + 1
+    $newVersion = "$major.$minor.$patch"
+
+    Write-Host "Bumping version: $major.$minor.$($patch - 1) -> $newVersion" -ForegroundColor Yellow
+
+    # Update tauri.conf.json
+    $tauriRaw = $tauriRaw -replace '"version":\s*"\d+\.\d+\.\d+"', "`"version`": `"$newVersion`""
+    Set-Content $tauriConfPath $tauriRaw -NoNewline
+
+    # Update Cargo.toml
+    $cargoRaw = Get-Content $cargoPath -Raw
+    $cargoRaw = $cargoRaw -replace 'version = "\d+\.\d+\.\d+"', "version = `"$newVersion`""
+    Set-Content $cargoPath $cargoRaw -NoNewline
+
+    # Update package.json
+    $pkgRaw = Get-Content $pkgPath -Raw
+    $pkgRaw = $pkgRaw -replace '"version":\s*"\d+\.\d+\.\d+"', "`"version`": `"$newVersion`""
+    Set-Content $pkgPath $pkgRaw -NoNewline
+
+    # Git commit the version bump
+    git add $tauriConfPath $cargoPath $pkgPath
+    git commit -m "chore: bump version to $newVersion"
+
+    Write-Host ""
+} else {
+    Write-Host "WARNING: Could not parse version from $tauriConfPath" -ForegroundColor Red
+    Read-Host "Press Enter to exit"
+    exit 1
+}
+
+Write-Host "Building Tauri app in release mode (v$newVersion)..." -ForegroundColor Yellow
 Write-Host ""
 npm run tauri build
 if ($LASTEXITCODE -ne 0) {
