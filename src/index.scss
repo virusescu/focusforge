@@ -33,10 +33,9 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background: 
+    background:
       radial-gradient(circle, transparent 20%, var(--bg-darker) 90%),
-      url('./assets/forge-bg.png');
-    background-size: cover;
+      url('/forge-bg.png');    background-size: cover;
     background-position: center;
     opacity: 0.4;
     z-index: -1;
