@@ -36,14 +36,6 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Write signing key to file
-        shell: pwsh
-        run: |
-          $keyContent = "${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}"
-          $keyPath = "$env:RUNNER_TEMP\focusforge.key"
-          Set-Content -Path $keyPath -Value $keyContent -NoNewline
-          echo "SIGNING_KEY_PATH=$keyPath" | Out-File -FilePath $env:GITHUB_ENV -Append
-
       - name: Create GitHub Release
         shell: bash
         env:
@@ -52,7 +44,7 @@ jobs:
           gh release create "${{ github.ref_name }}" \
             --repo virusescu/focusforge \
             --title "FocusForge ${{ github.ref_name }}" \
-            --notes "Release ${{ github.ref_name }}"
+            --notes "Release ${{ github.ref_name }}" || echo "Release already exists"
 
       - name: Get release ID
         id: get_release
@@ -68,12 +60,18 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ env.SIGNING_KEY_PATH }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
+          tagName: ${{ github.ref_name }}
           releaseId: ${{ steps.get_release.outputs.release_id }}
           releaseDraft: false
           prerelease: false
+
+      - name: List artifacts
+        shell: pwsh
+        run: |
+          Get-ChildItem -Path src-tauri/target/release/bundle -Recursive
 
       - name: Upload updater artifacts
         shell: pwsh
@@ -84,15 +82,22 @@ jobs:
           $repo = "virusescu/focusforge"
           $bundleDir = "src-tauri/target/release/bundle/nsis"
 
+          Write-Host "Searching for updater artifacts in $bundleDir"
           $nsisZip = Get-ChildItem -Path $bundleDir -Filter "*.nsis.zip" -ErrorAction SilentlyContinue | Select-Object -First 1
           $nsisSig = Get-ChildItem -Path $bundleDir -Filter "*.nsis.zip.sig" -ErrorAction SilentlyContinue | Select-Object -First 1
 
           if (-not $nsisZip -or -not $nsisSig) {
-            Write-Error "Could not find .nsis.zip or .nsis.zip.sig in $bundleDir"
+            Write-Host "Trying parent directory..."
+            $nsisZip = Get-ChildItem -Path "src-tauri/target/release/bundle" -Filter "*.nsis.zip" -Recursive | Select-Object -First 1
+            $nsisSig = Get-ChildItem -Path "src-tauri/target/release/bundle" -Filter "*.nsis.zip.sig" -Recursive | Select-Object -First 1
+          }
+
+          if (-not $nsisZip -or -not $nsisSig) {
+            Write-Error "Could not find .nsis.zip or .nsis.zip.sig"
             exit 1
           }
 
-          Write-Host "Uploading $($nsisZip.Name) and $($nsisSig.Name)"
+          Write-Host "Uploading $($nsisZip.FullName) and $($nsisSig.FullName)"
           gh release upload $tag $nsisZip.FullName $nsisSig.FullName --repo $repo --clobber
 
       - name: Generate update.json
@@ -103,8 +108,13 @@ jobs:
           $tag = "${{ github.ref_name }}"
           $bundleDir = "src-tauri/target/release/bundle/nsis"
 
-          $nsisZip = Get-ChildItem -Path $bundleDir -Filter "*.nsis.zip" | Select-Object -First 1
-          $nsisSig = Get-ChildItem -Path $bundleDir -Filter "*.nsis.zip.sig" | Select-Object -First 1
+          $nsisZip = Get-ChildItem -Path $bundleDir -Filter "*.nsis.zip" -ErrorAction SilentlyContinue | Select-Object -First 1
+          $nsisSig = Get-ChildItem -Path $bundleDir -Filter "*.nsis.zip.sig" -ErrorAction SilentlyContinue | Select-Object -First 1
+
+          if (-not $nsisZip -or -not $nsisSig) {
+            $nsisZip = Get-ChildItem -Path "src-tauri/target/release/bundle" -Filter "*.nsis.zip" -Recursive | Select-Object -First 1
+            $nsisSig = Get-ChildItem -Path "src-tauri/target/release/bundle" -Filter "*.nsis.zip.sig" -Recursive | Select-Object -First 1
+          }
 
           $sigContent = (Get-Content $nsisSig.FullName -Raw).Trim()
           $zipUrl = "https://github.com/$repo/releases/download/$tag/$($nsisZip.Name)"
