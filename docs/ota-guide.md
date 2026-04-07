@@ -31,7 +31,24 @@ Add these secrets:
 | `VITE_GOOGLE_CLIENT_ID` | Your Google OAuth client ID |
 | `VITE_GOOGLE_CLIENT_SECRET` | Your Google OAuth client secret |
 | `TELEGRAM_BOT_TOKEN` | Token from @BotFather (e.g. `123456789:ABCdef...`) |
-| `TELEGRAM_CHAT_ID` | Your Telegram chat ID (get it from `https://api.telegram.org/botYOUR_TOKEN/getUpdates`) |
+| `TELEGRAM_CHAT_ID` | Your Telegram chat ID (see instructions below) |
+
+#### Setting up the Telegram bot
+
+1. Open Telegram and search for [@BotFather](https://t.me/botfather)
+2. Send `/newbot` and follow the prompts — choose a name and username for your bot
+3. BotFather will reply with a token like `123456789:ABCdefGHI...` — this is your `TELEGRAM_BOT_TOKEN`
+
+#### Getting your Chat ID
+
+1. Send any message to your new bot in Telegram
+2. Open this URL in your browser (replace `YOUR_TOKEN` with your actual token):
+   ```
+   https://api.telegram.org/botYOUR_TOKEN/getUpdates
+   ```
+3. Look for `"chat":{"id":XXXXXXXXX}` in the JSON response — that number is your `TELEGRAM_CHAT_ID`
+
+> If the response is empty (`"result":[]`), make sure you sent a message to the bot first, then try again.
 
 ---
 
