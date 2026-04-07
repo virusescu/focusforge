@@ -291,6 +291,15 @@
   }
 }
 
+.bountyBadge {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 0.55rem;
+  color: #f0c040;
+  opacity: 0.5;
+  letter-spacing: 0.02em;
+}
+
 .deleteBtn {
   background: transparent;
   border: none;

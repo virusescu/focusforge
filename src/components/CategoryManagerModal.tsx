@@ -6,8 +6,8 @@ import { soundEngine } from '../utils/audio';
 
 interface Props {
   categories: ObjectiveCategory[];
-  onAdd: (label: string, color: string) => Promise<void>;
-  onUpdate: (id: number, label: string, color: string) => Promise<void>;
+  onAdd: (label: string, color: string, coinBounty?: number) => Promise<void>;
+  onUpdate: (id: number, label: string, color: string, coinBounty?: number) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
   onClose: () => void;
   objectiveCountByCategory: Map<number, number>;
@@ -18,12 +18,17 @@ export const CategoryManagerModal: FC<Props> = ({ categories, onAdd, onUpdate, o
 
   const handleLabelChange = (cat: ObjectiveCategory, newLabel: string) => {
     if (newLabel.trim() && newLabel !== cat.label) {
-      onUpdate(cat.id, newLabel.trim(), cat.color);
+      onUpdate(cat.id, newLabel.trim(), cat.color, cat.coin_bounty);
     }
   };
 
   const handleColorChange = (cat: ObjectiveCategory, newColor: string) => {
-    onUpdate(cat.id, cat.label, newColor);
+    onUpdate(cat.id, cat.label, newColor, cat.coin_bounty);
+  };
+
+  const handleBountyChange = (cat: ObjectiveCategory, newBounty: string) => {
+    const value = Math.max(0, parseInt(newBounty) || 0);
+    onUpdate(cat.id, cat.label, cat.color, value);
   };
 
   const handleDelete = (cat: ObjectiveCategory) => {
@@ -81,6 +86,18 @@ export const CategoryManagerModal: FC<Props> = ({ categories, onAdd, onUpdate, o
                   if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
                 }}
               />
+              <input
+                className={styles.bountyInput}
+                type="number"
+                defaultValue={cat.coin_bounty}
+                min="0"
+                onBlur={(e) => handleBountyChange(cat, e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                }}
+                title="Coin bounty"
+              />
+              <span className={styles.bountyIcon}>⟐</span>
               <button
                 className={styles.deleteBtn}
                 onClick={() => handleDelete(cat)}

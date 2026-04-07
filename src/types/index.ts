@@ -44,6 +44,7 @@ export interface ObjectiveCategory {
   label: string;
   color: string;
   sort_order: number;
+  coin_bounty: number;
 }
 
 export interface StrategicObjective {
@@ -155,6 +156,24 @@ export interface RewardToastData {
   sessionsToday: number;
   dailyChallengeJustCompleted: boolean;
   streakJustCompleted: boolean;
+  objectiveBounty?: {
+    baseBounty: number;
+    streakMultiplier: number;
+    activeToolMultiplier: number;
+  };
+}
+
+export interface ObjectiveBountyInput {
+  baseBounty: number;
+  currentStreakDays: number;
+  ownedActiveToolPercents: number[];
+}
+
+export interface ObjectiveBountyOutput {
+  baseBounty: number;
+  streakMultiplier: number;
+  activeToolMultiplier: number;
+  totalCoins: number;
 }
 
 export interface SessionRewardInput {

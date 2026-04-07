@@ -85,9 +85,9 @@ function HudApp() {
       <Header />
       {view === 'hud' ? (
         <>
-          <SidebarLeft onViewAnalytics={() => handleViewAnalytics()} onViewIntel={handleViewIntel} onViewVault={handleViewVault} />
+          <SidebarLeft />
           <MainDisplay onViewAnalytics={() => handleViewAnalytics()} onViewIntel={handleViewIntel} onViewVault={handleViewVault} />
-          <SidebarRight onViewAnalytics={(date) => handleViewAnalytics(date)} />
+          <SidebarRight onViewAnalytics={(date) => handleViewAnalytics(date)} onViewIntel={handleViewIntel} onViewVault={handleViewVault} />
         </>
       ) : view === 'analytics' ? (
         <AnalyticsView initialDate={analyticsDate} onBack={() => setView('hud')} />

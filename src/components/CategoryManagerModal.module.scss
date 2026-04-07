@@ -108,6 +108,40 @@
   }
 }
 
+.bountyInput {
+  width: 48px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: #f0c040;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  padding: 0.3rem 0.3rem;
+  text-align: right;
+  outline: none;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+
+  &:focus {
+    border-color: #f0c040;
+    background: rgba(240, 192, 64, 0.05);
+  }
+
+  // Hide number input spinners
+  -moz-appearance: textfield;
+  &::-webkit-outer-spin-button,
+  &::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+}
+
+.bountyIcon {
+  color: #f0c040;
+  font-size: 0.7rem;
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
 .deleteBtn {
   background: transparent;
   border: none;

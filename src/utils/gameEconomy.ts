@@ -1,4 +1,4 @@
-import type { SessionRewardInput, SessionRewardOutput, ToolDefinition } from '../types';
+import type { SessionRewardInput, SessionRewardOutput, ToolDefinition, ObjectiveBountyInput, ObjectiveBountyOutput } from '../types';
 
 /**
  * Pure functions for the FocusForge game economy.
@@ -59,6 +59,20 @@ export function calculateSessionReward(input: SessionRewardInput): SessionReward
     totalCoins: total,
     dailyChallengeJustCompleted: dailyJustCompleted,
     countsForProgress,
+  };
+}
+
+export function calculateObjectiveBounty(input: ObjectiveBountyInput): ObjectiveBountyOutput {
+  const streakMult = getStreakMultiplier(input.currentStreakDays);
+  const activePercent = input.ownedActiveToolPercents.reduce((sum, p) => sum + p, 0);
+  const activeMult = 1.0 + activePercent / 100;
+  const total = Math.round(input.baseBounty * streakMult * activeMult);
+
+  return {
+    baseBounty: input.baseBounty,
+    streakMultiplier: streakMult,
+    activeToolMultiplier: activeMult,
+    totalCoins: total,
   };
 }
 

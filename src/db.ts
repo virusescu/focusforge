@@ -202,6 +202,17 @@ export async function initDb() {
     )
   `);
 
+  // ─── Migrations ──────────────────────────────────────────────────
+  // Add coin_bounty column to objective_categories (safe if already exists)
+  try {
+    await database.execute(`ALTER TABLE objective_categories ADD COLUMN coin_bounty INTEGER DEFAULT 25`);
+    // Migrate existing seeded categories to their intended bounties
+    await database.execute(`UPDATE objective_categories SET coin_bounty = 50 WHERE label = 'Hard' AND coin_bounty = 25`);
+    await database.execute(`UPDATE objective_categories SET coin_bounty = 10 WHERE label = 'Easy' AND coin_bounty = 25`);
+  } catch {
+    // Column already exists — no action needed
+  }
+
   await seedToolDefinitions();
   await seedPrestigeTitles();
 }
@@ -473,6 +484,7 @@ export async function getCategories(userId: number): Promise<ObjectiveCategory[]
     label: row.label as string,
     color: row.color as string,
     sort_order: row.sort_order as number,
+    coin_bounty: (row.coin_bounty as number) ?? 25,
   }));
 }
 
@@ -484,13 +496,13 @@ export async function seedDefaultCategories(userId: number): Promise<void> {
   });
   if ((countResult.rows[0]?.n as number) === 0) {
     await database.execute({
-      sql: 'INSERT INTO objective_categories (user_id, label, color, sort_order) VALUES (?, ?, ?, ?), (?, ?, ?, ?), (?, ?, ?, ?)',
-      args: [userId, 'Hard', '#ff4444', 0, userId, 'Normal', '#ffffff', 1, userId, 'Easy', '#888888', 2],
+      sql: 'INSERT INTO objective_categories (user_id, label, color, sort_order, coin_bounty) VALUES (?, ?, ?, ?, ?), (?, ?, ?, ?, ?), (?, ?, ?, ?, ?)',
+      args: [userId, 'Hard', '#ff4444', 0, 50, userId, 'Normal', '#ffffff', 1, 25, userId, 'Easy', '#888888', 2, 10],
     });
   }
 }
 
-export async function addCategory(userId: number, label: string, color: string): Promise<number> {
+export async function addCategory(userId: number, label: string, color: string, coinBounty: number = 25): Promise<number> {
   const database = getDb();
   const countResult = await database.execute({
     sql: 'SELECT COUNT(*) as n FROM objective_categories WHERE user_id = ?',
@@ -498,17 +510,17 @@ export async function addCategory(userId: number, label: string, color: string):
   });
   const nextOrder = (countResult.rows[0]?.n as number) ?? 0;
   const result = await database.execute({
-    sql: 'INSERT INTO objective_categories (user_id, label, color, sort_order) VALUES (?, ?, ?, ?)',
-    args: [userId, label, color, nextOrder],
+    sql: 'INSERT INTO objective_categories (user_id, label, color, sort_order, coin_bounty) VALUES (?, ?, ?, ?, ?)',
+    args: [userId, label, color, nextOrder, coinBounty],
   });
   return Number(result.lastInsertRowid) ?? 0;
 }
 
-export async function updateCategory(id: number, label: string, color: string): Promise<void> {
+export async function updateCategory(id: number, label: string, color: string, coinBounty: number = 25): Promise<void> {
   const database = getDb();
   await database.execute({
-    sql: 'UPDATE objective_categories SET label = ?, color = ? WHERE id = ?',
-    args: [label, color, id],
+    sql: 'UPDATE objective_categories SET label = ?, color = ?, coin_bounty = ? WHERE id = ?',
+    args: [label, color, coinBounty, id],
   });
 }
 

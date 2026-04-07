@@ -4,6 +4,7 @@ import { useAuth } from './AuthContext';
 import { soundEngine } from '../utils/audio';
 import {
   calculateSessionReward,
+  calculateObjectiveBounty,
   calculatePassiveIncomePerHour,
   getStreakExtendCost,
   getStreakMultiplier,
@@ -256,6 +257,55 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
 
     window.addEventListener('timer-saved', handleTimerSaved);
     return () => window.removeEventListener('timer-saved', handleTimerSaved);
+  }, [authUser, season, gameState, ownedActiveTools, refreshGameData]);
+
+  // ─── Objective Neutralized Listener ─────────────────────────────
+
+  useEffect(() => {
+    const handleObjectiveNeutralized = async (e: Event) => {
+      if (!authUser || !season || !gameState) return;
+
+      const { baseBounty } = (e as CustomEvent<{ baseBounty: number }>).detail;
+
+      const reward = calculateObjectiveBounty({
+        baseBounty,
+        currentStreakDays: gameState.current_streak_days,
+        ownedActiveToolPercents: ownedActiveTools.map(t => t.active_percent),
+      });
+
+      await addCoinTransaction(authUser.id, season.id, reward.totalCoins, 'objective_complete', JSON.stringify({
+        baseBounty: reward.baseBounty,
+        multipliers: { streak: reward.streakMultiplier, tools: reward.activeToolMultiplier },
+      }));
+
+      soundEngine.playCoinEarned();
+
+      setRewardToast({
+        baseCoins: reward.baseBounty,
+        totalCoins: reward.totalCoins,
+        durationMinutes: 0,
+        milestoneMultiplier: 1,
+        milestoneName: 'NONE',
+        pausePenalty: 0,
+        streakMultiplier: reward.streakMultiplier,
+        dailyBonusMultiplier: 1,
+        activeToolMultiplier: reward.activeToolMultiplier,
+        currentStreakDays: gameState.current_streak_days,
+        sessionsToday: gameState.sessions_today,
+        dailyChallengeJustCompleted: false,
+        streakJustCompleted: false,
+        objectiveBounty: {
+          baseBounty: reward.baseBounty,
+          streakMultiplier: reward.streakMultiplier,
+          activeToolMultiplier: reward.activeToolMultiplier,
+        },
+      });
+
+      await refreshGameData();
+    };
+
+    window.addEventListener('objective-neutralized', handleObjectiveNeutralized);
+    return () => window.removeEventListener('objective-neutralized', handleObjectiveNeutralized);
   }, [authUser, season, gameState, ownedActiveTools, refreshGameData]);
 
   // ─── Passive Income Tick ────────────────────────────────────────

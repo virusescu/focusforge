@@ -1,9 +1,10 @@
-import { type FC, useEffect, useRef, useState } from 'react';
+import { type FC, useEffect, useRef, useState, useCallback } from 'react';
 import styles from './SidebarRight.module.scss';
-import { Terminal, Activity, History } from 'lucide-react';
+import { Terminal, Activity, History, BarChart2, Gem } from 'lucide-react';
 import { useSystemLog } from '../hooks/useSystemLog';
 import { useFocus } from '../contexts/FocusContext';
 import { soundEngine } from '../utils/audio';
+import { setStatusHint, clearStatusHint } from '../utils/statusHint';
 
 type RGB = [number, number, number];
 
@@ -49,10 +50,12 @@ function getCellStyle(minutes: number): React.CSSProperties {
 }
 
 interface Props {
-  onViewAnalytics: (date: string) => void;
+  onViewAnalytics: (date?: string) => void;
+  onViewIntel: () => void;
+  onViewVault: () => void;
 }
 
-export const SidebarRight: FC<Props> = ({ onViewAnalytics }) => {
+export const SidebarRight: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVault }) => {
   const { logs } = useSystemLog();
   const { dailyStats, recentSessions } = useFocus();
   const logContainerRef = useRef<HTMLDivElement>(null);
@@ -97,6 +100,21 @@ export const SidebarRight: FC<Props> = ({ onViewAnalytics }) => {
     soundEngine.playClick();
     onViewAnalytics(date);
   };
+
+  const handleAnalyticsClick = useCallback(() => {
+    soundEngine.playClick();
+    onViewAnalytics();
+  }, [onViewAnalytics]);
+
+  const handleIntelClick = useCallback(() => {
+    soundEngine.playTab();
+    onViewIntel();
+  }, [onViewIntel]);
+
+  const handleVaultClick = useCallback(() => {
+    soundEngine.playClick();
+    onViewVault();
+  }, [onViewVault]);
 
   return (
     <aside className={styles.sidebar}>
@@ -160,6 +178,36 @@ export const SidebarRight: FC<Props> = ({ onViewAnalytics }) => {
             ))
           )}
         </div>
+      </div>
+
+      <div className={styles.navRow}>
+        <button
+          className={styles.navBtn}
+          onClick={handleAnalyticsClick}
+          onMouseEnter={() => { soundEngine.playHover(); setStatusHint('SYSTEM_ANALYTICS'); }}
+          onMouseLeave={clearStatusHint}
+          style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}
+        >
+          <BarChart2 size={16} />
+        </button>
+        <button
+          className={styles.navBtn}
+          onClick={handleIntelClick}
+          onMouseEnter={() => { soundEngine.playHover(); setStatusHint('INTELLIGENCE_HUB'); }}
+          onMouseLeave={clearStatusHint}
+          style={{ borderColor: '#00f2ff', color: '#00f2ff' }}
+        >
+          <Activity size={16} />
+        </button>
+        <button
+          className={styles.navBtn}
+          onClick={handleVaultClick}
+          onMouseEnter={() => { soundEngine.playHover(); setStatusHint('FORGE_VAULT'); }}
+          onMouseLeave={clearStatusHint}
+          style={{ borderColor: '#f0c040', color: '#f0c040' }}
+        >
+          <Gem size={16} />
+        </button>
       </div>
     </aside>
   );

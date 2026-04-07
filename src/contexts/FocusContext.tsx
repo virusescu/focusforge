@@ -45,8 +45,8 @@ interface FocusContextType {
   setActiveObjective: (id: number | null) => void;
   neutralizeObjective: (id: number) => Promise<void>;
   reorderObjectives: (orderedIds: number[]) => Promise<void>;
-  addCategory: (label: string, color: string) => Promise<void>;
-  updateCategory: (id: number, label: string, color: string) => Promise<void>;
+  addCategory: (label: string, color: string, coinBounty?: number) => Promise<void>;
+  updateCategory: (id: number, label: string, color: string, coinBounty?: number) => Promise<void>;
   deleteCategory: (id: number) => Promise<void>;
   loading: boolean;
   timerStatus: 'idle' | 'active' | 'paused';
@@ -185,14 +185,14 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
     await refreshData();
   }, [refreshData]);
 
-  const addCategory = useCallback(async (label: string, color: string) => {
+  const addCategory = useCallback(async (label: string, color: string, coinBounty?: number) => {
     if (!authUser) return;
-    await dbAddCategory(authUser.id, label, color);
+    await dbAddCategory(authUser.id, label, color, coinBounty);
     await refreshData();
   }, [authUser, refreshData]);
 
-  const updateCategory = useCallback(async (id: number, label: string, color: string) => {
-    await dbUpdateCategory(id, label, color);
+  const updateCategory = useCallback(async (id: number, label: string, color: string, coinBounty?: number) => {
+    await dbUpdateCategory(id, label, color, coinBounty);
     await refreshData();
   }, [refreshData]);
 
@@ -212,11 +212,17 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
     }, 2800);
 
     await dbCompleteObjective(id);
+
+    // Dispatch bounty event for GameContext to handle
+    const cat = obj?.category_id ? categories.find(c => c.id === obj.category_id) : null;
+    const baseBounty = cat?.coin_bounty ?? 15;
+    window.dispatchEvent(new CustomEvent('objective-neutralized', { detail: { baseBounty } }));
+
     if (activeObjectiveId === id) {
       setActiveObjectiveId(null);
     }
     await refreshData();
-  }, [activeObjectiveId, refreshData]);
+  }, [activeObjectiveId, objectivePool, categories, refreshData]);
 
   useEffect(() => {
     const handleTimerSaved = (e: Event) => {

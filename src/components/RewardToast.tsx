@@ -48,36 +48,58 @@ export const RewardToast: FC = () => {
 
   if (!rewardToast) return null;
 
+  const bounty = rewardToast.objectiveBounty;
+
   return (
     <div className={`${styles.toast} ${exiting ? styles.exiting : ''}`}>
-      <div className={styles.title}>SESSION_COMPLETE</div>
-      <div className={styles.coinLine}>
-        <span className={styles.coinAmount}>+{displayedCoins} ⟐</span>
-        {rewardToast.milestoneMultiplier > 1 && (
-          <span className={styles.bonusTag}>{rewardToast.milestoneMultiplier}x {rewardToast.milestoneName}</span>
-        )}
-      </div>
-      <div className={styles.multiplierLine}>
-        {rewardToast.durationMinutes}m × {rewardToast.milestoneMultiplier}x
-        {rewardToast.pausePenalty > 0 && (
-          <span className={styles.penaltyTag}> −{(rewardToast.pausePenalty * 100).toFixed(0)}% pauses</span>
-        )}
-        {rewardToast.activeToolMultiplier > 1 && (
-          <span> · TOOLS +{Math.round((rewardToast.activeToolMultiplier - 1) * 100)}%</span>
-        )}
-      </div>
-      <div className={styles.streakLine}>
-        STREAK: DAY {rewardToast.currentStreakDays}/4
-        {rewardToast.streakJustCompleted && (
-          <span className={styles.streakComplete}> — STREAK_COMPLETE!</span>
-        )}
-      </div>
-      <div className={`${styles.dailyLine} ${rewardToast.dailyChallengeJustCompleted ? styles.dailyComplete : ''}`}>
-        DAILY: {rewardToast.sessionsToday}/3 SESSIONS
-        {rewardToast.dailyChallengeJustCompleted && (
-          <span> — 2x BONUS_UNLOCKED</span>
-        )}
-      </div>
+      {bounty ? (
+        <>
+          <div className={styles.title}>OBJECTIVE_NEUTRALIZED</div>
+          <div className={styles.coinLine}>
+            <span className={styles.coinAmount}>+{displayedCoins} ⟐</span>
+          </div>
+          <div className={styles.multiplierLine}>
+            {bounty.baseBounty} base
+            {bounty.streakMultiplier > 1 && (
+              <span> · {bounty.streakMultiplier}x STREAK</span>
+            )}
+            {bounty.activeToolMultiplier > 1 && (
+              <span> · TOOLS +{Math.round((bounty.activeToolMultiplier - 1) * 100)}%</span>
+            )}
+          </div>
+        </>
+      ) : (
+        <>
+          <div className={styles.title}>SESSION_COMPLETE</div>
+          <div className={styles.coinLine}>
+            <span className={styles.coinAmount}>+{displayedCoins} ⟐</span>
+            {rewardToast.milestoneMultiplier > 1 && (
+              <span className={styles.bonusTag}>{rewardToast.milestoneMultiplier}x {rewardToast.milestoneName}</span>
+            )}
+          </div>
+          <div className={styles.multiplierLine}>
+            {rewardToast.durationMinutes}m × {rewardToast.milestoneMultiplier}x
+            {rewardToast.pausePenalty > 0 && (
+              <span className={styles.penaltyTag}> −{(rewardToast.pausePenalty * 100).toFixed(0)}% pauses</span>
+            )}
+            {rewardToast.activeToolMultiplier > 1 && (
+              <span> · TOOLS +{Math.round((rewardToast.activeToolMultiplier - 1) * 100)}%</span>
+            )}
+          </div>
+          <div className={styles.streakLine}>
+            STREAK: DAY {rewardToast.currentStreakDays}/4
+            {rewardToast.streakJustCompleted && (
+              <span className={styles.streakComplete}> — STREAK_COMPLETE!</span>
+            )}
+          </div>
+          <div className={`${styles.dailyLine} ${rewardToast.dailyChallengeJustCompleted ? styles.dailyComplete : ''}`}>
+            DAILY: {rewardToast.sessionsToday}/3 SESSIONS
+            {rewardToast.dailyChallengeJustCompleted && (
+              <span> — 2x BONUS_UNLOCKED</span>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 };

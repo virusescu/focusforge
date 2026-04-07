@@ -1,6 +1,6 @@
 import { type FC, useCallback, useState, useRef, useEffect, useMemo } from 'react';
 import styles from './SidebarLeft.module.scss';
-import { User, Zap, Flame, Star, BarChart2, Plus, X, GripVertical, Edit3, Check, Activity, Gem } from 'lucide-react';
+import { User, Zap, Flame, Star, Plus, X, GripVertical, Edit3, Check } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 import { useFocus } from '../contexts/FocusContext';
 import { useGame } from '../contexts/GameContext';
@@ -47,7 +47,8 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, categories, onSele
   const [showPicker, setShowPicker] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const categoryColor = categories.find(c => c.id === obj.category_id)?.color;
+  const category = categories.find(c => c.id === obj.category_id);
+  const categoryColor = category?.color;
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -144,6 +145,7 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, categories, onSele
         <>
           <div className={styles.objectiveText}>
             <span>{obj.text}</span>
+            <span className={styles.bountyBadge}>{category?.coin_bounty ?? 15}⟐</span>
           </div>
           <button
             className={styles.editBtn}
@@ -168,13 +170,7 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, categories, onSele
   );
 };
 
-interface Props {
-  onViewAnalytics?: () => void;
-  onViewIntel?: () => void;
-  onViewVault?: () => void;
-}
-
-export const SidebarLeft: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVault }) => {
+export const SidebarLeft: FC = () => {
   const { name, avatar, loading } = useUser();
   const { objectivePool, activeObjectiveId, addObjective, deleteObjective, updateObjective, updateObjectiveCategory, setActiveObjective, reorderObjectives, categories, addCategory, updateCategory, deleteCategory } = useFocus();
   const { sessionsToday, dailyBonusActive, currentStreakDays, totalCoinsEarned } = useGame();
@@ -215,21 +211,6 @@ export const SidebarLeft: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVau
     const newOrder = arrayMove(objectivePool, oldIndex, newIndex);
     reorderObjectives(newOrder.map(o => o.id));
   }, [objectivePool, reorderObjectives]);
-
-  const handleAnalyticsClick = useCallback(() => {
-    soundEngine.playClick();
-    onViewAnalytics?.();
-  }, [onViewAnalytics]);
-
-  const handleIntelClick = useCallback(() => {
-    soundEngine.playTab();
-    onViewIntel?.();
-  }, [onViewIntel]);
-
-  const handleVaultClick = useCallback(() => {
-    soundEngine.playClick();
-    onViewVault?.();
-  }, [onViewVault]);
 
   const handleHover = () => {
     soundEngine.playHover();
@@ -325,41 +306,6 @@ export const SidebarLeft: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVau
           </div>
         </div>
 
-        <div className={styles.navRow}>
-          {onViewAnalytics && (
-            <button
-              className={styles.navBtn}
-              onClick={handleAnalyticsClick}
-              onMouseEnter={() => { handleHover(); setStatusHint('SYSTEM_ANALYTICS'); }}
-              onMouseLeave={clearStatusHint}
-              style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}
-            >
-              <BarChart2 size={16} />
-            </button>
-          )}
-          {onViewIntel && (
-            <button
-              className={styles.navBtn}
-              onClick={handleIntelClick}
-              onMouseEnter={() => { handleHover(); setStatusHint('INTELLIGENCE_HUB'); }}
-              onMouseLeave={clearStatusHint}
-              style={{ borderColor: '#00f2ff', color: '#00f2ff' }}
-            >
-              <Activity size={16} />
-            </button>
-          )}
-          {onViewVault && (
-            <button
-              className={styles.navBtn}
-              onClick={handleVaultClick}
-              onMouseEnter={() => { handleHover(); setStatusHint('FORGE_VAULT'); }}
-              onMouseLeave={clearStatusHint}
-              style={{ borderColor: '#f0c040', color: '#f0c040' }}
-            >
-              <Gem size={16} />
-            </button>
-          )}
-        </div>
       </div>
 
       <div className="card">
