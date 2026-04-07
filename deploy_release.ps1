@@ -46,7 +46,7 @@ if ($tauriRaw -match '"version":\s*"(\d+)\.(\d+)\.(\d+)"') {
     Write-Host ""
 } else {
     Write-Host "WARNING: Could not parse version from $tauriConfPath" -ForegroundColor Red
-    Read-Host "Press Enter to exit"
+
     exit 1
 }
 
@@ -56,7 +56,7 @@ Write-Host ""
 git tag "v$newVersion"
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Failed to create git tag!" -ForegroundColor Red
-    Read-Host "Press Enter to exit"
+
     exit 1
 }
 
@@ -64,7 +64,7 @@ git push origin master
 git push origin "v$newVersion"
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Failed to push to origin!" -ForegroundColor Red
-    Read-Host "Press Enter to exit"
+
     exit 1
 }
 
