@@ -1,12 +1,17 @@
 # FocusForge
 
-FocusForge is a high-performance productivity HUD (Heads-Up Display) built with **Tauri**, **React**, and **TypeScript**. It features a specialized "Neural Forge" timer designed to help operators maintain deep focus during intense engineering tasks, powered by a local SQLite engine and high-fidelity data analytics.
+FocusForge is a desktop productivity HUD (Heads-Up Display) built with **Tauri 2**, **React 19**, and **TypeScript**. It combines a precision focus timer with a full gamification economy — coins, tools, streaks, prestige ranks, and seasonal resets — designed to reinforce sustained deep work through game-loop psychology.
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 - [Node.js](https://nodejs.org/) (latest LTS)
 - [Rust](https://www.rust-lang.org/) (for Tauri)
+- A [Turso](https://turso.tech/) database with credentials in `.env`:
+  ```
+  VITE_TURSO_DATABASE_URL=...
+  VITE_TURSO_AUTH_TOKEN=...
+  ```
 
 ### Installation
 1. Clone the repository.
@@ -35,26 +40,64 @@ FocusForge is a high-performance productivity HUD (Heads-Up Display) built with 
   npm run test:watch
   ```
 
-## 🛠 Tech Stack
-- **Frontend**: React 19, TypeScript, Vite 8
-- **Backend**: Tauri 2 (Rust)
-- **Database**: Turso (Cloud SQLite)
-- **Audio**: Custom Web Audio Synthesis + AI-generated MP3 files (Suno)
+### Building & Releasing
+The `deploy_release.ps1` script handles versioning and builds:
+1. Auto-increments the patch version across `tauri.conf.json`, `Cargo.toml`, and `package.json`
+2. Commits the version bump
+3. Runs `npm run tauri build` to produce a Windows MSI installer
+
+## Tech Stack
+- **Frontend**: React 19, TypeScript 5.9, Vite 8
+- **Desktop**: Tauri 2 (Rust)
+- **Database**: Turso (cloud LibSQL) via `@libsql/client`
+- **Auth**: Google OAuth
+- **Audio**: Custom Web Audio API synthesis (zero external assets)
 - **Styling**: SCSS (CSS Modules)
+- **Icons**: Lucide React
+- **Drag & Drop**: @dnd-kit
 - **Testing**: Vitest, React Testing Library
 
-## 🏗 Key Features
-- **Neural Forge**: Precision focus timer with synthetic audio status feedback.
-- **Activity Map**: 21-day focus heatmap with interactive tooltips and contextual navigation.
-- **System Analytics**: Full-page data visualization featuring:
-  - **Day-View Visualizer**: Timeline-based session tracking from 8 AM to 2 AM.
-  - **Operator Diagnostics**: Detailed consistency, intensity, and volume metrics.
-  - **Forge Log**: Session history management with cross-highlighting.
-- **Keyboard Mastery**: Full application control via keyboard shortcuts (Space, Escape, Arrow Keys, 'A').
-- **Tactile Audio**: Synthesized mechanical feedback for every UI interaction.
+## Key Features
 
-## 📁 Architecture
-- **`src/contexts`**: State hubs for operator settings and focus analytics.
-- **`src/hooks`**: Reusable logic for timers and system logs.
-- **`src/utils/audio.ts`**: Synthetic sound engine for zero-asset tactile feedback.
-- **`src/db.ts`**: High-performance SQLite interaction layer.
+### Neural Forge Timer
+Precision focus timer with keyboard-first controls (Space, Escape, Ctrl+Enter). Includes a charge mechanic — hold-click to build charge and neutralize the active objective. Synthesized audio feedback on every interaction.
+
+### Objectives & Categories
+Drag-and-drop prioritized objectives with custom color-coded categories. Inline editing, completion tracking, and kill-rate analytics.
+
+### Analytics View
+21-day focus heatmap with an interactive day-view timeline (00:00–24:00). Sessions rendered as horizontal bars with objective completion overlays. Zoomable and draggable for detailed inspection.
+
+### Intelligence Hub
+Aggregated diagnostics: focus-by-hour heatmap, day-of-week patterns, session length distribution, and fragmentation analysis (pause counts per session).
+
+### Vault (Game Economy)
+Full coin economy with earning, spending, and progression:
+
+- **Coin Earnings**: 1 coin/min base, scaled by duration milestones (up to 2x at 60+ min), pause penalties, streak multipliers (up to 3x), and daily challenge bonuses.
+- **Tool Shop**: 8 purchasable tools — passive income generators and active session multipliers, culminating in the Elite Workstation prestige tool.
+- **Streaks**: Consecutive work-day chains (Mon–Fri) where completing the daily challenge (3 sessions of 30+ min) extends the streak. Broken streaks can be repaired with coins.
+- **Prestige Titles**: 10 ranks from Initiate to Forge Legend, unlocked by total coins earned per season.
+- **Seasons**: Quarterly resets (Q1–Q4). All coins and tools reset, but full snapshots are archived with badges and stats.
+
+### Reward Toasts
+Post-session notification showing base coins, multipliers applied, streak status, and total earned. Accompanied by coin and milestone sound effects.
+
+## Architecture
+- **`src/contexts/`** — State providers: Auth, Focus (timer/objectives), Game (economy), User (settings)
+- **`src/components/`** — UI components: MainDisplay, AnalyticsView, IntelligenceHub, VaultPage, SidebarLeft, Header, etc.
+- **`src/hooks/`** — Reusable logic: `useTimer`, `useSystemLog`
+- **`src/utils/`** — Audio synthesis engine, game economy calculations, logging
+- **`src/db.ts`** — Turso database layer (100+ functions covering all tables)
+- **`src/auth.ts`** — Google OAuth flow
+- **`src-tauri/`** — Rust backend with Tauri plugins (logging, shell, store)
+
+## Keyboard Shortcuts
+| Key | Action |
+|-----|--------|
+| Space | Start / Pause timer |
+| Escape | Reset timer |
+| Ctrl+Enter | Neutralize objective |
+| A | Toggle Analytics |
+| I | Toggle Intelligence Hub |
+| V | Toggle Vault |

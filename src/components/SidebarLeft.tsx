@@ -5,6 +5,7 @@ import { useUser } from '../contexts/UserContext';
 import { useFocus } from '../contexts/FocusContext';
 import { useGame } from '../contexts/GameContext';
 import { soundEngine } from '../utils/audio';
+import { setStatusHint, clearStatusHint } from '../utils/statusHint';
 import {
   DndContext,
   closestCenter,
@@ -107,7 +108,8 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, categories, onSele
         className={styles.categoryBullet}
         style={{ backgroundColor: categoryColor || '#333333' }}
         onClick={(e) => { e.stopPropagation(); setShowPicker(prev => !prev); }}
-        title="Set category"
+        onMouseEnter={() => setStatusHint('SET_CATEGORY')}
+        onMouseLeave={clearStatusHint}
       />
 
       {showPicker && (
@@ -146,8 +148,8 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, categories, onSele
           <button
             className={styles.editBtn}
             onClick={handleEdit}
-            onMouseEnter={onHover}
-            title="Edit Objective"
+            onMouseEnter={() => { onHover(); setStatusHint('EDIT_OBJECTIVE'); }}
+            onMouseLeave={clearStatusHint}
           >
             <Edit3 size={12} />
           </button>
@@ -157,8 +159,8 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, categories, onSele
       <button
         className={styles.deleteBtn}
         onClick={(e) => onDelete(e, obj.id)}
-        onMouseEnter={onHover}
-        title="Delete Objective"
+        onMouseEnter={() => { onHover(); setStatusHint('DELETE_OBJECTIVE'); }}
+        onMouseLeave={clearStatusHint}
       >
         <X size={12} />
       </button>
@@ -328,8 +330,8 @@ export const SidebarLeft: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVau
             <button
               className={styles.navBtn}
               onClick={handleAnalyticsClick}
-              onMouseEnter={handleHover}
-              title="SYSTEM_ANALYTICS"
+              onMouseEnter={() => { handleHover(); setStatusHint('SYSTEM_ANALYTICS'); }}
+              onMouseLeave={clearStatusHint}
               style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}
             >
               <BarChart2 size={16} />
@@ -339,8 +341,8 @@ export const SidebarLeft: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVau
             <button
               className={styles.navBtn}
               onClick={handleIntelClick}
-              onMouseEnter={handleHover}
-              title="INTELLIGENCE_HUB"
+              onMouseEnter={() => { handleHover(); setStatusHint('INTELLIGENCE_HUB'); }}
+              onMouseLeave={clearStatusHint}
               style={{ borderColor: '#00f2ff', color: '#00f2ff' }}
             >
               <Activity size={16} />
@@ -350,8 +352,8 @@ export const SidebarLeft: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVau
             <button
               className={styles.navBtn}
               onClick={handleVaultClick}
-              onMouseEnter={handleHover}
-              title="FORGE_VAULT"
+              onMouseEnter={() => { handleHover(); setStatusHint('FORGE_VAULT'); }}
+              onMouseLeave={clearStatusHint}
               style={{ borderColor: '#f0c040', color: '#f0c040' }}
             >
               <Gem size={16} />
@@ -368,7 +370,8 @@ export const SidebarLeft: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVau
               className={styles.categoryBullet}
               style={{ backgroundColor: newCategoryColor || '#333333' }}
               onClick={() => setShowNewCategoryPicker(prev => !prev)}
-              title="Set category"
+              onMouseEnter={() => setStatusHint('SET_CATEGORY')}
+              onMouseLeave={clearStatusHint}
             />
             {showNewCategoryPicker && (
               <CategoryDotPicker
