@@ -1,11 +1,11 @@
 {
-  "notes": "Release v0.1.22",
-  "pub_date": "2026-04-07T21:03:23Z",
-  "version": "0.1.22",
+  "notes": "Release v0.1.32",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTUGhuNk9vd0FLdWxwRjlHd1M0RERTcUsrdEJ4RzVuZ2UycVdaYU5xTWdGTHZpM0VrOVdZWXF3OWpVSGw2M21VV2lXbVFsTEZETFNsdWJIL3RtVW5jcENtMnJKQlRxRGdNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc1NTk1Nzk3CWZpbGU6Zm9jdXNmb3JnZV8wLjEuMjJfeDY0LXNldHVwLmV4ZQowcU05c1pmV2lKYXlBMnZjcWdmUERhTjgrK3d5U0hYaWtETDJPc0Q3eUQ1dGpOeVNVYjJUNVJ0M0x3Q0ZUblVWYmowemdwWjlRNXQ1K2NFTjNaYUtEQT09Cg==",
-      "url": "https://github.com/virusescu/focusforge/releases/download/v0.1.22/focusforge_0.1.22_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUUHFJdThyd2NSa0xZcjhDTDdVajkrbEZuT05IK3pETHE4OTB5aVRmdWNDQnppdmxaaTRTbDVveFhNZ0IyT2NBYm1wZXVta05FRDJqMWN4TEcyK05VUVFjNURLQ21LQXdBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc1NTk4MDU0CWZpbGU6Zm9jdXNmb3JnZV8wLjEuMzJfeDY0LXNldHVwLmV4ZQpOdDBlUThkNXBZd3lxRllIbXRISGh5RFNZRXFBeE8wbjNjME5hZUFBTUZuK0xYa2xKb0s4NUQ3TXhBamxtWkZYY1RmdzNYUkplU3hNUmRhYTR3WHBCdz09Cg==",
+      "url": "https://github.com/virusescu/focusforge/releases/download/v0.1.32/focusforge_0.1.32_x64-setup.exe"
     }
-  }
+  },
+  "pub_date": "2026-04-07T21:41:02Z",
+  "version": "0.1.32"
 }
