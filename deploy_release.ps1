@@ -40,7 +40,7 @@ if ($tauriRaw -match '"version":\s*"(\d+)\.(\d+)\.(\d+)"') {
     Set-Content $pkgPath $pkgRaw -NoNewline
 
     # Git commit the version bump
-    git add $tauriConfPath $cargoPath $pkgPath
+    git add $tauriConfPath $cargoPath $pkgPath "src-tauri\Cargo.lock"
     git commit -m "chore: bump version to $newVersion"
 
     Write-Host ""
