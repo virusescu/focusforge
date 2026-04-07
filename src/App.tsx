@@ -30,10 +30,16 @@ function HudApp() {
   const [availableUpdate, setAvailableUpdate] = useState<Update | null>(null);
 
   useEffect(() => {
+    console.log('Checking for updates...');
     check().then(update => {
-      if (update) setAvailableUpdate(update);
-    }).catch(() => {
-      // silently ignore — no network, server down, etc.
+      if (update) {
+        console.log('Update found:', update.version);
+        setAvailableUpdate(update);
+      } else {
+        console.log('No updates available');
+      }
+    }).catch(err => {
+      console.error('Update check failed:', err);
     });
   }, []);
 
