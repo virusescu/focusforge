@@ -1,11 +1,11 @@
 {
-  "version": "0.1.17",
-  "notes": "Release v0.1.17",
-  "pub_date": "2026-04-07T20:03:08Z",
+  "version": "0.1.20",
+  "notes": "Release v0.1.20",
+  "pub_date": "2026-04-07T20:32:20Z",
   "platforms": {
     "windows-x86_64": {
-      "url": "https://github.com/virusescu/focusforge/releases/download/v0.1.17/focusforge_0.1.17_x64-setup.exe",
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTUGhuNk9vd0FLdXRkaTVSdjBBUEVzM05qQ09obTRFa1B6Wk1OZUpNSWpNcXNJYWgrdUI4UmZGWEU1VnBGenBRM1M5LzlqcWR2dGZTdjdhYmJtejcrLzFoQS9iSVFGSFFRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc1NTkyMTgyCWZpbGU6Zm9jdXNmb3JnZV8wLjEuMTdfeDY0LXNldHVwLmV4ZQpFRXhxdUtRb2xMcTdhSE9Va1B1NkpMWkU0Q1RUL3ovKy9aS0lYcW9kMWFQUlJMZHo1K0g1U0V3ZlRJUEVickFWcDd5SitaRkhBNEF2dDlPRHNnWUxBdz09Cg=="
+      "url": "https://github.com/virusescu/focusforge/releases/download/v0.1.20/focusforge_0.1.20_x64-setup.exe",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTUGhuNk9vd0FLdXJCVXRiTzFmKzVOZUc3Z0dsc0hJYUNjVnY1WERYRlRxYkI0MlZJUzVxM3JUNFE3anBIK1Vxb0lxdjNOd1pqRlF1QjIrbVZ0VHBPbFZaSzh1Q1dNVmd3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc1NTkzOTMyCWZpbGU6Zm9jdXNmb3JnZV8wLjEuMjBfeDY0LXNldHVwLmV4ZQpycWxhaXFpbnl6ZGlydWcrb216U2ZnQVhGNGdLZjVFT1lrZkljbS95RFRRWWo2b2pEb1RaV3NyeHhlOHBBbTNETWNKc2xka2NSY2ZBV1BZUGZ0b1ZBdz09Cg=="
     }
   }
 }
