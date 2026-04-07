@@ -39,3 +39,8 @@ Thumbs.db
 
 # Git worktrees
 .worktrees/
+
+# Tauri signing keys (never commit)
+~/
+*.key
+*.key.pub
