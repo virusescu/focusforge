@@ -23,7 +23,7 @@ jobs:
           TIME=$(date -u +"%Y-%m-%d %H:%M UTC")
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
             -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -d text="FocusForge ${{ github.ref_name }} build started at $TIME"
+            -d text="🔨 FocusForge ${{ github.ref_name }} build started at $TIME"
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -129,7 +129,7 @@ jobs:
         run: |
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
             -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -d text="FocusForge ${{ github.ref_name }} released successfully ✅"
+            -d text="✅ FocusForge ${{ github.ref_name }} released successfully"
 
       - name: Notify Telegram failure
         if: failure()
@@ -137,4 +137,4 @@ jobs:
         run: |
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
             -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -d text="FocusForge ${{ github.ref_name }} build FAILED ❌ Check: https://github.com/virusescu/focusforge/actions"
+            -d text="❌ FocusForge ${{ github.ref_name }} build failed"
