@@ -30,6 +30,7 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": "all",
     "icon": [
       "icons/32x32.png",
@@ -41,8 +42,7 @@
   },
   "plugins": {
     "updater": {
-      "active": true,
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEJEN0YwOTVENTU2OThGQkIKUldTN2oybFZYUWwvdlVHMm8yYkJLd1pnVHloR010aEVNaGpud3FvS212eStyTHBWTXlxY0xNclkK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDkwMTEwN0FGQkM4QkE4Q0YKUldUUHFJdThyd2NSa0hkTUEzZ2VQa2JzUXIvZUZQbThnODg2cDF1KzBpR09mWUp0V2NWTVRTbS8K",
       "endpoints": [
         "https://raw.githubusercontent.com/virusescu/focusforge/master/update.json"
       ]
