@@ -48,10 +48,19 @@ Write-Host ""
 Write-Host "Release build complete!" -ForegroundColor Green
 Write-Host ""
 
-# --- List artifacts ---
-Write-Host "Generated Artifacts:" -ForegroundColor Cyan
-$bundlePath = Join-Path $PSScriptRoot "src-tauri\target\release\bundle"
-if (Test-Path $bundlePath) {
+# --- Find and optionally run installer ---
+$installer = Get-ChildItem -Path $bundlePath -Filter "*-setup.exe" -Recurse | Select-Object -First 1
+
+if ($installer) {
+    Write-Host "Generated Installer: $($installer.Name)" -ForegroundColor Cyan
+    Write-Host ""
+    $choice = Read-Host "Would you like to run the installer now? (y/n)"
+    if ($choice -eq 'y') {
+        Write-Host "Launching installer..." -ForegroundColor Yellow
+        Start-Process $installer.FullName
+    }
+} else {
+    Write-Host "Generated Artifacts:" -ForegroundColor Cyan
     Get-ChildItem -Path $bundlePath -Recurse | Where-Object { -not $_.PSIsContainer } | ForEach-Object {
         $fullPath = $_.FullName
         $relative = $fullPath.Replace($PSScriptRoot, "").TrimStart("\")
