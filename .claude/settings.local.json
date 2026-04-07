@@ -25,7 +25,9 @@
       "Bash(ls -lh src/components/IntelligenceHub*)",
       "Bash(grep -iE \"\\\\.\\(tsx|ts\\)$\")",
       "Bash(npx vite:*)",
-      "Bash(grep -E \"\\\\.\\(ts|tsx|scss|json\\)$\")"
+      "Bash(grep -E \"\\\\.\\(ts|tsx|scss|json\\)$\")",
+      "Bash(ls:*)",
+      "Bash(cargo search:*)"
     ]
   }
 }
