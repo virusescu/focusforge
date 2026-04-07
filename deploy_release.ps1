@@ -50,34 +50,30 @@ if ($tauriRaw -match '"version":\s*"(\d+)\.(\d+)\.(\d+)"') {
     exit 1
 }
 
-Write-Host "Building Tauri app in release mode (v$newVersion)..." -ForegroundColor Yellow
+Write-Host "Tagging and pushing v$newVersion to trigger GitHub Actions build..." -ForegroundColor Yellow
 Write-Host ""
-npm run tauri build
+
+git tag "v$newVersion"
 if ($LASTEXITCODE -ne 0) {
-    Write-Host ""
-    Write-Host "Build failed!" -ForegroundColor Red
+    Write-Host "Failed to create git tag!" -ForegroundColor Red
     Read-Host "Press Enter to exit"
     exit 1
 }
-Write-Host ""
-Write-Host "Release build complete!" -ForegroundColor Green
-Write-Host "Find the installer in: " -NoNewline -ForegroundColor Green
-Write-Host "src-tauri\target\release\bundle\"
-Write-Host ""
 
-$msiFiles = Get-ChildItem -Path "src-tauri\target\release\bundle\msi\*.msi" -ErrorAction SilentlyContinue
-if ($msiFiles) {
-    $msi = $msiFiles | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-    Write-Host "Found MSI: " -NoNewline -ForegroundColor Cyan
-    Write-Host $msi.Name
-    $answer = Read-Host "Do you want to install it now? (Y/N)"
-    if ($answer -eq 'Y' -or $answer -eq 'y') {
-        Write-Host "Launching installer..." -ForegroundColor Yellow
-        Start-Process msiexec.exe -ArgumentList "/i", "`"$($msi.FullName)`"" -Wait
-        Write-Host "Done." -ForegroundColor Green
-    }
-} else {
-    Write-Host "No .msi file found in bundle output." -ForegroundColor Yellow
+git push origin master
+git push origin "v$newVersion"
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Failed to push to origin!" -ForegroundColor Red
+    Read-Host "Press Enter to exit"
+    exit 1
 }
+
+Write-Host ""
+Write-Host "============================================" -ForegroundColor Green
+Write-Host "  Released v$newVersion" -ForegroundColor Green
+Write-Host "  GitHub Actions is building now." -ForegroundColor Green
+Write-Host "  Check: https://github.com/virusescu/focusforge/actions" -ForegroundColor Cyan
+Write-Host "============================================" -ForegroundColor Green
+Write-Host ""
 
 Read-Host "Press Enter to exit"
