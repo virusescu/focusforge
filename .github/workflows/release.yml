@@ -95,17 +95,17 @@ jobs:
           $bundleDir = "src-tauri/target/release/bundle/nsis"
 
           Write-Host "Searching for updater artifacts in $bundleDir"
-          $nsisZip = Get-ChildItem -Path $bundleDir -Filter "*.nsis.zip" -ErrorAction SilentlyContinue | Select-Object -First 1
-          $nsisSig = Get-ChildItem -Path $bundleDir -Filter "*.nsis.zip.sig" -ErrorAction SilentlyContinue | Select-Object -First 1
+          $nsisZip = Get-ChildItem -Path $bundleDir -Filter "*-setup.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          $nsisSig = Get-ChildItem -Path $bundleDir -Filter "*-setup.exe.sig" -ErrorAction SilentlyContinue | Select-Object -First 1
 
           if (-not $nsisZip -or -not $nsisSig) {
             Write-Host "Trying parent directory..."
-            $nsisZip = Get-ChildItem -Path "src-tauri/target/release/bundle" -Filter "*.nsis.zip" -Recurse | Select-Object -First 1
-            $nsisSig = Get-ChildItem -Path "src-tauri/target/release/bundle" -Filter "*.nsis.zip.sig" -Recurse | Select-Object -First 1
+            $nsisZip = Get-ChildItem -Path "src-tauri/target/release/bundle" -Filter "*-setup.exe" -Recurse | Select-Object -First 1
+            $nsisSig = Get-ChildItem -Path "src-tauri/target/release/bundle" -Filter "*-setup.exe.sig" -Recurse | Select-Object -First 1
           }
 
           if (-not $nsisZip -or -not $nsisSig) {
-            Write-Error "Could not find .nsis.zip or .nsis.zip.sig"
+            Write-Error "Could not find -setup.exe or -setup.exe.sig"
             exit 1
           }
 
@@ -120,12 +120,12 @@ jobs:
           $tag = "${{ github.ref_name }}"
           $bundleDir = "src-tauri/target/release/bundle/nsis"
 
-          $nsisZip = Get-ChildItem -Path $bundleDir -Filter "*.nsis.zip" -ErrorAction SilentlyContinue | Select-Object -First 1
-          $nsisSig = Get-ChildItem -Path $bundleDir -Filter "*.nsis.zip.sig" -ErrorAction SilentlyContinue | Select-Object -First 1
+          $nsisZip = Get-ChildItem -Path $bundleDir -Filter "*-setup.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          $nsisSig = Get-ChildItem -Path $bundleDir -Filter "*-setup.exe.sig" -ErrorAction SilentlyContinue | Select-Object -First 1
 
           if (-not $nsisZip -or -not $nsisSig) {
-            $nsisZip = Get-ChildItem -Path "src-tauri/target/release/bundle" -Filter "*.nsis.zip" -Recurse | Select-Object -First 1
-            $nsisSig = Get-ChildItem -Path "src-tauri/target/release/bundle" -Filter "*.nsis.zip.sig" -Recurse | Select-Object -First 1
+            $nsisZip = Get-ChildItem -Path "src-tauri/target/release/bundle" -Filter "*-setup.exe" -Recurse | Select-Object -First 1
+            $nsisSig = Get-ChildItem -Path "src-tauri/target/release/bundle" -Filter "*-setup.exe.sig" -Recurse | Select-Object -First 1
           }
 
           $sigContent = (Get-Content $nsisSig.FullName -Raw).Trim()
