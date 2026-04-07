@@ -1,5 +1,5 @@
 Write-Host "============================================" -ForegroundColor Cyan
-Write-Host "   FocusForge - Run Release Build" -ForegroundColor Cyan
+Write-Host "   FocusForge - Build Release Bundle" -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Building release..." -ForegroundColor Yellow
