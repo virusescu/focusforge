@@ -36,6 +36,17 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Prepare signing key
+        shell: pwsh
+        run: |
+          $key = @"
+          ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          "@
+          $keyPath = Join-Path $env:RUNNER_TEMP "focusforge.key"
+          Set-Content -Path $keyPath -Value $key -NoNewline
+          "TAURI_SIGNING_PRIVATE_KEY=$keyPath" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Write-Host "Signing key prepared at $keyPath"
+
       - name: Create GitHub Release
         shell: bash
         env:
@@ -60,7 +71,7 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ env.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
