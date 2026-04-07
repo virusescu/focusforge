@@ -1,8 +1,9 @@
 import { type FC, useCallback, useState, useRef, useEffect, useMemo } from 'react';
 import styles from './SidebarLeft.module.scss';
-import { User, Database, Cpu, HardDrive, BarChart2, Plus, X, GripVertical, Edit3, Check, Activity, Gem } from 'lucide-react';
+import { User, Zap, Flame, Star, BarChart2, Plus, X, GripVertical, Edit3, Check, Activity, Gem } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 import { useFocus } from '../contexts/FocusContext';
+import { useGame } from '../contexts/GameContext';
 import { soundEngine } from '../utils/audio';
 import {
   DndContext,
@@ -172,8 +173,9 @@ interface Props {
 }
 
 export const SidebarLeft: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVault }) => {
-  const { user, name, avatar, loading } = useUser();
+  const { name, avatar, loading } = useUser();
   const { objectivePool, activeObjectiveId, addObjective, deleteObjective, updateObjective, updateObjectiveCategory, setActiveObjective, reorderObjectives, categories, addCategory, updateCategory, deleteCategory } = useFocus();
+  const { sessionsToday, dailyBonusActive, currentStreakDays, totalCoinsEarned } = useGame();
   const [newObjective, setNewObjective] = useState('');
   const [newCategoryId, setNewCategoryId] = useState<number | null>(null);
   const [showNewCategoryPicker, setShowNewCategoryPicker] = useState(false);
@@ -284,73 +286,78 @@ export const SidebarLeft: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVau
           <div className={styles.statItem}>
             <div className={styles.statInfo}>
               <div className={styles.statLabel}>
-                <Database size={12} />
-                <span>EXPERIENCE_LVL</span>
+                <Zap size={12} />
+                <span>DAILY_CHALLENGE</span>
               </div>
-              <span className={styles.statValue}>{user?.experience_lvl || 42}</span>
+              <span className={styles.statValue}>{dailyBonusActive ? '2x' : `${Math.min(sessionsToday, 3)}/3`}</span>
             </div>
             <div className={styles.progressBar}>
-              <div className={styles.progressFill} style={{ width: `${Math.min(user?.experience_lvl || 42, 100)}%` }} />
+              <div className={`${styles.progressFill} ${dailyBonusActive ? styles.progressActive : ''}`} style={{ width: `${Math.min(sessionsToday / 3, 1) * 100}%` }} />
             </div>
           </div>
-          
+
           <div className={styles.statItem}>
             <div className={styles.statInfo}>
               <div className={styles.statLabel}>
-                <Cpu size={12} />
-                <span>MEMORY_LOAD</span>
+                <Flame size={12} />
+                <span>STREAK_STATUS</span>
               </div>
-              <span className={styles.statValue}>68%</span>
+              <span className={styles.statValue}>DAY {currentStreakDays}/4</span>
             </div>
             <div className={styles.progressBar}>
-              <div className={styles.progressFill} style={{ width: '68%' }} />
+              <div className={styles.progressFill} style={{ width: `${(currentStreakDays / 4) * 100}%` }} />
             </div>
           </div>
-          
+
           <div className={styles.statItem}>
             <div className={styles.statInfo}>
               <div className={styles.statLabel}>
-                <HardDrive size={12} />
-                <span>INVENTORY_CAP</span>
+                <Star size={12} />
+                <span>FORGE_PROGRESS</span>
               </div>
-              <span className={styles.statValue}>40/50</span>
+              <span className={styles.statValue}>{totalCoinsEarned.toLocaleString()}/50,000</span>
             </div>
             <div className={styles.progressBar}>
-              <div className={styles.progressFill} style={{ width: '80%' }} />
+              <div className={styles.progressFill} style={{ width: `${Math.min(totalCoinsEarned / 50000, 1) * 100}%` }} />
             </div>
           </div>
         </div>
 
-        {onViewAnalytics && (
-          <button
-            className={styles.analyticsBtn}
-            onClick={handleAnalyticsClick}
-            onMouseEnter={handleHover}
-          >
-            <BarChart2 size={14} />
-            <span>SYSTEM_ANALYTICS</span>
-          </button>
-        )}
-        {onViewIntel && (
-          <button
-            className={styles.intelBtn}
-            onClick={handleIntelClick}
-            onMouseEnter={handleHover}
-          >
-            <Activity size={14} />
-            <span>INTELLIGENCE_HUB</span>
-          </button>
-        )}
-        {onViewVault && (
-          <button
-            className={styles.vaultBtn}
-            onClick={handleVaultClick}
-            onMouseEnter={handleHover}
-          >
-            <Gem size={14} />
-            <span>FORGE_VAULT</span>
-          </button>
-        )}
+        <div className={styles.navRow}>
+          {onViewAnalytics && (
+            <button
+              className={styles.navBtn}
+              onClick={handleAnalyticsClick}
+              onMouseEnter={handleHover}
+              title="SYSTEM_ANALYTICS"
+              style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}
+            >
+              <BarChart2 size={16} />
+            </button>
+          )}
+          {onViewIntel && (
+            <button
+              className={styles.navBtn}
+              onClick={handleIntelClick}
+              onMouseEnter={handleHover}
+              title="INTELLIGENCE_HUB"
+              style={{ borderColor: '#00f2ff', color: '#00f2ff' }}
+            >
+              <Activity size={16} />
+            </button>
+          )}
+          {onViewVault && (
+            <button
+              className={styles.navBtn}
+              onClick={handleVaultClick}
+              onMouseEnter={handleHover}
+              title="FORGE_VAULT"
+              style={{ borderColor: '#f0c040', color: '#f0c040' }}
+            >
+              <Gem size={16} />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="card">
