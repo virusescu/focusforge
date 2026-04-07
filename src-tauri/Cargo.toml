@@ -25,4 +25,5 @@ tauri = { version = "2", features = [] }
 tauri-plugin-log = "2"
 tauri-plugin-shell = "2"
 tauri-plugin-store = "2"
+tauri-plugin-updater = "2"
 tiny_http = "0.12"
