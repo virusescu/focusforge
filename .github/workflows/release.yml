@@ -67,11 +67,12 @@ jobs:
           releaseId: ${{ steps.get_release.outputs.release_id }}
           releaseDraft: false
           prerelease: false
+          includeUpdaterJson: true
 
       - name: List artifacts
         shell: pwsh
         run: |
-          Get-ChildItem -Path src-tauri/target/release/bundle -Recursive
+          Get-ChildItem -Path src-tauri/target/release/bundle -Recurse
 
       - name: Upload updater artifacts
         shell: pwsh
@@ -88,8 +89,8 @@ jobs:
 
           if (-not $nsisZip -or -not $nsisSig) {
             Write-Host "Trying parent directory..."
-            $nsisZip = Get-ChildItem -Path "src-tauri/target/release/bundle" -Filter "*.nsis.zip" -Recursive | Select-Object -First 1
-            $nsisSig = Get-ChildItem -Path "src-tauri/target/release/bundle" -Filter "*.nsis.zip.sig" -Recursive | Select-Object -First 1
+            $nsisZip = Get-ChildItem -Path "src-tauri/target/release/bundle" -Filter "*.nsis.zip" -Recurse | Select-Object -First 1
+            $nsisSig = Get-ChildItem -Path "src-tauri/target/release/bundle" -Filter "*.nsis.zip.sig" -Recurse | Select-Object -First 1
           }
 
           if (-not $nsisZip -or -not $nsisSig) {
@@ -112,8 +113,8 @@ jobs:
           $nsisSig = Get-ChildItem -Path $bundleDir -Filter "*.nsis.zip.sig" -ErrorAction SilentlyContinue | Select-Object -First 1
 
           if (-not $nsisZip -or -not $nsisSig) {
-            $nsisZip = Get-ChildItem -Path "src-tauri/target/release/bundle" -Filter "*.nsis.zip" -Recursive | Select-Object -First 1
-            $nsisSig = Get-ChildItem -Path "src-tauri/target/release/bundle" -Filter "*.nsis.zip.sig" -Recursive | Select-Object -First 1
+            $nsisZip = Get-ChildItem -Path "src-tauri/target/release/bundle" -Filter "*.nsis.zip" -Recurse | Select-Object -First 1
+            $nsisSig = Get-ChildItem -Path "src-tauri/target/release/bundle" -Filter "*.nsis.zip.sig" -Recurse | Select-Object -First 1
           }
 
           $sigContent = (Get-Content $nsisSig.FullName -Raw).Trim()
