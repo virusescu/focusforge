@@ -188,7 +188,7 @@ export const SidebarRight: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVa
           onMouseLeave={clearStatusHint}
           style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}
         >
-          <BarChart2 size={16} />
+          <BarChart2 size={24} />
         </button>
         <button
           className={styles.navBtn}
@@ -197,7 +197,7 @@ export const SidebarRight: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVa
           onMouseLeave={clearStatusHint}
           style={{ borderColor: '#00f2ff', color: '#00f2ff' }}
         >
-          <Activity size={16} />
+          <Activity size={24} />
         </button>
         <button
           className={styles.navBtn}
@@ -206,7 +206,7 @@ export const SidebarRight: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVa
           onMouseLeave={clearStatusHint}
           style={{ borderColor: '#f0c040', color: '#f0c040' }}
         >
-          <Gem size={16} />
+          <Gem size={24} />
         </button>
       </div>
     </aside>
