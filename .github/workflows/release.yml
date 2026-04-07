@@ -154,9 +154,17 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Force checkout master and pull to make sure we are not on a detached head
+          # and that we have the absolute latest if the user pushed during build
+          git fetch origin master
+          git checkout master
+          git pull origin master
+          
+          # Add and commit the new update.json (which was generated in previous step)
           git add update.json
           git commit -m "chore: update update.json for ${{ github.ref_name }}"
-          git push origin HEAD:master
+          git push origin master
 
       - name: Notify Telegram success
         if: success()
