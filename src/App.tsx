@@ -1,4 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { check } from '@tauri-apps/plugin-updater';
+import type { Update } from '@tauri-apps/plugin-updater';
+import { UpdatePrompt } from './components/UpdatePrompt';
 import { Header } from './components/Header';
 import { SidebarLeft } from './components/SidebarLeft';
 import { MainDisplay } from './components/MainDisplay';
@@ -24,6 +27,15 @@ function HudApp() {
   const [analyticsDate, setAnalyticsDate] = useState<Date>(new Date());
   const [pendingNavigation, setPendingNavigation] = useState<{ target: 'analytics' | 'intel' | 'vault'; dateStr?: string } | null>(null);
   const { timerStatus, resetTimer } = useFocus();
+  const [availableUpdate, setAvailableUpdate] = useState<Update | null>(null);
+
+  useEffect(() => {
+    check().then(update => {
+      if (update) setAvailableUpdate(update);
+    }).catch(() => {
+      // silently ignore — no network, server down, etc.
+    });
+  }, []);
 
   const handleViewAnalytics = (dateStr?: string) => {
     if (timerStatus !== 'idle') {
@@ -107,6 +119,12 @@ function HudApp() {
     </div>
     <RewardToast />
     <SeasonTransitionModal />
+    {availableUpdate && (
+      <UpdatePrompt
+        update={availableUpdate}
+        onSkip={() => setAvailableUpdate(null)}
+      />
+    )}
   </>
   );
 }
