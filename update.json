@@ -1,11 +1,11 @@
 {
-  "version": "0.1.2",
-  "notes": "Initial release.",
-  "pub_date": "2026-04-07T00:00:00Z",
   "platforms": {
     "windows-x86_64": {
-      "url": "",
-      "signature": ""
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTUGhuNk9vd0FLdWlMVHNZSnExNzkxdk9UeXpBcFNHbE5DSlNsZmZhUGljUmZJYWEvRWw4Q2RHeVNqMDlWWlFPVjNHYUJUMHZwTjF1dWtTWTQwa2gvUzZzS1FUQ2szZ2c4PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc1NTkxMjk1CWZpbGU6Zm9jdXNmb3JnZV8wLjEuMTZfeDY0LXNldHVwLmV4ZQpBSllDT2hGcWxCVzJjZDFrUmVNRUVmQXlHNmQwV3B0UElBZ1FqQzVjendtZlJYQm9aNkpWdG1QaG5GV2o2TzdyRUNTTjdlL1NPVVhRZkR3Y2JLbS9EQT09Cg==",
+      "url": "https://github.com/virusescu/focusforge/releases/download/v0.1.16/focusforge_0.1.16_x64-setup.exe"
     }
-  }
+  },
+  "notes": "Release v0.1.16",
+  "version": "0.1.16",
+  "pub_date": "2026-04-07T19:48:22Z"
 }
