@@ -186,7 +186,7 @@ export const SidebarRight: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVa
           onClick={handleAnalyticsClick}
           onMouseEnter={() => { soundEngine.playHover(); setStatusHint('SYSTEM_ANALYTICS'); }}
           onMouseLeave={clearStatusHint}
-          style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}
+          style={{ '--btn-color': 'var(--primary)' } as any}
         >
           <BarChart2 size={24} />
         </button>
@@ -195,7 +195,7 @@ export const SidebarRight: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVa
           onClick={handleIntelClick}
           onMouseEnter={() => { soundEngine.playHover(); setStatusHint('INTELLIGENCE_HUB'); }}
           onMouseLeave={clearStatusHint}
-          style={{ borderColor: '#00f2ff', color: '#00f2ff' }}
+          style={{ '--btn-color': '#00f2ff' } as any}
         >
           <Activity size={24} />
         </button>
@@ -204,7 +204,7 @@ export const SidebarRight: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVa
           onClick={handleVaultClick}
           onMouseEnter={() => { soundEngine.playHover(); setStatusHint('FORGE_VAULT'); }}
           onMouseLeave={clearStatusHint}
-          style={{ borderColor: '#f0c040', color: '#f0c040' }}
+          style={{ '--btn-color': '#f0c040' } as any}
         >
           <Gem size={24} />
         </button>
