@@ -1,5 +1,5 @@
 import { createClient, type Client, type InArgs } from '@libsql/client';
-import type { FocusSession, DailyStat, StrategicObjective, ObjectiveCategory, AuthUser, UserSettings, GameSeason, GameState, ToolDefinition, PrestigeTitleDefinition, CoinTransaction, SeasonArchive, StreakLogEntry } from './types';
+import type { FocusSession, DailyStat, StrategicObjective, ObjectiveCategory, AuthUser, UserSettings, GameSeason, GameState, ToolDefinition, PrestigeTitleDefinition, SeasonArchive, StreakLogEntry } from './types';
 import { getQuarter, getSeasonDates, getSeasonLabel, getSeasonName, getSeasonBadgeColor } from './utils/gameEconomy';
 
 let db: Client | null = null;

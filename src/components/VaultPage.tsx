@@ -1,10 +1,10 @@
-import { type FC, useEffect, useState, useMemo, useCallback } from 'react';
+import { type FC, useEffect, useState, useCallback } from 'react';
 import styles from './VaultPage.module.scss';
 import { ArrowLeft, Lock, Check, HelpCircle, X } from 'lucide-react';
 import { useGame } from '../contexts/GameContext';
 import { soundEngine } from '../utils/audio';
-import { getStreakExtendCost, getStreakMultiplier } from '../utils/gameEconomy';
-import type { ToolDefinition, SeasonArchive } from '../types';
+import { getStreakExtendCost } from '../utils/gameEconomy';
+import type { ToolDefinition } from '../types';
 
 interface Props {
   onBack: () => void;
@@ -333,7 +333,6 @@ export const VaultPage: FC<Props> = ({ onBack }) => {
           {prestigeTitles.map((title, index) => {
             const unlocked = totalCoinsEarned >= title.unlock_threshold;
             const isCurrent = currentTitle?.id === title.id;
-            const progress = Math.min(totalCoinsEarned / title.unlock_threshold, 1);
             const nextTitle = index > 0 ? prestigeTitles[index - 1] : null;
             const prevThreshold = nextTitle ? nextTitle.unlock_threshold : 0;
             const segmentProgress = title.unlock_threshold > prevThreshold

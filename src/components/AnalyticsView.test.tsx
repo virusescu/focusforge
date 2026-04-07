@@ -72,6 +72,7 @@ describe('AnalyticsView', () => {
     mockUseFocus.mockReturnValue({
       globalStats: { allTimeTotal: 5400, allTimePeak: 3600, weekTotal: 5400, monthTotal: 5400 },
       refreshData: vi.fn(),
+      categories: [],
     });
 
     const { getSessionsForDay, getCompletedObjectivesForDay } = await import('../db');

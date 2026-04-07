@@ -2,7 +2,7 @@ import { type FC, useEffect, useRef } from 'react';
 import styles from './SeasonTransitionModal.module.scss';
 import { useGame } from '../contexts/GameContext';
 import { soundEngine } from '../utils/audio';
-import { getSeasonLabel, getSeasonName, getSeasonBadgeColor, getQuarter } from '../utils/gameEconomy';
+import { getSeasonLabel, getSeasonName, getSeasonBadgeColor } from '../utils/gameEconomy';
 
 export const SeasonTransitionModal: FC = () => {
   const { showSeasonTransition, season, coins, totalCoinsEarned, streaksCompletedThisSeason, startNewSeason } = useGame();
