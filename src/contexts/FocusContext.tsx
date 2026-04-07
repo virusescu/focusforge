@@ -75,7 +75,7 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
     toggleTimer: baseToggle, 
     resetTimer: baseReset, 
     formatTime 
-  } = useTimer(user?.debug_speed || 1);
+  } = useTimer(import.meta.env.DEV ? (user?.debug_speed || 1) : 1);
 
   const [recentSessions, setRecentSessions] = useState<FocusSession[]>([]);
   const [dailyStats, setDailyStats] = useState<DailyStat[]>([]);
