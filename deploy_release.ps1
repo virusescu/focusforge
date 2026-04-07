@@ -76,4 +76,4 @@ Write-Host "  Check: https://github.com/virusescu/focusforge/actions" -Foregroun
 Write-Host "============================================" -ForegroundColor Green
 Write-Host ""
 
-Read-Host "Press Enter to exit"
+
