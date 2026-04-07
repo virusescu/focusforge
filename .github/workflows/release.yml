@@ -42,37 +42,45 @@ jobs:
           releaseDraft: false
           prerelease: false
 
-      - name: Generate update.json
+      - name: Upload updater artifacts
         shell: pwsh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $version = "${{ github.ref_name }}".TrimStart('v')
-          $repo = "virusescu/focusforge"
           $tag = "${{ github.ref_name }}"
+          $repo = "virusescu/focusforge"
+          $bundleDir = "src-tauri/target/release/bundle/nsis"
 
-          # Get release assets
-          $release = gh api repos/$repo/releases/tags/$tag | ConvertFrom-Json
+          $nsisZip = Get-ChildItem -Path $bundleDir -Filter "*.nsis.zip" -ErrorAction SilentlyContinue | Select-Object -First 1
+          $nsisSig = Get-ChildItem -Path $bundleDir -Filter "*.nsis.zip.sig" -ErrorAction SilentlyContinue | Select-Object -First 1
 
-          # Find the .nsis.zip asset and its .sig
-          $zipAsset = $release.assets | Where-Object { $_.name -like "*.nsis.zip" } | Select-Object -First 1
-          $sigAsset  = $release.assets | Where-Object { $_.name -like "*.nsis.zip.sig" } | Select-Object -First 1
-
-          if (-not $zipAsset -or -not $sigAsset) {
-            Write-Error "Could not find nsis.zip or .sig asset in release"
+          if (-not $nsisZip -or -not $nsisSig) {
+            Write-Error "Could not find .nsis.zip or .nsis.zip.sig in $bundleDir"
+            Get-ChildItem -Path $bundleDir | ForEach-Object { Write-Host $_.Name }
             exit 1
           }
 
-          $zipUrl = $zipAsset.browser_download_url
+          Write-Host "Uploading $($nsisZip.Name) and $($nsisSig.Name)"
+          gh release upload $tag $nsisZip.FullName $nsisSig.FullName --repo $repo --clobber
 
-          # Download the .sig file contents
-          $sigContent = gh api $sigAsset.url --header "Accept: application/octet-stream"
+      - name: Generate update.json
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart('v')
+          $repo = "virusescu/focusforge"
+          $tag = "${{ github.ref_name }}"
+          $bundleDir = "src-tauri/target/release/bundle/nsis"
 
+          $nsisZip = Get-ChildItem -Path $bundleDir -Filter "*.nsis.zip" | Select-Object -First 1
+          $nsisSig = Get-ChildItem -Path $bundleDir -Filter "*.nsis.zip.sig" | Select-Object -First 1
+
+          $sigContent = (Get-Content $nsisSig.FullName -Raw).Trim()
+          $zipUrl = "https://github.com/$repo/releases/download/$tag/$($nsisZip.Name)"
           $pubDate = (Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")
 
           $updateJson = @{
-            version = $version
-            notes   = "Release v$version"
+            version  = $version
+            notes    = "Release v$version"
             pub_date = $pubDate
             platforms = @{
               "windows-x86_64" = @{
