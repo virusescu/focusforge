@@ -7,17 +7,19 @@ FocusForge is a desktop productivity HUD (Heads-Up Display) built with **Tauri 2
 ### Prerequisites
 - [Node.js](https://nodejs.org/) (latest LTS)
 - [Rust](https://www.rust-lang.org/) (for Tauri)
-- A [Turso](https://turso.tech/) database with credentials in `.env`:
-  ```
-  VITE_TURSO_DATABASE_URL=...
-  VITE_TURSO_AUTH_TOKEN=...
-  ```
+- A [Turso](https://turso.tech/) account — FocusForge uses Turso as its database. Each user brings their own database. Create a free account at [turso.tech](https://turso.tech), create a database, and copy the **Database URL** and **Auth Token**. The app will ask for these on first launch — no `.env` needed for end users.
+- A Google OAuth client ID and secret — create a **Desktop App** OAuth client in [Google Cloud Console](https://console.cloud.google.com) and copy the credentials into your `.env` file (see `.env.example`).
 
 ### Installation
 1. Clone the repository.
 2. Install dependencies:
    ```bash
    npm install
+   ```
+3. Copy `.env.example` to `.env` and fill in your Google OAuth credentials:
+   ```
+   VITE_GOOGLE_CLIENT_ID=your-client-id
+   VITE_GOOGLE_CLIENT_SECRET=your-client-secret
    ```
 
 ### Development
@@ -29,6 +31,7 @@ FocusForge is a desktop productivity HUD (Heads-Up Display) built with **Tauri 2
   ```bash
   npm run tauri dev
   ```
+  Or simply: `run_debug.bat`
 
 ### Testing
 - Run the unit & integration tests:
@@ -41,10 +44,26 @@ FocusForge is a desktop productivity HUD (Heads-Up Display) built with **Tauri 2
   ```
 
 ### Building & Releasing
-The `deploy_release.ps1` script handles versioning and builds:
+
+Run `deploy_release.bat` to ship a new version:
 1. Auto-increments the patch version across `tauri.conf.json`, `Cargo.toml`, and `package.json`
-2. Commits the version bump
-3. Runs `npm run tauri build` to produce a Windows MSI installer
+2. Commits the version bump, tags it, and pushes to GitHub
+3. GitHub Actions takes over — builds, signs, and publishes the release automatically
+
+Monitor the build at `github.com/virusescu/focusforge/actions`. The finished installer appears under [Releases](https://github.com/virusescu/focusforge/releases).
+
+**First-time setup:** Before the first release, follow [`docs/ota-guide.md`](docs/ota-guide.md) to generate signing keys and add the required GitHub repository secrets:
+
+| Secret | Purpose |
+|--------|---------|
+| `TAURI_SIGNING_PRIVATE_KEY` | Signs release artifacts |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Key password |
+| `VITE_GOOGLE_CLIENT_ID` | Baked into the build for OAuth |
+| `VITE_GOOGLE_CLIENT_SECRET` | Baked into the build for OAuth |
+
+### OTA Updates
+
+Installed copies check for updates on startup. If a new version is available, users see a prompt to install and restart. No manual download needed after the initial install.
 
 ## Tech Stack
 - **Frontend**: React 19, TypeScript 5.9, Vite 8

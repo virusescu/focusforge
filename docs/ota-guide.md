@@ -22,12 +22,14 @@ This produces two files:
 
 Go to: `https://github.com/virusescu/focusforge` → Settings → Secrets and variables → Actions → New repository secret
 
-Add these two secrets:
+Add these secrets:
 
 | Name | Value |
 |------|-------|
 | `TAURI_SIGNING_PRIVATE_KEY` | Full contents of `~/.tauri/focusforge.key` |
 | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | The password you chose when generating the key |
+| `VITE_GOOGLE_CLIENT_ID` | Your Google OAuth client ID |
+| `VITE_GOOGLE_CLIENT_SECRET` | Your Google OAuth client secret |
 
 ---
 
