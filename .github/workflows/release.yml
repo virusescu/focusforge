@@ -17,6 +17,14 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Notify Telegram build started
+        shell: bash
+        run: |
+          TIME=$(date -u +"%Y-%m-%d %H:%M UTC")
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d text="FocusForge ${{ github.ref_name }} build started at $TIME"
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
