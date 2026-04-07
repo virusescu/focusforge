@@ -3,6 +3,15 @@ Write-Host "   FocusForge - Build Release Bundle" -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host ""
 
+# --- Sync with server ---
+Write-Host "Synchronizing with remote repository..." -ForegroundColor Yellow
+git pull
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Failed to pull from remote! Please resolve conflicts manually." -ForegroundColor Red
+    exit 1
+}
+Write-Host ""
+
 # --- Auto-increment patch version ---
 $tauriConfPath = "src-tauri\tauri.conf.json"
 $cargoPath = "src-tauri\Cargo.toml"
