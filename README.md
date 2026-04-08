@@ -52,7 +52,7 @@ Run `deploy_release.bat` to ship a new version:
 
 Monitor the build at `github.com/virusescu/focusforge/actions`. The finished installer appears under [Releases](https://github.com/virusescu/focusforge/releases).
 
-**First-time setup:** Before the first release, follow [`docs/ota-guide.md`](docs/ota-guide.md) to generate signing keys and add the required GitHub repository secrets:
+**First-time setup:** Before the first release, generate a Tauri signing key pair (`npm run tauri signer generate -- -w ~/.tauri/focusforge.key`), then add the following GitHub repository secrets (Settings → Secrets → Actions):
 
 | Secret | Purpose |
 |--------|---------|
