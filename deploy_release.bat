@@ -1,2 +1,2 @@
 @echo off
-powershell -ExecutionPolicy Bypass -File "%~dp0deploy_release.ps1"
+powershell -ExecutionPolicy Bypass -File "%~dp0cmds\deploy_release.ps1"

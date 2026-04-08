@@ -3,15 +3,18 @@ Write-Host "   FocusForge - Build Release Bundle" -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host ""
 
+# --- Project root is one level up from cmds/ ---
+$projectRoot = Split-Path $PSScriptRoot -Parent
+
 # --- Clean old bundles ---
-$bundlePath = Join-Path $PSScriptRoot "src-tauri\target\release\bundle"
+$bundlePath = Join-Path $projectRoot "src-tauri\target\release\bundle"
 if (Test-Path $bundlePath) {
     Write-Host "Cleaning old build artifacts..." -ForegroundColor Yellow
     Remove-Item -Path $bundlePath -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 # --- Robust .env loading (handles multi-line keys) ---
-$envFile = Join-Path $PSScriptRoot ".env"
+$envFile = Join-Path $projectRoot ".env"
 if (Test-Path $envFile) {
     Write-Host "Loading signing environment from .env..." -ForegroundColor Yellow
     $content = Get-Content $envFile -Raw
@@ -42,7 +45,9 @@ Write-Host ""
 Write-Host "Building release..." -ForegroundColor Yellow
 Write-Host ""
 
+Push-Location $projectRoot
 npx tauri build --verbose
+Pop-Location
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host ""
@@ -70,7 +75,7 @@ if ($installer) {
     Write-Host "Generated Artifacts:" -ForegroundColor Cyan
     Get-ChildItem -Path $bundlePath -Recurse | Where-Object { -not $_.PSIsContainer } | ForEach-Object {
         $fullPath = $_.FullName
-        $relative = $fullPath.Replace($PSScriptRoot, "").TrimStart("\")
+        $relative = $fullPath.Replace($projectRoot, "").TrimStart("\")
         Write-Host " - $relative" -ForegroundColor Gray
     }
 }

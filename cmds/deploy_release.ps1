@@ -3,6 +3,10 @@ Write-Host "   FocusForge - Build Release Bundle" -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host ""
 
+# --- Project root is one level up from cmds/ ---
+$projectRoot = Split-Path $PSScriptRoot -Parent
+Push-Location $projectRoot
+
 # --- Sync with server ---
 Write-Host "Synchronizing with remote repository..." -ForegroundColor Yellow
 git pull
@@ -85,4 +89,4 @@ Write-Host "  Check: https://github.com/virusescu/focusforge/actions" -Foregroun
 Write-Host "============================================" -ForegroundColor Green
 Write-Host ""
 
-
+Pop-Location
