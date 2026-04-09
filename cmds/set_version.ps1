@@ -8,9 +8,12 @@ $NewVersion = $NewVersion.TrimStart('v')
 
 Write-Host "Updating project version to $NewVersion..." -ForegroundColor Cyan
 
-$tauriConfPath = "src-tauri\tauri.conf.json"
-$cargoPath = "src-tauri\Cargo.toml"
-$pkgPath = "package.json"
+# --- Project root is one level up from cmds/ ---
+$projectRoot = Split-Path $PSScriptRoot -Parent
+
+$tauriConfPath = Join-Path $projectRoot "src-tauri\tauri.conf.json"
+$cargoPath = Join-Path $projectRoot "src-tauri\Cargo.toml"
+$pkgPath = Join-Path $projectRoot "package.json"
 
 # 1. Update tauri.conf.json
 if (Test-Path $tauriConfPath) {
