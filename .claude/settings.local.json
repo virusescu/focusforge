@@ -28,7 +28,8 @@
       "Bash(grep -E \"\\\\.\\(ts|tsx|scss|json\\)$\")",
       "Bash(ls:*)",
       "Bash(cargo search:*)",
-      "Bash(cargo check:*)"
+      "Bash(cargo check:*)",
+      "Bash(grep -n \"title=\\\\`\" C:/Work/focusforge/src/components/AnalyticsView.tsx)"
     ]
   }
 }

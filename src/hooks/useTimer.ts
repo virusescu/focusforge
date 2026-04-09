@@ -13,6 +13,7 @@ export const useTimer = (multiplier: number = 1) => {
 
   const startTimeRef = useRef<string | null>(null);
   const pauseTimesRef = useRef<string[]>([]);
+  const lastPauseRef = useRef<string | null>(null);
 
   const resetTimer = useCallback(() => {
     setIsActive(false);
@@ -29,6 +30,7 @@ export const useTimer = (multiplier: number = 1) => {
     setSeconds(0);
     startTimeRef.current = null;
     pauseTimesRef.current = [];
+    lastPauseRef.current = null;
     window.dispatchEvent(new CustomEvent('timer-reset'));
   }, []);
 
@@ -69,11 +71,15 @@ export const useTimer = (multiplier: number = 1) => {
       // Starting or resuming — record start time on first activation only
       if (!startTimeRef.current) {
         startTimeRef.current = new Date().toISOString();
+      } else if (lastPauseRef.current) {
+        // Resuming after a pause — the pause counts as an interrupt
+        pauseTimesRef.current = [...pauseTimesRef.current, lastPauseRef.current];
       }
+      lastPauseRef.current = null;
       window.dispatchEvent(new CustomEvent('timer-active'));
     } else {
-      // Pausing — record wall-clock time of this pause
-      pauseTimesRef.current = [...pauseTimesRef.current, new Date().toISOString()];
+      // Pausing — record the pause but don't count it yet (only if followed by resume)
+      lastPauseRef.current = new Date().toISOString();
       window.dispatchEvent(new CustomEvent('timer-paused'));
     }
   }, [isActive]);

@@ -555,12 +555,16 @@
     display: flex;
     align-items: center;
     gap: 0.4rem;
+    flex: 1;
+    min-width: 0;
+    flex-wrap: wrap;
 
     label {
       font-size: 0.6rem;
       color: var(--text-muted);
       letter-spacing: 0.05em;
       white-space: nowrap;
+      flex-basis: 100%;
     }
   }
 
@@ -603,6 +607,8 @@
   color: var(--text-primary);
   font-family: var(--font-mono);
   font-size: 0.65rem;
+  flex: 1;
+  min-width: 70px;
 
   &:focus {
     outline: none;

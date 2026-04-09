@@ -144,8 +144,7 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, categories, onSele
       ) : (
         <>
           <div className={styles.objectiveText}>
-            <span>{obj.text}</span>
-            <span className={styles.bountyBadge}>{category?.coin_bounty ?? 15}⟐</span>
+            <span className={styles.objectiveTextContent}>{obj.text}</span>
           </div>
           <button
             className={styles.editBtn}
@@ -355,27 +354,29 @@ export const SidebarLeft: FC = () => {
         </form>
 
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd} modifiers={[restrictToVerticalAxis, restrictToParentElement]}>
-          <SortableContext items={objectivePool.map(o => o.id)} strategy={verticalListSortingStrategy}>
-            <div className={styles.objectiveList}>
-              {objectivePool.map((obj) => (
-                <SortableItem
-                  key={obj.id}
-                  obj={obj}
-                  isActive={activeObjectiveId === obj.id}
-                  categories={categories}
-                  onSelect={handleSelectObjective}
-                  onDelete={handleDeleteObjective}
-                  onUpdate={handleUpdateObjective}
-                  onCategoryChange={handleObjectiveCategoryChange}
-                  onManageCategories={() => setShowCategoryManager(true)}
-                  onHover={handleHover}
-                />
-              ))}
-              {objectivePool.length === 0 && (
-                <div className={styles.emptyPool}>NO_ACTIVE_OBJECTIVES</div>
-              )}
-            </div>
-          </SortableContext>
+          <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+            <SortableContext items={objectivePool.map(o => o.id)} strategy={verticalListSortingStrategy}>
+              <div className={styles.objectiveList}>
+                {objectivePool.map((obj) => (
+                  <SortableItem
+                    key={obj.id}
+                    obj={obj}
+                    isActive={activeObjectiveId === obj.id}
+                    categories={categories}
+                    onSelect={handleSelectObjective}
+                    onDelete={handleDeleteObjective}
+                    onUpdate={handleUpdateObjective}
+                    onCategoryChange={handleObjectiveCategoryChange}
+                    onManageCategories={() => setShowCategoryManager(true)}
+                    onHover={handleHover}
+                  />
+                ))}
+                {objectivePool.length === 0 && (
+                  <div className={styles.emptyPool}>NO_ACTIVE_OBJECTIVES</div>
+                )}
+              </div>
+            </SortableContext>
+          </div>
         </DndContext>
       </div>
 

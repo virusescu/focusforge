@@ -133,9 +133,35 @@ export const CompletedObjectivesModal: FC<Props> = ({ objectives, categories, on
                 {editingTimeId === obj.id ? (
                   <div className={styles.timeEditForm}>
                     <input
-                      type="datetime-local"
-                      value={editTimeValue}
-                      onChange={e => setEditTimeValue(e.target.value)}
+                      type="date"
+                      value={editTimeValue.slice(0, 10)}
+                      onChange={e => {
+                        const date = e.target.value;
+                        const time = editTimeValue.slice(11, 16);
+                        setEditTimeValue(date ? `${date}T${time || '00:00'}` : '');
+                      }}
+                      className={styles.dateTimeInput}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') handleSaveTimeEdit(obj);
+                        else if (e.key === 'Escape') {
+                          e.stopPropagation();
+                          setEditingTimeId(null);
+                        }
+                      }}
+                    />
+                    <input
+                      type="text"
+                      placeholder="HH:MM"
+                      value={editTimeValue.slice(11, 16)}
+                      onChange={e => {
+                        const timeStr = e.target.value.replace(/[^\d:]/g, '').slice(0, 5);
+                        const date = editTimeValue.slice(0, 10);
+                        if (date && timeStr.length === 5 && timeStr[2] === ':') {
+                          setEditTimeValue(`${date}T${timeStr}`);
+                        } else if (date) {
+                          setEditTimeValue(`${date}T${timeStr.padEnd(5, ':')}`);
+                        }
+                      }}
                       className={styles.dateTimeInput}
                       onKeyDown={e => {
                         if (e.key === 'Enter') handleSaveTimeEdit(obj);

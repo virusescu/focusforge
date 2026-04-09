@@ -246,7 +246,7 @@ export const MainDisplay: FC<{ onViewAnalytics?: () => void; onViewIntel?: () =>
           className={styles.btnSecondary}
         >
           <RotateCcw size={20} />
-          <span>REBOOT_CYCLE</span>
+          <span>END_FORGE</span>
         </button>
       </div>
       

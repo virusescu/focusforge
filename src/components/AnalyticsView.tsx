@@ -38,10 +38,11 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
   const [selectedDotKey, setSelectedDotKey] = useState<string | null>(null);
   const [editingSessionId, setEditingSessionId] = useState<number | null>(null);
   const [editStartTime, setEditStartTime] = useState('');
-  const [editEndTime, setEditEndTime] = useState('');
+  const [editDuration, setEditDuration] = useState('');
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const sessionRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const durationInputRef = useRef<HTMLInputElement>(null);
 
   // Zoom state (1.0 = full width, higher = zoomed in)
   const [zoom, setZoom] = useState(1.0);
@@ -247,6 +248,12 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [changeDay, handleBack, jumpToToday, isToday]);
 
+  useEffect(() => {
+    if (editingSessionId !== null && durationInputRef.current) {
+      setTimeout(() => durationInputRef.current?.focus(), 0);
+    }
+  }, [editingSessionId]);
+
   const handleMouseEnterSession = (id: number) => {
     if (hoveredSessionId !== id) {
       soundEngine.playHover();
@@ -302,17 +309,16 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
     soundEngine.playClick();
     setEditingSessionId(session.id);
     const start = new Date(session.start_time);
-    const end = new Date(start.getTime() + session.duration_seconds * 1000);
     setEditStartTime(toDatetimeLocal(start));
-    setEditEndTime(toDatetimeLocal(end));
+    setEditDuration(String(Math.floor(session.duration_seconds / 60)));
   };
 
   const handleSaveSession = async () => {
     if (!editingSessionId) return;
     const startDate = new Date(editStartTime);
-    const endDate = new Date(editEndTime);
-    const durationSeconds = Math.floor((endDate.getTime() - startDate.getTime()) / 1000);
-    if (durationSeconds <= 0) return;
+    const durationMinutes = parseInt(editDuration, 10);
+    if (isNaN(durationMinutes) || durationMinutes <= 0) return;
+    const durationSeconds = durationMinutes * 60;
     await updateFocusSession(editingSessionId, startDate.toISOString(), durationSeconds);
     setEditingSessionId(null);
     await loadSessions();
@@ -544,7 +550,7 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
                       style={pos}
                       onMouseEnter={() => handleMouseEnterSession(s.id)}
                       onMouseLeave={() => setHoveredSessionId(null)}
-                      title={`${new Date(s.start_time).toLocaleTimeString()} - ${Math.floor(s.duration_seconds / 60)}m`}
+                      title={`${new Date(s.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })} - ${Math.floor(s.duration_seconds / 60)}m`}
                     >
                       {s.pause_times?.map((pauseTime, i) => {
                         const fraction = (new Date(pauseTime).getTime() - sessionStartMs) / sessionDurationMs;
@@ -622,18 +628,55 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
                       <div className={styles.editRow}>
                         <label>START:</label>
                         <input
-                          type="datetime-local"
-                          value={editStartTime}
-                          onChange={e => setEditStartTime(e.target.value)}
+                          type="date"
+                          value={editStartTime.slice(0, 10)}
+                          onChange={e => {
+                            const date = e.target.value;
+                            const time = editStartTime.slice(11, 16);
+                            setEditStartTime(date ? `${date}T${time || '00:00'}` : '');
+                          }}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') handleSaveSession();
+                            else if (e.key === 'Escape') handleCancelEditSession();
+                          }}
+                          className={styles.dateTimeInput}
+                        />
+                        <input
+                          type="text"
+                          placeholder="HH:MM"
+                          value={editStartTime.slice(11, 16)}
+                          onChange={e => {
+                            const timeStr = e.target.value.replace(/[^\d:]/g, '').slice(0, 5);
+                            const date = editStartTime.slice(0, 10);
+                            if (date && timeStr.length === 5 && timeStr[2] === ':') {
+                              setEditStartTime(`${date}T${timeStr}`);
+                            } else if (date) {
+                              setEditStartTime(`${date}T${timeStr.padEnd(5, ':')}`);
+                            }
+                          }}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') handleSaveSession();
+                            else if (e.key === 'Escape') handleCancelEditSession();
+                          }}
                           className={styles.dateTimeInput}
                         />
                       </div>
                       <div className={styles.editRow}>
-                        <label>END:</label>
+                        <label>DURATION (min):</label>
                         <input
-                          type="datetime-local"
-                          value={editEndTime}
-                          onChange={e => setEditEndTime(e.target.value)}
+                          ref={durationInputRef}
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="minutes"
+                          value={editDuration}
+                          onChange={e => {
+                            const val = e.target.value.replace(/[^\d]/g, '').slice(0, 4);
+                            setEditDuration(val);
+                          }}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') handleSaveSession();
+                            else if (e.key === 'Escape') handleCancelEditSession();
+                          }}
                           className={styles.dateTimeInput}
                         />
                       </div>
@@ -649,7 +692,7 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
                   ) : (
                     <>
                       <div className={styles.sessionMain}>
-                        <span className={styles.time}>{new Date(s.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        <span className={styles.time}>{new Date(s.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
                         <span className={styles.duration}>{Math.floor(s.duration_seconds / 60)}m FORGE</span>
                         {(s.pause_times?.length ?? 0) > 0 && (
                           <span className={styles.interruptCount}>{s.pause_times!.length} INT</span>

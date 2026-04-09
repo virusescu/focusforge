@@ -21,6 +21,7 @@ export const VaultPage: FC<Props> = ({ onBack }) => {
     currentStreakDays,
     streaksCompletedThisSeason,
     streakMultiplier,
+    streakIsBroken,
     sessionsToday,
     dailyBonusActive,
     toolDefinitions,
@@ -69,7 +70,7 @@ export const VaultPage: FC<Props> = ({ onBack }) => {
   // ─── Streak extend ──────────────────────────────────────────────
 
   const streakExtendCost = getStreakExtendCost(currentStreakDays);
-  const canExtendStreak = coins >= streakExtendCost && currentStreakDays === 0;
+  const canExtendStreak = coins >= streakExtendCost && streakIsBroken;
 
   return (
     <div className={styles.vault}>
@@ -137,7 +138,7 @@ export const VaultPage: FC<Props> = ({ onBack }) => {
                   <strong>DAILY_CHALLENGE (2x):</strong> Complete 3 qualifying sessions (30+ min each) in a single day to unlock a 2x multiplier on ALL coins earned that day. Resets at midnight. Shorter sessions still earn coins but don't count toward the challenge.
                 </div>
                 <div className={styles.helpItem}>
-                  <strong>STREAK (1.0x → 3.0x):</strong> Counts consecutive work-days (Mon–Fri) where you completed the daily challenge. The streak doesn't start on your first day — you earn it by showing up again. Day 1 = 1.0x, Day 2 = 1.5x, Day 3 = 2.0x, Day 4 = 3.0x. Missing a daily challenge breaks the streak.
+                  <strong>STREAK (1.0x → 3.0x):</strong> Counts consecutive work-days (Mon–Fri) where you completed the daily challenge. Day 1 = 1.25x, Day 2 = 1.5x, Day 3 = 2.0x, Day 4 = 3.0x, then resets. Missing a daily challenge breaks the streak.
                 </div>
                 <div className={styles.helpItem}>
                   <strong>ACTIVE_TOOLS:</strong> Tools like Standing Desk and NC Headphones add a % bonus to coins earned during active sessions. Bonuses stack additively.

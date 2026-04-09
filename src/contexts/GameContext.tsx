@@ -43,6 +43,7 @@ interface GameContextType {
   currentStreakDays: number;
   streaksCompletedThisSeason: number;
   streakMultiplier: number;
+  streakIsBroken: boolean;
 
   // Daily challenge
   sessionsToday: number;
@@ -94,15 +95,25 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
   const streaksCompletedThisSeason = gameState?.streaks_completed ?? 0;
   const dailyBonusActive = (gameState?.daily_bonus_active ?? 0) === 1;
 
-  // Effective streak: only show non-zero if streak was earned/extended today
-  // The streak advances when daily challenge is completed, setting streak_last_date to today
-  // If streak_last_date is from a previous day, show 0 — the handler will set it fresh
+  // Detect if streak is actually broken (a day was missed, not just waiting for today)
+  // Streak is broken if: there's a streak_last_date, but it's not today and not the previous work day
+  const streakIsBroken = (() => {
+    if (!gameState?.streak_last_date) return false;
+    const todayStr = formatDateStr(new Date());
+    if (gameState.streak_last_date === todayStr) return false;
+    const prevWorkDayStr = formatDateStr(getPreviousWorkDay(new Date()));
+    if (gameState.streak_last_date === prevWorkDayStr) return false;
+    return true;
+  })();
+
+  // Effective streak: show the streak as long as it hasn't been broken
+  // A streak is broken when a full workday passes without completing the daily challenge
+  // Don't reset the display just because it's a new calendar day
   const currentStreakDays = (() => {
     const raw = gameState?.current_streak_days ?? 0;
     if (raw === 0 || !gameState?.streak_last_date) return 0;
-    const todayStr = formatDateStr(new Date());
-    if (gameState.streak_last_date === todayStr) return raw;
-    return 0;
+    if (streakIsBroken) return 0;
+    return raw;
   })();
 
   // Reset sessions_today if it's a stale date
@@ -113,6 +124,7 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
   })();
 
   const streakMultiplier = getStreakMultiplier(currentStreakDays);
+
   const seasonDaysRemaining = season ? getSeasonDaysRemaining(season.end_date) : 0;
 
   const ownedPassiveTools = toolDefinitions.filter(t => ownedToolIds.has(t.id) && (t.effect_type === 'passive' || t.effect_type === 'prestige'));
@@ -417,6 +429,7 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
       currentStreakDays,
       streaksCompletedThisSeason,
       streakMultiplier,
+      streakIsBroken,
       sessionsToday,
       dailyBonusActive,
       toolDefinitions,
@@ -449,6 +462,7 @@ const defaultGameContext: GameContextType = {
   currentStreakDays: 0,
   streaksCompletedThisSeason: 0,
   streakMultiplier: 1,
+  streakIsBroken: false,
   sessionsToday: 0,
   dailyBonusActive: false,
   toolDefinitions: [],

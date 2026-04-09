@@ -86,11 +86,11 @@ export function getStreakExtendCost(currentStreakDays: number): number {
 
 /**
  * Streak multiplier based on consecutive days of completed daily challenges.
- * Day 1 (first day, no prior completions) = 1.0x
- * Day 2 = 1.5x, Day 3 = 2.0x, Day 4 = 3.0x
+ * Day 0 (no streak) = 1.0x
+ * Day 1 = 1.25x, Day 2 = 1.5x, Day 3 = 2.0x, Day 4 = 3.0x
  */
 export function getStreakMultiplier(currentStreakDays: number): number {
-  const multipliers: Record<number, number> = { 0: 1.0, 1: 1.0, 2: 1.5, 3: 2.0, 4: 3.0 };
+  const multipliers: Record<number, number> = { 0: 1.0, 1: 1.25, 2: 1.5, 3: 2.0, 4: 3.0 };
   return multipliers[Math.min(currentStreakDays, 4)] ?? 1.0;
 }
 
