@@ -216,13 +216,21 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenSettings }) => {
     updateCategory,
     deleteCategory,
   } = useFocus();
-  const { sessionsToday, dailyBonusActive, currentStreakDays, streakMultiplier, totalCoinsEarned } = useGame();
+  const { sessionsToday, dailyBonusActive, currentStreakDays, streakMultiplier, totalCoinsEarned, prestigeTitles, currentTitle } = useGame();
   const [newObjective, setNewObjective] = useState('');
   const [newCategoryId, setNewCategoryId] = useState<number | null>(null);
   const [showNewCategoryPicker, setShowNewCategoryPicker] = useState(false);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
 
   const displayedObjectives = objectiveView === 'mission' ? missionObjectives : backlogObjectives;
+
+  // Compute current prestige level progress (from current threshold to next threshold)
+  const nextTitle = currentTitle
+    ? prestigeTitles.find(t => t.unlock_threshold > currentTitle.unlock_threshold)
+    : prestigeTitles[0];
+  const levelFrom = currentTitle?.unlock_threshold ?? 0;
+  const levelTo = nextTitle?.unlock_threshold ?? 60000;
+  const levelProgress = Math.min(Math.max((totalCoinsEarned - levelFrom) / (levelTo - levelFrom), 0), 1);
 
   // Default newCategoryId to the first available category
   useEffect(() => {
@@ -375,16 +383,23 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenSettings }) => {
             </div>
           </div>
 
-          <div className={styles.statItem}>
+          <div
+            className={styles.statItem}
+            title={`Total: ${Math.floor(totalCoinsEarned).toLocaleString()} / 60,000 ⟐`}
+          >
             <div className={styles.statInfo}>
               <div className={styles.statLabel}>
                 <Star size={12} />
                 <span>FORGE_PROGRESS</span>
               </div>
-              <span className={styles.statValue}>{totalCoinsEarned.toLocaleString()}/60,000</span>
+              <span className={styles.statValue}>
+                {nextTitle
+                  ? `${Math.floor(totalCoinsEarned - levelFrom).toLocaleString()} / ${(levelTo - levelFrom).toLocaleString()}`
+                  : 'MAX'}
+              </span>
             </div>
             <div className={styles.progressBar}>
-              <div className={styles.progressFill} style={{ width: `${Math.min(totalCoinsEarned / 60000, 1) * 100}%` }} />
+              <div className={styles.progressFill} style={{ width: `${levelProgress * 100}%` }} />
             </div>
           </div>
         </div>
