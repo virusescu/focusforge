@@ -5,6 +5,7 @@ import { useSystemLog } from '../hooks/useSystemLog';
 import { useFocus } from '../contexts/FocusContext';
 import { soundEngine } from '../utils/audio';
 import { setStatusHint, clearStatusHint } from '../utils/statusHint';
+import { isWorkDay } from '../utils/gameEconomy';
 
 type RGB = [number, number, number];
 
@@ -68,28 +69,37 @@ export const SidebarRight: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVa
     }
   }, [logs]);
 
-  // Heatmap generation logic
-  const days = 21;
-  const today = new Date();
-  const heatmapCells = Array.from({ length: days }).map((_, i) => {
-    const d = new Date(today);
-    d.setDate(today.getDate() - (days - 1 - i));
-    const dateStr = d.toISOString().split('T')[0];
-    const stat = dailyStats.find(s => s.date === dateStr);
-    const totalSeconds = stat ? stat.totalSeconds : 0;
-    const minutes = totalSeconds / 60;
-    
-    const h = Math.floor(minutes / 60);
-    const m = Math.floor(minutes % 60);
-    const timeStr = `${h}:${m.toString().padStart(2, '0')}`;
-
-    return {
-      date: dateStr,
-      minutes,
-      cellStyle: getCellStyle(minutes),
-      formattedTime: timeStr
-    };
-  });
+  // Heatmap generation logic: show 21 work days (Mon-Fri only), going backwards from today
+  const heatmapCells = (() => {
+    const cells = [];
+    const cursor = new Date();
+    // If today is a weekend, start from the last work day
+    while (!isWorkDay(cursor)) {
+      cursor.setDate(cursor.getDate() - 1);
+    }
+    for (let i = 0; i < 21; i++) {
+      // Step back to previous work day (after first iteration)
+      if (i > 0) {
+        cursor.setDate(cursor.getDate() - 1);
+        while (!isWorkDay(cursor)) {
+          cursor.setDate(cursor.getDate() - 1);
+        }
+      }
+      const dateStr = cursor.toISOString().split('T')[0];
+      const stat = dailyStats.find(s => s.date === dateStr);
+      const totalSeconds = stat ? stat.totalSeconds : 0;
+      const minutes = totalSeconds / 60;
+      const h = Math.floor(minutes / 60);
+      const m = Math.floor(minutes % 60);
+      cells.push({
+        date: dateStr,
+        minutes,
+        cellStyle: getCellStyle(minutes),
+        formattedTime: `${h}:${m.toString().padStart(2, '0')}`,
+      });
+    }
+    return cells.reverse(); // oldest first
+  })();
 
   const handleCellMouseEnter = (date: string, time: string) => {
     soundEngine.playHover();
