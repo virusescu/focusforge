@@ -12,6 +12,7 @@ import {
   getSeasonDaysRemaining,
   isWorkDay,
   getPreviousWorkDay,
+  getNextWorkDay,
   formatDateStr,
 } from './gameEconomy';
 import type { ToolDefinition } from '../types';
@@ -293,5 +294,42 @@ describe('work day functions', () => {
 
   it('formatDateStr formats correctly', () => {
     expect(formatDateStr(new Date('2026-04-06'))).toBe('2026-04-06');
+  });
+});
+
+describe('getNextWorkDay', () => {
+  it('advances Monday to Tuesday', () => {
+    const mon = new Date('2026-04-13'); // Monday
+    const result = getNextWorkDay(mon);
+    expect(result.getDay()).toBe(2); // Tuesday
+    expect(formatDateStr(result)).toBe('2026-04-14');
+  });
+
+  it('advances Friday to next Monday (skips weekend)', () => {
+    const fri = new Date('2026-04-17'); // Friday
+    const result = getNextWorkDay(fri);
+    expect(result.getDay()).toBe(1); // Monday
+    expect(formatDateStr(result)).toBe('2026-04-20');
+  });
+
+  it('advances Saturday to Monday (skips rest of weekend)', () => {
+    const sat = new Date('2026-04-18'); // Saturday
+    const result = getNextWorkDay(sat);
+    expect(result.getDay()).toBe(1); // Monday
+    expect(formatDateStr(result)).toBe('2026-04-20');
+  });
+
+  it('advances Sunday to Monday', () => {
+    const sun = new Date('2026-04-19'); // Sunday
+    const result = getNextWorkDay(sun);
+    expect(result.getDay()).toBe(1); // Monday
+    expect(formatDateStr(result)).toBe('2026-04-20');
+  });
+
+  it('advances Thursday to Friday', () => {
+    const thu = new Date('2026-04-16'); // Thursday
+    const result = getNextWorkDay(thu);
+    expect(result.getDay()).toBe(5); // Friday
+    expect(formatDateStr(result)).toBe('2026-04-17');
   });
 });

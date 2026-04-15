@@ -171,6 +171,20 @@ export function getPreviousWorkDay(date: Date): Date {
   return prev;
 }
 
+/**
+ * Gets the next work day from a given date.
+ * Thursday → Friday, Friday → Monday, Saturday → Monday, etc.
+ */
+export function getNextWorkDay(date: Date): Date {
+  const next = new Date(date);
+  next.setDate(next.getDate() + 1);
+  // Skip weekends forwards
+  while (next.getDay() === 0 || next.getDay() === 6) {
+    next.setDate(next.getDate() + 1);
+  }
+  return next;
+}
+
 /** Format a date as YYYY-MM-DD. */
 export function formatDateStr(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
