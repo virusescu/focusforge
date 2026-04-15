@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
 import type { FocusSession, DailyStat, StrategicObjective, ObjectiveCategory } from '../types';
 import { soundEngine, playObjectiveComplete } from '../utils/audio';
 import { useTimer } from '../hooks/useTimer';
@@ -15,6 +15,7 @@ import {
   updateObjective as dbUpdateObjective,
   completeObjective as dbCompleteObjective,
   reorderObjectives as dbReorderObjectives,
+  moveObjectiveToOtherList as dbMoveObjectiveToOtherList,
   getCategories,
   addCategory as dbAddCategory,
   updateCategory as dbUpdateCategory,
@@ -38,13 +39,18 @@ interface FocusContextType {
   categories: ObjectiveCategory[];
   saveSession: (startTime: string, durationSeconds: number, pauseTimes?: string[]) => Promise<void>;
   refreshData: () => Promise<void>;
-  addObjective: (text: string, categoryId?: number | null) => Promise<void>;
+  addObjective: (text: string, categoryId?: number | null, prepend?: boolean) => Promise<void>;
   deleteObjective: (id: number) => Promise<void>;
   updateObjective: (id: number, text: string) => Promise<void>;
   updateObjectiveCategory: (id: number, categoryId: number | null) => Promise<void>;
   setActiveObjective: (id: number | null) => void;
   neutralizeObjective: (id: number) => Promise<void>;
   reorderObjectives: (orderedIds: number[]) => Promise<void>;
+  moveObjectiveToOtherList: (id: number) => Promise<void>;
+  objectiveView: 'mission' | 'backlog';
+  switchObjectiveView: (view: 'mission' | 'backlog') => void;
+  missionObjectives: StrategicObjective[];
+  backlogObjectives: StrategicObjective[];
   addCategory: (label: string, color: string, coinBounty?: number) => Promise<void>;
   updateCategory: (id: number, label: string, color: string, coinBounty?: number) => Promise<void>;
   deleteCategory: (id: number) => Promise<void>;
@@ -82,6 +88,16 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
   const [globalStats, setGlobalStats] = useState<FocusContextType['globalStats']>(null);
   const [objectivePool, setObjectivePool] = useState<StrategicObjective[]>([]);
   const [categories, setCategories] = useState<ObjectiveCategory[]>([]);
+  const [objectiveView, setObjectiveView] = useState<'mission' | 'backlog'>('mission');
+
+  const missionObjectives = useMemo(
+    () => objectivePool.filter(o => o.is_mission === 1),
+    [objectivePool]
+  );
+  const backlogObjectives = useMemo(
+    () => objectivePool.filter(o => o.is_mission === 0),
+    [objectivePool]
+  );
   const [activeObjectiveId, setActiveObjectiveId] = useState<number | null>(null);
   const [isGlitching, setIsGlitching] = useState(false);
   const [completedObjectiveText, setCompletedObjectiveText] = useState<string | null>(null);
@@ -149,11 +165,12 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
     await refreshData();
   }, [authUser, refreshData]);
 
-  const addObjective = useCallback(async (text: string, categoryId?: number | null) => {
+  const addObjective = useCallback(async (text: string, categoryId?: number | null, prepend: boolean = false) => {
     if (!authUser) return;
-    await dbAddObjective(authUser.id, text, categoryId);
+    const isMission = objectiveView === 'mission' ? 1 : 0;
+    await dbAddObjective(authUser.id, text, categoryId, isMission, prepend);
     await refreshData();
-  }, [authUser, refreshData]);
+  }, [authUser, objectiveView, refreshData]);
 
   const deleteObjective = useCallback(async (id: number) => {
     await dbDeleteObjective(id);
@@ -173,12 +190,28 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const reorderObjectives = useCallback(async (orderedIds: number[]) => {
+    const reorderedSet = new Set(orderedIds);
     setObjectivePool(prev => {
       const map = new Map(prev.map(o => [o.id, o]));
-      return orderedIds.map(id => map.get(id)!).filter(Boolean);
+      const unchanged = prev.filter(o => !reorderedSet.has(o.id));
+      const reordered = orderedIds.map(id => map.get(id)!).filter(Boolean);
+      return [...unchanged, ...reordered];
     });
     await dbReorderObjectives(orderedIds);
   }, []);
+
+  const switchObjectiveView = useCallback((view: 'mission' | 'backlog') => {
+    setObjectiveView(view);
+  }, []);
+
+  const moveObjectiveToOtherList = useCallback(async (id: number) => {
+    const targetIsMission = objectiveView === 'mission' ? 0 : 1;
+    await dbMoveObjectiveToOtherList(id, targetIsMission);
+    if (activeObjectiveId === id) {
+      setActiveObjectiveId(null);
+    }
+    await refreshData();
+  }, [objectiveView, activeObjectiveId, refreshData]);
 
   const updateObjectiveCategory = useCallback(async (id: number, categoryId: number | null) => {
     await dbUpdateObjectiveCategory(id, categoryId);
@@ -273,6 +306,11 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
       setActiveObjective,
       neutralizeObjective,
       reorderObjectives,
+      moveObjectiveToOtherList,
+      objectiveView,
+      switchObjectiveView,
+      missionObjectives,
+      backlogObjectives,
       addCategory,
       updateCategory,
       deleteCategory,
