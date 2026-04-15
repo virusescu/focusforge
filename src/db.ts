@@ -220,6 +220,22 @@ export async function initDb() {
     // Column already exists — no action needed
   }
 
+  // Migrate prestige titles to 12 titles with even 5k spacing
+  try {
+    await database.execute(`UPDATE game_prestige_titles SET unlock_threshold = 5000  WHERE id = 1`);
+    await database.execute(`UPDATE game_prestige_titles SET unlock_threshold = 10000 WHERE id = 2`);
+    await database.execute(`UPDATE game_prestige_titles SET unlock_threshold = 15000 WHERE id = 3`);
+    await database.execute(`UPDATE game_prestige_titles SET unlock_threshold = 20000 WHERE id = 4`);
+    await database.execute(`UPDATE game_prestige_titles SET unlock_threshold = 25000 WHERE id = 5`);
+    await database.execute(`UPDATE game_prestige_titles SET unlock_threshold = 30000 WHERE id = 6`);
+    await database.execute(`UPDATE game_prestige_titles SET unlock_threshold = 35000 WHERE id = 7`);
+    await database.execute(`UPDATE game_prestige_titles SET unlock_threshold = 40000 WHERE id = 8`);
+    await database.execute(`UPDATE game_prestige_titles SET unlock_threshold = 45000 WHERE id = 9`);
+    await database.execute(`UPDATE game_prestige_titles SET unlock_threshold = 50000 WHERE id = 10`);
+  } catch {
+    // Table may not exist yet — seed will handle it
+  }
+
   await seedToolDefinitions();
   await seedPrestigeTitles();
 }
@@ -747,20 +763,22 @@ async function seedToolDefinitions() {
 async function seedPrestigeTitles() {
   const database = getDb();
   const titles = [
-    [1,  'INITIATE',          'Initiate',          'First steps into the forge',           100,   '🔰'],
-    [2,  'OPERATOR',          'Operator',          'Learning the ropes',                   500,   '⚙️'],
-    [3,  'FOCUSED',           'Focused',           'Concentration is becoming natural',    1500,  '🎯'],
-    [4,  'DEEP_WORKER',       'Deep Worker',       'Master of sustained attention',        3500,  '🧠'],
-    [5,  'STREAK_MASTER',     'Streak Master',     'Consistency is your weapon',           7000,  '🔥'],
-    [6,  'FORGE_ADEPT',       'Forge Adept',       'The forge bends to your will',         12000, '⚒️'],
-    [7,  'NEURAL_ARCHITECT',  'Neural Architect',  'Rewiring focus pathways',              20000, '🏗️'],
-    [8,  'APEX_OPERATOR',     'Apex Operator',     'Peak performance unlocked',            30000, '💎'],
-    [9,  'TRANSCENDENT',      'Transcendent',      'Beyond ordinary focus',                40000, '✨'],
-    [10, 'FORGE_LEGEND',      'Forge Legend',      'The ultimate FocusForge operator',     50000, '⭐'],
+    [1,  'INITIATE',          'Initiate',          'First steps into the forge',             5000,  '🔰'],
+    [2,  'OPERATOR',          'Operator',          'Learning the ropes',                     10000, '⚙️'],
+    [3,  'FOCUSED',           'Focused',           'Concentration is becoming natural',      15000, '🎯'],
+    [4,  'DEEP_WORKER',       'Deep Worker',       'Master of sustained attention',          20000, '🧠'],
+    [5,  'STREAK_MASTER',     'Streak Master',     'Consistency is your weapon',             25000, '🔥'],
+    [6,  'FORGE_ADEPT',       'Forge Adept',       'The forge bends to your will',           30000, '⚒️'],
+    [7,  'NEURAL_ARCHITECT',  'Neural Architect',  'Rewiring focus pathways',                35000, '🏗️'],
+    [8,  'APEX_OPERATOR',     'Apex Operator',     'Peak performance unlocked',              40000, '💎'],
+    [9,  'TRANSCENDENT',      'Transcendent',      'Beyond ordinary focus',                  45000, '✨'],
+    [10, 'FORGE_LEGEND',      'Forge Legend',      'The ultimate FocusForge operator',       50000, '⭐'],
+    [11, 'ETERNAL_FLAME',     'Eternal Flame',     'The forge burns eternal',                55000, '🔱'],
+    [12, 'SINGULARITY',       'Singularity',       'Where focus and will become one',        60000, '🌀'],
   ];
   for (const t of titles) {
     await database.execute({
-      sql: `INSERT OR IGNORE INTO game_prestige_titles (id, name, display_name, description, unlock_threshold, icon)
+      sql: `INSERT OR REPLACE INTO game_prestige_titles (id, name, display_name, description, unlock_threshold, icon)
             VALUES (?, ?, ?, ?, ?, ?)`,
       args: t,
     });
