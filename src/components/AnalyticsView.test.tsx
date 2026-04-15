@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { AnalyticsView } from './AnalyticsView';
+import { getPreviousWorkDay, getNextWorkDay } from '../utils/gameEconomy';
 
 // Mock hooks
 const mockUseUser = vi.fn();
@@ -206,3 +207,18 @@ describe('AnalyticsView', () => {
     });
   });
 });
+
+describe('AnalyticsView weekend-skipping navigation utilities', () => {
+  it('getPreviousWorkDay skips from Monday to Friday', () => {
+    const monday = new Date('2026-04-13'); // Monday
+    const result = getPreviousWorkDay(monday);
+    expect(result.getDay()).toBe(5); // Friday
+  });
+
+  it('getNextWorkDay skips from Friday to Monday', () => {
+    const friday = new Date('2026-04-17'); // Friday
+    const result = getNextWorkDay(friday);
+    expect(result.getDay()).toBe(1); // Monday
+  });
+});
+

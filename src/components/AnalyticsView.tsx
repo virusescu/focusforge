@@ -7,6 +7,7 @@ import { useUser } from '../contexts/UserContext';
 import { useAuth } from '../contexts/AuthContext';
 import type { FocusSession, StrategicObjective } from '../types';
 import { soundEngine } from '../utils/audio';
+import { getPreviousWorkDay, getNextWorkDay } from '../utils/gameEconomy';
 import { CompletedObjectivesModal } from './CompletedObjectivesModal';
 import { CategoryManagerModal } from './CategoryManagerModal';
 
@@ -214,9 +215,8 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
     soundEngine.playClick();
     setLoading(true);
     setCurrentDate(prev => {
-      const next = new Date(prev);
-      next.setDate(next.getDate() + delta);
-      return next;
+      if (delta < 0) return getPreviousWorkDay(prev);
+      return getNextWorkDay(prev);
     });
   }, []);
 
