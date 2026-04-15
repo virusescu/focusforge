@@ -187,9 +187,9 @@ describe('AnalyticsView', () => {
   it('renders one dot per 5-min bucket of completed objectives', async () => {
     const { getCompletedObjectivesForDay } = await import('../db');
     vi.mocked(getCompletedObjectivesForDay).mockResolvedValueOnce([
-      { id: 1, text: 'Objective A', created_at: '2026-03-24T08:00:00.000Z', completed_at: '2026-03-24T12:01:00.000Z', sort_order: 0 },
-      { id: 2, text: 'Objective B', created_at: '2026-03-24T08:00:00.000Z', completed_at: '2026-03-24T12:03:00.000Z', sort_order: 1 },
-      { id: 3, text: 'Objective C', created_at: '2026-03-24T08:00:00.000Z', completed_at: '2026-03-24T13:00:00.000Z', sort_order: 2 },
+      { id: 1, text: 'Objective A', created_at: '2026-03-24T08:00:00.000Z', completed_at: '2026-03-24T12:01:00.000Z', sort_order: 0, is_mission: 1 },
+      { id: 2, text: 'Objective B', created_at: '2026-03-24T08:00:00.000Z', completed_at: '2026-03-24T12:03:00.000Z', sort_order: 1, is_mission: 1 },
+      { id: 3, text: 'Objective C', created_at: '2026-03-24T08:00:00.000Z', completed_at: '2026-03-24T13:00:00.000Z', sort_order: 2, is_mission: 1 },
     ]);
 
     render(<AnalyticsView onBack={onBack} initialDate={new Date('2026-03-24T12:00:00.000Z')} />);

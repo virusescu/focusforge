@@ -703,6 +703,7 @@ export async function getCompletedObjectivesForDay(userId: number, date: string,
     created_at: '',
     completed_at: row.completed_at as string,
     category_id: row.category_id as number | null,
+    is_mission: (row.is_mission as number) ?? 1,
   }));
 }
 
