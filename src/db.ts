@@ -213,6 +213,13 @@ export async function initDb() {
     // Column already exists — no action needed
   }
 
+  // Add is_mission column to objectives (1 = Mission, 0 = Backlog; existing = mission)
+  try {
+    await database.execute(`ALTER TABLE objectives ADD COLUMN is_mission INTEGER DEFAULT 1`);
+  } catch {
+    // Column already exists — no action needed
+  }
+
   await seedToolDefinitions();
   await seedPrestigeTitles();
 }
@@ -545,19 +552,37 @@ export async function getObjectives(userId: number): Promise<StrategicObjective[
     completed_at: row.completed_at as string | undefined,
     sort_order: row.sort_order as number,
     category_id: row.category_id as number | null,
+    is_mission: (row.is_mission as number) ?? 1,
   }));
 }
 
-export async function addObjective(userId: number, text: string, categoryId?: number | null): Promise<number> {
+export async function addObjective(
+  userId: number,
+  text: string,
+  categoryId?: number | null,
+  isMission: number = 1,
+  prepend: boolean = false
+): Promise<number> {
   const database = getDb();
-  const countResult = await database.execute({
-    sql: 'SELECT COUNT(*) as n FROM objectives WHERE user_id = ?',
-    args: [userId],
-  });
-  const nextOrder = (countResult.rows[0]?.n as number) ?? 0;
+  let sortOrder: number;
+  if (prepend) {
+    const minResult = await database.execute({
+      sql: 'SELECT MIN(sort_order) as minOrder FROM objectives WHERE user_id = ? AND is_mission = ? AND completed_at IS NULL',
+      args: [userId, isMission],
+    });
+    const minOrder = (minResult.rows[0]?.minOrder as number | null) ?? 0;
+    sortOrder = minOrder - 1;
+  } else {
+    const maxResult = await database.execute({
+      sql: 'SELECT MAX(sort_order) as maxOrder FROM objectives WHERE user_id = ? AND is_mission = ? AND completed_at IS NULL',
+      args: [userId, isMission],
+    });
+    const maxOrder = (maxResult.rows[0]?.maxOrder as number | null) ?? -1;
+    sortOrder = maxOrder + 1;
+  }
   const result = await database.execute({
-    sql: 'INSERT INTO objectives (user_id, text, sort_order, category_id) VALUES (?, ?, ?, ?)',
-    args: [userId, text, nextOrder, categoryId ?? null],
+    sql: 'INSERT INTO objectives (user_id, text, sort_order, category_id, is_mission) VALUES (?, ?, ?, ?, ?)',
+    args: [userId, text, sortOrder, categoryId ?? null, isMission],
   });
   return Number(result.lastInsertRowid) ?? 0;
 }
@@ -587,6 +612,25 @@ export async function updateObjectiveCategory(id: number, categoryId: number | n
   await database.execute({
     sql: 'UPDATE objectives SET category_id = ? WHERE id = ?',
     args: [categoryId, id],
+  });
+}
+
+export async function moveObjectiveToOtherList(id: number, targetIsMission: number): Promise<void> {
+  const database = getDb();
+  const obj = await database.execute({
+    sql: 'SELECT user_id FROM objectives WHERE id = ?',
+    args: [id],
+  });
+  if (obj.rows.length === 0) return;
+  const userId = obj.rows[0].user_id as number;
+  const maxResult = await database.execute({
+    sql: 'SELECT MAX(sort_order) as maxOrder FROM objectives WHERE user_id = ? AND is_mission = ? AND completed_at IS NULL',
+    args: [userId, targetIsMission],
+  });
+  const maxOrder = (maxResult.rows[0]?.maxOrder as number | null) ?? -1;
+  await database.execute({
+    sql: 'UPDATE objectives SET is_mission = ?, sort_order = ? WHERE id = ?',
+    args: [targetIsMission, maxOrder + 1, id],
   });
 }
 

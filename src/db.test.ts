@@ -90,14 +90,14 @@ describe('db utility functions', () => {
 
     it('addObjective inserts with user_id', async () => {
       mockExecute
-        .mockResolvedValueOnce({ rows: [{ n: 0 }], rowsAffected: 0 })
+        .mockResolvedValueOnce({ rows: [{ maxOrder: 0 }], rowsAffected: 0 })
         .mockResolvedValueOnce({ lastInsertRowid: BigInt(123), rows: [], rowsAffected: 1 });
 
       const id = await addObjective(1, 'Test Objective');
 
       expect(mockExecute).toHaveBeenCalledWith({
-        sql: expect.stringContaining('INSERT INTO objectives (user_id, text, sort_order, category_id)'),
-        args: [1, 'Test Objective', 0, null],
+        sql: expect.stringContaining('INSERT INTO objectives (user_id, text, sort_order, category_id, is_mission)'),
+        args: [1, 'Test Objective', 1, null, 1],
       });
       expect(id).toBe(123);
     });
