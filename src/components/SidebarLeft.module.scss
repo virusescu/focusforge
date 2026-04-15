@@ -492,6 +492,10 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: 8px;
+
+  .sectionTitle {
+    margin-bottom: 0;
+  }
 }
 
 .viewToggleArrow {
@@ -506,7 +510,6 @@
   align-items: center;
   justify-content: center;
   align-self: stretch;
-  line-height: 1;
   transition: color 0.15s;
 
   &:hover:not(:disabled) {

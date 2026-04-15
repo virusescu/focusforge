@@ -98,7 +98,7 @@
   background: transparent;
   border: none;
   padding: 0;
-  cursor: pointer;
+  cursor: pointer !important;
   display: flex;
   flex-direction: column;
   text-align: left;
@@ -214,4 +214,12 @@
 .seasonUrgent {
   color: var(--primary);
   text-shadow: 0 0 6px var(--primary-glow);
+}
+
+.forgeTotal {
+  color: var(--text-secondary);
+  font-size: 0.65rem;
+  font-family: var(--font-mono);
+  letter-spacing: 0.05em;
+  cursor: default;
 }

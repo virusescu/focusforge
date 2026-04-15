@@ -9,7 +9,7 @@ import { useGame } from '../contexts/GameContext';
 import { getVersion } from '@tauri-apps/api/app';
 
 function GameIndicators() {
-  const { coins, currentStreakDays, season, seasonDaysRemaining, rewardToast } = useGame();
+  const { coins, currentStreakDays, season, seasonDaysRemaining, rewardToast, totalCoinsEarned } = useGame();
 
   return (
     <div className={styles.gameIndicators}>
@@ -29,6 +29,12 @@ function GameIndicators() {
           S{season.season_number} · {seasonDaysRemaining}d
         </span>
       )}
+      <span
+        className={styles.forgeTotal}
+        title={`FORGE_PROGRESS: ${Math.floor(totalCoinsEarned).toLocaleString()} / 60,000 ⟐`}
+      >
+        ◈ {Math.floor(totalCoinsEarned).toLocaleString()}
+      </span>
     </div>
   );
 }

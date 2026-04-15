@@ -29,7 +29,9 @@
       "Bash(ls:*)",
       "Bash(cargo search:*)",
       "Bash(cargo check:*)",
-      "Bash(grep -n \"title=\\\\`\" C:/Work/focusforge/src/components/AnalyticsView.tsx)"
+      "Bash(grep -n \"title=\\\\`\" C:/Work/focusforge/src/components/AnalyticsView.tsx)",
+      "Bash(grep -n \"Space\\\\|Escape\\\\|Ctrl\\\\|Enter\\\\|keyboard\\\\|shortcut\" /c/Work/focusforge/src/components/*.tsx)",
+      "Bash(xargs grep:*)"
     ]
   }
 }
