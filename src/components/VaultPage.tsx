@@ -162,7 +162,7 @@ export const VaultPage: FC<Props> = ({ onBack }) => {
               <div className={styles.helpSection}>
                 <h4>PRESTIGE_RANK</h4>
                 <div className={styles.helpItem}>
-                  As you earn coins throughout the season, you unlock prestige titles automatically. These are based on your <strong>total coins earned</strong> (not current balance — spending doesn't lose rank). 10 tiers from Initiate (100 ⟐) to Forge Legend (<span className={styles.helpCoin}>50,000 ⟐</span>). Prestige resets each season.
+                  As you earn coins throughout the season, you unlock prestige titles automatically. These are based on your <strong>total coins earned</strong> (not current balance — spending doesn't lose rank). 12 tiers from Initiate (5,000 ⟐) to Singularity (<span className={styles.helpCoin}>60,000 ⟐</span>). Prestige resets each season.
                 </div>
               </div>
 
@@ -321,48 +321,62 @@ export const VaultPage: FC<Props> = ({ onBack }) => {
         })}
       </section>
 
-      {/* Prestige Levels */}
+      {/* Prestige Ranks */}
       <section className={styles.section}>
         <h3 className={styles.sectionTitle}>PRESTIGE_RANK</h3>
-        {currentTitle && (
-          <div className={styles.currentTitleBanner}>
-            <span className={styles.currentTitleIcon}>{currentTitle.icon}</span>
-            <span className={styles.currentTitleName}>{currentTitle.display_name}</span>
+
+        {/* Current title hero */}
+        <div className={styles.prestigeHero}>
+          <div className={styles.prestigeHeroIcon}>
+            {currentTitle ? currentTitle.icon : '🔒'}
           </div>
-        )}
-        <div className={styles.prestigeList}>
-          {prestigeTitles.map((title, index) => {
+          <div className={styles.prestigeHeroInfo}>
+            <div className={styles.prestigeHeroName}>
+              {currentTitle ? currentTitle.display_name.toUpperCase() : 'UNRANKED'}
+            </div>
+            <div className={styles.prestigeHeroDesc}>
+              {currentTitle ? currentTitle.description : 'Complete sessions to earn coins and unlock your first rank'}
+            </div>
+            {(() => {
+              const nextTitle = currentTitle
+                ? prestigeTitles.find(t => t.unlock_threshold > (currentTitle?.unlock_threshold ?? 0))
+                : prestigeTitles[0];
+              if (!nextTitle) return (
+                <div className={styles.prestigeHeroMaxed}>MAXIMUM RANK ACHIEVED</div>
+              );
+              const prevThreshold = currentTitle?.unlock_threshold ?? 0;
+              const progress = Math.min(
+                Math.max((totalCoinsEarned - prevThreshold) / (nextTitle.unlock_threshold - prevThreshold), 0),
+                1
+              );
+              return (
+                <div className={styles.prestigeHeroProgress}>
+                  <div className={styles.prestigeProgressTrack}>
+                    <div className={styles.prestigeProgressFill} style={{ width: `${progress * 100}%` }} />
+                  </div>
+                  <span className={styles.prestigeProgressLabel}>
+                    {Math.floor(totalCoinsEarned).toLocaleString()} / {nextTitle.unlock_threshold.toLocaleString()} ⟐ → {nextTitle.display_name}
+                  </span>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+
+        {/* 4×3 prestige grid */}
+        <div className={styles.prestigeGrid}>
+          {prestigeTitles.map(title => {
             const unlocked = totalCoinsEarned >= title.unlock_threshold;
             const isCurrent = currentTitle?.id === title.id;
-            const nextTitle = index > 0 ? prestigeTitles[index - 1] : null;
-            const prevThreshold = nextTitle ? nextTitle.unlock_threshold : 0;
-            const segmentProgress = title.unlock_threshold > prevThreshold
-              ? Math.min(Math.max((totalCoinsEarned - prevThreshold) / (title.unlock_threshold - prevThreshold), 0), 1)
-              : 0;
-
             return (
               <div
                 key={title.id}
-                className={`${styles.prestigeItem} ${unlocked ? styles.prestigeUnlocked : ''} ${isCurrent ? styles.prestigeCurrent : ''}`}
+                className={`${styles.prestigeTile} ${unlocked ? styles.prestigeTileUnlocked : styles.prestigeTileLocked} ${isCurrent ? styles.prestigeTileCurrent : ''}`}
               >
-                <span className={styles.prestigeIcon}>{unlocked ? title.icon : '🔒'}</span>
-                <div className={styles.prestigeInfo}>
-                  <div className={styles.prestigeNameRow}>
-                    <span className={styles.prestigeName}>{title.display_name}</span>
-                    <span className={styles.prestigeThreshold}>
-                      {unlocked ? (
-                        <><Check size={10} /> UNLOCKED</>
-                      ) : (
-                        <>{title.unlock_threshold.toLocaleString()} ⟐</>
-                      )}
-                    </span>
-                  </div>
-                  <span className={styles.prestigeDesc}>{title.description}</span>
-                  {!unlocked && (
-                    <div className={styles.prestigeProgress}>
-                      <div className={styles.prestigeProgressFill} style={{ width: `${segmentProgress * 100}%` }} />
-                    </div>
-                  )}
+                <div className={styles.prestigeTileIcon}>{unlocked ? title.icon : '🔒'}</div>
+                <div className={styles.prestigeTileName}>{title.display_name}</div>
+                <div className={styles.prestigeTileThreshold}>
+                  {unlocked ? '✓ UNLOCKED' : `${title.unlock_threshold.toLocaleString()} ⟐`}
                 </div>
               </div>
             );

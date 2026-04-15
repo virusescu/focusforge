@@ -733,3 +733,141 @@
   border-radius: 6px;
   letter-spacing: 0.1em;
 }
+
+// ─── Prestige Hero ───────────────────────────────────────────────
+
+.prestigeHero {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  background: rgba(240, 192, 64, 0.06);
+  border: 1px solid rgba(240, 192, 64, 0.2);
+  border-radius: 4px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.prestigeHeroIcon {
+  font-size: 2.5rem;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.prestigeHeroInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.prestigeHeroName {
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: #f0c040;
+  text-shadow: 0 0 12px rgba(240, 192, 64, 0.5);
+  margin-bottom: 4px;
+}
+
+.prestigeHeroDesc {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  letter-spacing: 0.05em;
+}
+
+.prestigeHeroMaxed {
+  font-size: 0.7rem;
+  color: #f0c040;
+  letter-spacing: 0.1em;
+}
+
+.prestigeHeroProgress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.prestigeProgressTrack {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.prestigeProgressFill {
+  height: 100%;
+  background: linear-gradient(90deg, #f0c040, #ff9a3c);
+  border-radius: 2px;
+  transition: width 0.4s ease;
+}
+
+.prestigeProgressLabel {
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+}
+
+// ─── Prestige 4×3 Grid ──────────────────────────────────────────
+
+.prestigeGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.prestigeTile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 12px 8px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  text-align: center;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.prestigeTileLocked {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.05);
+  opacity: 0.45;
+}
+
+.prestigeTileUnlocked {
+  background: rgba(240, 192, 64, 0.08);
+  border-color: rgba(240, 192, 64, 0.15);
+}
+
+.prestigeTileCurrent {
+  background: rgba(240, 192, 64, 0.15);
+  border-color: rgba(240, 192, 64, 0.5);
+  box-shadow: 0 0 12px rgba(240, 192, 64, 0.2);
+}
+
+.prestigeTileIcon {
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.prestigeTileName {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-primary);
+  text-transform: uppercase;
+}
+
+.prestigeTileThreshold {
+  font-size: 0.55rem;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+}
+
+.prestigeTileUnlocked .prestigeTileName {
+  color: #f0c040;
+}
+
+.prestigeTileCurrent .prestigeTileName {
+  color: #f0c040;
+  text-shadow: 0 0 8px rgba(240, 192, 64, 0.5);
+}
