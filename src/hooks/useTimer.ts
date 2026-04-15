@@ -23,7 +23,9 @@ export const useTimer = (multiplier: number = 1) => {
         detail: {
           durationSeconds: secondsRef.current,
           startTime: startTimeRef.current ?? new Date().toISOString(),
-          pauseTimes: [...pauseTimesRef.current],
+          pauseTimes: lastPauseRef.current
+            ? [...pauseTimesRef.current, lastPauseRef.current]
+            : [...pauseTimesRef.current],
         },
       }));
     }

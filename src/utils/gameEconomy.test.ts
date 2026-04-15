@@ -106,10 +106,10 @@ describe('calculateSessionReward', () => {
     expect(result.totalCoins).toBe(5); // 10 * 0.5
   });
 
-  it('streak day 1 gives 1.0x (no bonus on first day)', () => {
+  it('streak day 1 gives 1.25x', () => {
     const result = calculateSessionReward({ ...baseInput, currentStreakDays: 1 });
-    expect(result.streakMultiplier).toBe(1.0);
-    expect(result.totalCoins).toBe(45); // 30 * 1.5 * 1.0
+    expect(result.streakMultiplier).toBe(1.25);
+    expect(result.totalCoins).toBe(56); // 30 * 1.5 * 1.25 = 56.25 → 56
   });
 
   it('streak day 2 gives 1.5x', () => {
@@ -207,8 +207,8 @@ describe('getStreakMultiplier', () => {
     expect(getStreakMultiplier(0)).toBe(1.0);
   });
 
-  it('returns 1.0x at day 1 (first day, no prior dailies)', () => {
-    expect(getStreakMultiplier(1)).toBe(1.0);
+  it('returns 1.25x at day 1', () => {
+    expect(getStreakMultiplier(1)).toBe(1.25);
   });
 
   it('returns 1.5x at day 2', () => {
