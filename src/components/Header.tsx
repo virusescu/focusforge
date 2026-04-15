@@ -2,8 +2,8 @@ import { type FC, useState, useEffect, useCallback } from 'react';
 import styles from './Header.module.scss';
 import { Shield, Radio, Wifi, Settings } from 'lucide-react';
 import { WindowControls } from './WindowControls';
-import { SettingsModal } from './SettingsModal';
 import { soundEngine } from '../utils/audio';
+import { setStatusHint, clearStatusHint } from '../utils/statusHint';
 import { useFocus } from '../contexts/FocusContext';
 import { useGame } from '../contexts/GameContext';
 import { getVersion } from '@tauri-apps/api/app';
@@ -33,8 +33,12 @@ function GameIndicators() {
   );
 }
 
-export const Header: FC = () => {
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+interface HeaderProps {
+  onOpenSettings: () => void;
+  onViewVault: () => void;
+}
+
+export const Header: FC<HeaderProps> = ({ onOpenSettings, onViewVault }) => {
   const [appVersion, setAppVersion] = useState('...');
   const { timerStatus } = useFocus();
   const { currentTitle } = useGame();
@@ -45,8 +49,8 @@ export const Header: FC = () => {
 
   const handleOpenSettings = useCallback(() => {
     soundEngine.playClick();
-    setIsSettingsOpen(true);
-  }, []);
+    onOpenSettings();
+  }, [onOpenSettings]);
 
   const getStatusConfig = () => {
     switch (timerStatus) {
@@ -69,10 +73,16 @@ export const Header: FC = () => {
           <span>{status.label}</span>
         </div>
         <div className={styles.divider} />
-        <div className={styles.rank}>
+        <button
+          className={styles.rankBtn}
+          onClick={() => { soundEngine.playClick(); onViewVault(); }}
+          onMouseEnter={() => setStatusHint('VIEW_FORGE_VAULT')}
+          onMouseLeave={clearStatusHint}
+          title="Open Forge Vault"
+        >
           <span className={styles.label}>PRESTIGE_RANK</span>
           <span className={styles.value}>{currentTitle?.display_name ?? 'UNRANKED'}</span>
-        </div>
+        </button>
       </div>
 
       <div className={styles.center} data-tauri-drag-region>
@@ -101,9 +111,6 @@ export const Header: FC = () => {
         <WindowControls />
       </div>
 
-      {isSettingsOpen && (
-        <SettingsModal onClose={() => setIsSettingsOpen(false)} />
-      )}
     </header>
   );
 };

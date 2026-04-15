@@ -4,6 +4,7 @@ import type { Update } from '@tauri-apps/plugin-updater';
 import { UpdatePrompt } from './components/UpdatePrompt';
 import { Header } from './components/Header';
 import { SidebarLeft } from './components/SidebarLeft';
+import { SettingsModal } from './components/SettingsModal';
 import { MainDisplay } from './components/MainDisplay';
 import { SidebarRight } from './components/SidebarRight';
 import { Footer } from './components/Footer';
@@ -26,6 +27,7 @@ function HudApp() {
   const [view, setView] = useState<'hud' | 'analytics' | 'intel' | 'vault'>('hud');
   const [analyticsDate, setAnalyticsDate] = useState<Date>(new Date());
   const [pendingNavigation, setPendingNavigation] = useState<{ target: 'analytics' | 'intel' | 'vault'; dateStr?: string } | null>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const { timerStatus, resetTimer } = useFocus();
   const [availableUpdate, setAvailableUpdate] = useState<Update | null>(null);
 
@@ -100,10 +102,10 @@ function HudApp() {
   <>
     <div className="hud-container">
       <GlitchOverlay />
-      <Header />
+      <Header onOpenSettings={() => setIsSettingsOpen(true)} onViewVault={handleViewVault} />
       {view === 'hud' ? (
         <>
-          <SidebarLeft />
+          <SidebarLeft onOpenSettings={() => setIsSettingsOpen(true)} />
           <MainDisplay onViewAnalytics={() => handleViewAnalytics()} onViewIntel={handleViewIntel} onViewVault={handleViewVault} />
           <SidebarRight onViewAnalytics={(date) => handleViewAnalytics(date)} onViewIntel={handleViewIntel} onViewVault={handleViewVault} />
         </>
@@ -125,6 +127,9 @@ function HudApp() {
     </div>
     <RewardToast />
     <SeasonTransitionModal />
+    {isSettingsOpen && (
+      <SettingsModal onClose={() => setIsSettingsOpen(false)} />
+    )}
     {availableUpdate && (
       <UpdatePrompt
         update={availableUpdate}
