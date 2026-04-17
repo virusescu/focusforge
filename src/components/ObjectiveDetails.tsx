@@ -329,7 +329,7 @@ export const ObjectiveDetails: FC<Props> = ({ onClose }) => {
               </div>
             </div>
           ) : (
-            <div className={styles.previewContainer}>
+            <div className={styles.previewContainer} onDoubleClick={handleEdit}>
               {renderedDetails ? (
                 <ToggleContext.Provider value={handleCheckboxToggle}>
                   <div className={styles.markdown}>
