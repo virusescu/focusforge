@@ -5,7 +5,7 @@ import remarkBreaks from 'remark-breaks';
 import styles from './ObjectiveDetails.module.scss';
 import { Edit3, Check, X, ClipboardList, Heading1, Heading2, Heading3, List, ListChecks, Strikethrough, Table, Bold, Italic, Link2 } from 'lucide-react';
 import { useFocus } from '../contexts/FocusContext';
-import { soundEngine } from '../utils/audio';
+import { soundEngine, playCheckboxCheckWithFile } from '../utils/audio';
 import { open } from '@tauri-apps/plugin-shell';
 
 // ─── Remark plugin: embed 0-indexed source line on each task list item ──────────
@@ -237,7 +237,7 @@ export const ObjectiveDetails: FC<Props> = ({ onClose }) => {
     const line = lines[lineIndex];
     if (/\[ \]/.test(line)) {
       lines[lineIndex] = line.replace('[ ]', '[x]');
-      soundEngine.playCheckboxCheck();
+      playCheckboxCheckWithFile();
     } else if (/\[x\]/i.test(line)) {
       lines[lineIndex] = line.replace(/\[x\]/i, '[ ]');
       soundEngine.playCheckboxUncheck();

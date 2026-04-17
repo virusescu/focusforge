@@ -491,6 +491,18 @@ export async function playObjectiveComplete(): Promise<void> {
   }
 }
 
+export async function playCheckboxCheckWithFile(): Promise<void> {
+  try {
+    const soundIndex = Math.floor(Math.random() * 6) + 1;
+    const audio = new Audio(`/sounds/checkbox-check-${soundIndex}.mp3`);
+    audio.volume = 0.8 + Math.random() * 0.15;
+    audio.playbackRate = 0.95 + Math.random() * 0.1;
+    await audio.play();
+  } catch {
+    soundEngine.playCheckboxCheck();
+  }
+}
+
 export async function playChargeClickWithFile(step: number): Promise<void> {
   try {
     const audio = new Audio(`./sounds/charge-${step}.mp3`);
