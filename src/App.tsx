@@ -29,7 +29,7 @@ function HudApp() {
   const [pendingNavigation, setPendingNavigation] = useState<{ target: 'analytics' | 'intel' | 'vault'; dateStr?: string } | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [detailsPanelOpen, setDetailsPanelOpen] = useState(false);
-  const { timerStatus, resetTimer } = useFocus();
+  const { timerStatus, resetTimer, activeObjectiveId } = useFocus();
   const [availableUpdate, setAvailableUpdate] = useState<Update | null>(null);
 
   useEffect(() => {
@@ -45,6 +45,14 @@ function HudApp() {
       console.error('Update check failed:', err);
     });
   }, []);
+
+  useEffect(() => {
+    if (activeObjectiveId !== null) {
+      setDetailsPanelOpen(true);
+    } else {
+      setDetailsPanelOpen(false);
+    }
+  }, [activeObjectiveId]);
 
   const handleViewAnalytics = (dateStr?: string) => {
     if (timerStatus !== 'idle') {

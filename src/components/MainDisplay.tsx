@@ -144,6 +144,7 @@ export const MainDisplay: FC<{ onViewAnalytics?: () => void; onViewIntel?: () =>
         <div
           className={styles.objectiveHUD}
           onClick={handleChargeClick}
+          role="button"
         >
           <span className={styles.hudLabel}>ACTIVE_OBJECTIVE // LOCKED_ON</span>
           <div className={styles.hudText}>{activeObjective.text}</div>

@@ -383,6 +383,59 @@ class SoundEngine {
     });
   }
 
+  playNavSelect() {
+    const ctx = this.init();
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(1100, t);
+    osc.frequency.exponentialRampToValueAtTime(1400, t + 0.04);
+    gain.gain.setValueAtTime(0.04, t);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.07);
+  }
+
+  playCheckboxCheck() {
+    const ctx = this.init();
+    const t = ctx.currentTime;
+    const playTone = (freq: number, start: number, dur: number, vol: number) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, t + start);
+      osc.frequency.exponentialRampToValueAtTime(freq * 1.6, t + start + dur);
+      gain.gain.setValueAtTime(vol, t + start);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + start + dur);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t + start);
+      osc.stop(t + start + dur + 0.01);
+    };
+    playTone(660, 0, 0.07, 0.07);
+    playTone(990, 0.06, 0.12, 0.05);
+    playTone(1320, 0.14, 0.1, 0.035);
+  }
+
+  playCheckboxUncheck() {
+    const ctx = this.init();
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(900, t);
+    osc.frequency.exponentialRampToValueAtTime(500, t + 0.07);
+    gain.gain.setValueAtTime(0.04, t);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.08);
+  }
+
   playSeasonComplete() {
     const ctx = this.init();
     const t = ctx.currentTime;

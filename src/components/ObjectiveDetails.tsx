@@ -3,9 +3,10 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import styles from './ObjectiveDetails.module.scss';
-import { Edit3, Check, X, ClipboardList, Heading1, Heading2, Heading3, List, ListChecks, Strikethrough, Table } from 'lucide-react';
+import { Edit3, Check, X, ClipboardList, Heading1, Heading2, Heading3, List, ListChecks, Strikethrough, Table, Bold, Italic, Link2 } from 'lucide-react';
 import { useFocus } from '../contexts/FocusContext';
 import { soundEngine } from '../utils/audio';
+import { open } from '@tauri-apps/plugin-shell';
 
 // ─── Remark plugin: embed 0-indexed source line on each task list item ──────────
 // This runs on the MDAST after remark-gfm has set node.checked,
@@ -58,8 +59,18 @@ const TaskCheckbox: FC<any> = ({ node, ...props }) => {
   );
 };
 
+const ExternalLink: FC<any> = ({ href, children, ...props }) => (
+  <a
+    {...props}
+    href={href}
+    onClick={(e) => { e.preventDefault(); if (href) open(href); }}
+  >
+    {children}
+  </a>
+);
+
 // Single stable components object — ReactMarkdown won't remount on every render
-const MARKDOWN_COMPONENTS = { li: TaskListItem, input: TaskCheckbox };
+const MARKDOWN_COMPONENTS = { li: TaskListItem, input: TaskCheckbox, a: ExternalLink };
 
 // ─── Main component ───────────────────────────────────────────────────────────────
 interface Props {
@@ -73,6 +84,18 @@ export const ObjectiveDetails: FC<Props> = ({ onClose }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const asideRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const handleMouseDown = (e: MouseEvent) => {
+      if (asideRef.current?.contains(e.target as Node)) return;
+      const target = e.target as Element;
+      if (target.closest('[data-details-barrier], button, input, select, a, textarea, [role="button"]')) return;
+      onClose();
+    };
+    document.addEventListener('mousedown', handleMouseDown);
+    return () => document.removeEventListener('mousedown', handleMouseDown);
+  }, [onClose]);
 
   useEffect(() => {
     setIsEditing(false);
@@ -132,6 +155,25 @@ export const ObjectiveDetails: FC<Props> = ({ onClose }) => {
     }, 0);
   }, [editText]);
 
+  const insertLink = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    soundEngine.playClick();
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selected = editText.slice(start, end);
+    const linkText = selected || 'link text';
+    const insertion = `[${linkText}](url)`;
+    const newText = editText.slice(0, start) + insertion + editText.slice(end);
+    setEditText(newText);
+    const urlStart = start + linkText.length + 3;
+    const urlEnd = urlStart + 3;
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(urlStart, urlEnd);
+    }, 0);
+  }, [editText]);
+
   const insertTemplate = useCallback((template: string) => {
     const textarea = textareaRef.current;
     if (!textarea) return;
@@ -155,29 +197,37 @@ export const ObjectiveDetails: FC<Props> = ({ onClose }) => {
     if (e.key === 'Escape') {
       e.preventDefault();
       if (e.shiftKey) {
-        handleCancel(); // Shift+Escape → discard changes
+        handleCancel();
       } else {
-        handleSave();   // Escape → save
+        handleSave();
       }
       return;
     }
-    if (e.key === 'd' && e.ctrlKey) {
-      e.preventDefault();
-      soundEngine.playClick();
-      const textarea = e.currentTarget;
-      const pos = textarea.selectionStart;
-      const value = editText;
-      const lineStart = value.lastIndexOf('\n', pos - 1) + 1;
-      const lineEndIdx = value.indexOf('\n', pos);
-      const lineEnd = lineEndIdx === -1 ? value.length : lineEndIdx;
-      const currentLine = value.slice(lineStart, lineEnd);
-      const newText = value.slice(0, lineEnd) + '\n' + currentLine + value.slice(lineEnd);
-      setEditText(newText);
-      const newPos = lineEnd + 1 + (pos - lineStart);
-      setTimeout(() => {
-        textarea.focus();
-        textarea.setSelectionRange(newPos, newPos);
-      }, 0);
+    if (e.ctrlKey) {
+      if (e.key === 'b' || e.key === 'B') { e.preventDefault(); wrapSelection('**', '**'); return; }
+      if (e.key === 'i' || e.key === 'I') { e.preventDefault(); wrapSelection('*', '*'); return; }
+      if (e.key === 's' || e.key === 'S') { e.preventDefault(); wrapSelection('~~', '~~'); return; }
+      if (e.key === '1') { e.preventDefault(); insertTemplate('# '); return; }
+      if (e.key === '2') { e.preventDefault(); insertTemplate('## '); return; }
+      if (e.key === '3') { e.preventDefault(); insertTemplate('### '); return; }
+      if (e.key === 'd' || e.key === 'D') {
+        e.preventDefault();
+        soundEngine.playClick();
+        const textarea = e.currentTarget;
+        const pos = textarea.selectionStart;
+        const value = editText;
+        const lineStart = value.lastIndexOf('\n', pos - 1) + 1;
+        const lineEndIdx = value.indexOf('\n', pos);
+        const lineEnd = lineEndIdx === -1 ? value.length : lineEndIdx;
+        const currentLine = value.slice(lineStart, lineEnd);
+        const newText = value.slice(0, lineEnd) + '\n' + currentLine + value.slice(lineEnd);
+        setEditText(newText);
+        const newPos = lineEnd + 1 + (pos - lineStart);
+        setTimeout(() => {
+          textarea.focus();
+          textarea.setSelectionRange(newPos, newPos);
+        }, 0);
+      }
     }
   };
 
@@ -187,10 +237,11 @@ export const ObjectiveDetails: FC<Props> = ({ onClose }) => {
     const line = lines[lineIndex];
     if (/\[ \]/.test(line)) {
       lines[lineIndex] = line.replace('[ ]', '[x]');
+      soundEngine.playCheckboxCheck();
     } else if (/\[x\]/i.test(line)) {
       lines[lineIndex] = line.replace(/\[x\]/i, '[ ]');
+      soundEngine.playCheckboxUncheck();
     }
-    soundEngine.playClick();
     updateObjectiveDetails(activeObjective.id, lines.join('\n'));
   }, [activeObjective, updateObjectiveDetails]);
 
@@ -204,7 +255,7 @@ export const ObjectiveDetails: FC<Props> = ({ onClose }) => {
     : null;
 
   return (
-    <aside className={styles.sidebar}>
+    <aside className={styles.sidebar} ref={asideRef as any}>
       <div className="card" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <div className={styles.header}>
           <div className={styles.titleRow}>
@@ -242,20 +293,31 @@ export const ObjectiveDetails: FC<Props> = ({ onClose }) => {
                 </div>
                 <div className={styles.toolbarDivider} />
                 <div className={styles.toolbarGroup}>
+                  <button className={styles.toolBtn} onClick={() => wrapSelection('**', '**')} title="Bold (Ctrl+B)">
+                    <Bold size={13} />
+                  </button>
+                  <button className={styles.toolBtn} onClick={() => wrapSelection('*', '*')} title="Italic (Ctrl+I)">
+                    <Italic size={13} />
+                  </button>
+                  <button className={styles.toolBtn} onClick={() => wrapSelection('~~', '~~')} title="Strikethrough (Ctrl+S)">
+                    <Strikethrough size={13} />
+                  </button>
+                </div>
+                <div className={styles.toolbarDivider} />
+                <div className={styles.toolbarGroup}>
                   <button className={styles.toolBtn} onClick={() => insertTemplate('- Item 1\n- Item 2\n- Item 3')} title="Bullet list">
                     <List size={13} />
                   </button>
                   <button className={styles.toolBtn} onClick={() => insertTemplate('- [ ] Task 1\n- [ ] Task 2\n- [ ] Task 3')} title="Task list">
                     <ListChecks size={13} />
                   </button>
-                  <button className={styles.toolBtn} onClick={() => wrapSelection('~~', '~~')} title="Strikethrough">
-                    <Strikethrough size={13} />
+                  <button className={styles.toolBtn} onClick={insertLink} title="Insert link">
+                    <Link2 size={13} />
                   </button>
                   <button className={styles.toolBtn} onClick={() => insertTemplate('| Col 1       | Col 2       | Col 3       |\n| :---        |    :---:    |        ---: |\n| Cell        | Cell        | Cell        |\n| Cell        | Cell        | Cell        |')} title="Table">
                     <Table size={13} />
                   </button>
                 </div>
-                <span className={styles.toolbarHint}>Esc saves · Shift+Esc reverts · Ctrl+D dupes line</span>
               </div>
               <div className={styles.editActions}>
                 <button className={styles.saveBtn} onClick={handleSave}>

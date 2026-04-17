@@ -315,13 +315,29 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenSettings }) => {
     setActiveObjective(id === activeObjectiveId ? null : id);
   };
 
-  // Arrow key shortcuts: Left/Right switch view; Shift+Up/Down/Home/End reorder active objective
+  // Arrow key shortcuts: Left/Right switch view; Up/Down select adjacent; Shift+Up/Down/Home/End reorder
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if (!e.shiftKey) {
-        if (e.key === 'ArrowLeft') switchObjectiveView('mission');
-        else if (e.key === 'ArrowRight') switchObjectiveView('backlog');
+        if (e.key === 'ArrowLeft') { switchObjectiveView('mission'); return; }
+        if (e.key === 'ArrowRight') { switchObjectiveView('backlog'); return; }
+        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+          e.preventDefault();
+          if (displayedObjectives.length === 0) return;
+          const idx = displayedObjectives.findIndex(o => o.id === activeObjectiveId);
+          let nextIdx: number;
+          if (idx === -1) {
+            nextIdx = e.key === 'ArrowDown' ? 0 : displayedObjectives.length - 1;
+          } else {
+            nextIdx = e.key === 'ArrowUp' ? Math.max(0, idx - 1) : Math.min(displayedObjectives.length - 1, idx + 1);
+          }
+          if (nextIdx !== idx) {
+            setActiveObjective(displayedObjectives[nextIdx].id);
+            soundEngine.playNavSelect();
+          }
+          return;
+        }
         return;
       }
       if (activeObjectiveId === null) return;
@@ -345,12 +361,12 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenSettings }) => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [switchObjectiveView, activeObjectiveId, displayedObjectives, reorderObjectives]);
+  }, [switchObjectiveView, activeObjectiveId, displayedObjectives, reorderObjectives, setActiveObjective]);
 
-  if (loading) return <aside className={styles.sidebar}>LOADING...</aside>;
+  if (loading) return <aside className={styles.sidebar} data-details-barrier>LOADING...</aside>;
 
   return (
-    <aside className={styles.sidebar}>
+    <aside className={styles.sidebar} data-details-barrier>
       <div className="card">
         <div
           className={styles.operatorCard}
