@@ -3,7 +3,7 @@ const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frida
 export function formatDateWithWeekday(dateStr: string): string {
   const [year, month, day] = dateStr.split('-').map(Number);
   const d = new Date(year, month - 1, day);
-  return `${WEEKDAYS[d.getDay()]} ${dateStr}`;
+  return `${dateStr} ${WEEKDAYS[d.getDay()]}`;
 }
 
 export function formatDateObjWithWeekday(date: Date): string {
@@ -21,5 +21,5 @@ export function formatNowWithWeekday(): string {
   const h = String(now.getHours()).padStart(2, '0');
   const min = String(now.getMinutes()).padStart(2, '0');
   const s = String(now.getSeconds()).padStart(2, '0');
-  return `${WEEKDAYS[now.getDay()]} ${y}-${m}-${d} ${h}:${min}:${s}`;
+  return `${y}-${m}-${d} ${WEEKDAYS[now.getDay()]} ${h}:${min}:${s}`;
 }
