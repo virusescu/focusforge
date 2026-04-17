@@ -20,7 +20,8 @@ import {
   addCategory as dbAddCategory,
   updateCategory as dbUpdateCategory,
   deleteCategory as dbDeleteCategory,
-  updateObjectiveCategory as dbUpdateObjectiveCategory
+  updateObjectiveCategory as dbUpdateObjectiveCategory,
+  updateObjectiveDetails as dbUpdateObjectiveDetails
 } from '../db';
 
 interface FocusContextType {
@@ -43,6 +44,7 @@ interface FocusContextType {
   deleteObjective: (id: number) => Promise<void>;
   updateObjective: (id: number, text: string) => Promise<void>;
   updateObjectiveCategory: (id: number, categoryId: number | null) => Promise<void>;
+  updateObjectiveDetails: (id: number, details: string | null) => Promise<void>;
   setActiveObjective: (id: number | null) => void;
   neutralizeObjective: (id: number) => Promise<void>;
   reorderObjectives: (orderedIds: number[]) => Promise<void>;
@@ -218,6 +220,11 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
     await refreshData();
   }, [refreshData]);
 
+  const updateObjectiveDetails = useCallback(async (id: number, details: string | null) => {
+    await dbUpdateObjectiveDetails(id, details);
+    setObjectivePool(prev => prev.map(o => o.id === id ? { ...o, details } : o));
+  }, []);
+
   const addCategory = useCallback(async (label: string, color: string, coinBounty?: number) => {
     if (!authUser) return;
     await dbAddCategory(authUser.id, label, color, coinBounty);
@@ -303,6 +310,7 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
       deleteObjective,
       updateObjective,
       updateObjectiveCategory,
+      updateObjectiveDetails,
       setActiveObjective,
       neutralizeObjective,
       reorderObjectives,

@@ -99,12 +99,20 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, categories, onSele
     }
   };
 
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    if (isEditing) return;
+    e.stopPropagation();
+    soundEngine.playEditStart();
+    setIsEditing(true);
+  };
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={`${styles.objectiveItem} ${isActive ? styles.activeObjective : ''}`}
       onClick={handleClick}
+      onDoubleClick={handleDoubleClick}
       onMouseEnter={onHover}
     >
       <button
@@ -307,19 +315,37 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenSettings }) => {
     setActiveObjective(id === activeObjectiveId ? null : id);
   };
 
-  // Left/Right arrow keys switch objective view
+  // Arrow key shortcuts: Left/Right switch view; Shift+Up/Down/Home/End reorder active objective
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (e.key === 'ArrowLeft') {
-        switchObjectiveView('mission');
-      } else if (e.key === 'ArrowRight') {
-        switchObjectiveView('backlog');
+      if (!e.shiftKey) {
+        if (e.key === 'ArrowLeft') switchObjectiveView('mission');
+        else if (e.key === 'ArrowRight') switchObjectiveView('backlog');
+        return;
+      }
+      if (activeObjectiveId === null) return;
+      const idx = displayedObjectives.findIndex(o => o.id === activeObjectiveId);
+      if (idx === -1) return;
+      let newOrder: typeof displayedObjectives | null = null;
+      if (e.key === 'ArrowUp' && idx > 0) {
+        newOrder = arrayMove(displayedObjectives, idx, idx - 1);
+      } else if (e.key === 'ArrowDown' && idx < displayedObjectives.length - 1) {
+        newOrder = arrayMove(displayedObjectives, idx, idx + 1);
+      } else if (e.key === 'Home' && idx > 0) {
+        newOrder = arrayMove(displayedObjectives, idx, 0);
+      } else if (e.key === 'End' && idx < displayedObjectives.length - 1) {
+        newOrder = arrayMove(displayedObjectives, idx, displayedObjectives.length - 1);
+      }
+      if (newOrder) {
+        e.preventDefault();
+        soundEngine.playReorder();
+        reorderObjectives(newOrder.map(o => o.id));
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [switchObjectiveView]);
+  }, [switchObjectiveView, activeObjectiveId, displayedObjectives, reorderObjectives]);
 
   if (loading) return <aside className={styles.sidebar}>LOADING...</aside>;
 

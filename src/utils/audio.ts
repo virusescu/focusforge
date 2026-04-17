@@ -297,6 +297,92 @@ class SoundEngine {
     });
   }
 
+  playDetailsOpen() {
+    const ctx = this.init();
+    const t = ctx.currentTime;
+    // Soft rising two-tone sweep — panel sliding in
+    [440, 660].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, t + i * 0.04);
+      osc.frequency.exponentialRampToValueAtTime(freq * 1.5, t + i * 0.04 + 0.12);
+      gain.gain.setValueAtTime(0.05, t + i * 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.04 + 0.18);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t + i * 0.04);
+      osc.stop(t + i * 0.04 + 0.2);
+    });
+  }
+
+  playDetailsClose() {
+    const ctx = this.init();
+    const t = ctx.currentTime;
+    // Mirror of open — descending sweep
+    [660, 440].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, t + i * 0.04);
+      osc.frequency.exponentialRampToValueAtTime(freq * 0.67, t + i * 0.04 + 0.12);
+      gain.gain.setValueAtTime(0.04, t + i * 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.04 + 0.16);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t + i * 0.04);
+      osc.stop(t + i * 0.04 + 0.18);
+    });
+  }
+
+  playReorder() {
+    const ctx = this.init();
+    const t = ctx.currentTime;
+    // Short tick then a soft thud
+    const tick = ctx.createOscillator();
+    const tickGain = ctx.createGain();
+    tick.type = 'sine';
+    tick.frequency.setValueAtTime(1400, t);
+    tick.frequency.exponentialRampToValueAtTime(900, t + 0.04);
+    tickGain.gain.setValueAtTime(0.06, t);
+    tickGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+    tick.connect(tickGain);
+    tickGain.connect(ctx.destination);
+    tick.start(t);
+    tick.stop(t + 0.06);
+
+    const thud = ctx.createOscillator();
+    const thudGain = ctx.createGain();
+    thud.type = 'sine';
+    thud.frequency.setValueAtTime(200, t + 0.04);
+    thud.frequency.exponentialRampToValueAtTime(80, t + 0.1);
+    thudGain.gain.setValueAtTime(0.08, t + 0.04);
+    thudGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+    thud.connect(thudGain);
+    thudGain.connect(ctx.destination);
+    thud.start(t + 0.04);
+    thud.stop(t + 0.15);
+  }
+
+  playEditStart() {
+    const ctx = this.init();
+    const t = ctx.currentTime;
+    // Double-click feel: two quick high taps
+    [0, 0.07].forEach(delay => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1600, t + delay);
+      osc.frequency.exponentialRampToValueAtTime(1200, t + delay + 0.05);
+      gain.gain.setValueAtTime(0.055, t + delay);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + delay + 0.06);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t + delay);
+      osc.stop(t + delay + 0.07);
+    });
+  }
+
   playSeasonComplete() {
     const ctx = this.init();
     const t = ctx.currentTime;

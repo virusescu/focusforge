@@ -1,11 +1,12 @@
 import { type FC, useEffect, useRef, useState, useCallback } from 'react';
 import styles from './SidebarRight.module.scss';
-import { Terminal, Activity, History, BarChart2, Gem } from 'lucide-react';
+import { Terminal, Activity, History, BarChart2, Gem, ClipboardList } from 'lucide-react';
 import { useSystemLog } from '../hooks/useSystemLog';
 import { useFocus } from '../contexts/FocusContext';
 import { soundEngine } from '../utils/audio';
 import { setStatusHint, clearStatusHint } from '../utils/statusHint';
 import { isWorkDay } from '../utils/gameEconomy';
+import { ObjectiveDetails } from './ObjectiveDetails';
 
 type RGB = [number, number, number];
 
@@ -54,11 +55,26 @@ interface Props {
   onViewAnalytics: (date?: string) => void;
   onViewIntel: () => void;
   onViewVault: () => void;
+  detailsPanelOpen: boolean;
+  onOpenDetails: () => void;
+  onCloseDetails: () => void;
 }
 
-export const SidebarRight: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVault }) => {
+export const SidebarRight: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVault, detailsPanelOpen, onOpenDetails, onCloseDetails }) => {
   const { logs } = useSystemLog();
-  const { dailyStats, recentSessions } = useFocus();
+  const { dailyStats, recentSessions, activeObjectiveId } = useFocus();
+
+  useEffect(() => {
+    if (!detailsPanelOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) {
+        soundEngine.playDetailsClose();
+        onCloseDetails();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [detailsPanelOpen, onCloseDetails]);
   const logContainerRef = useRef<HTMLDivElement>(null);
 
   const [hoveredCell, setHoveredCell] = useState<{ date: string; time: string } | null>(null);
@@ -125,6 +141,10 @@ export const SidebarRight: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVa
     soundEngine.playClick();
     onViewVault();
   }, [onViewVault]);
+
+  if (detailsPanelOpen) {
+    return <ObjectiveDetails onClose={() => { soundEngine.playDetailsClose(); onCloseDetails(); }} />;
+  }
 
   return (
     <aside className={styles.sidebar}>
@@ -217,6 +237,16 @@ export const SidebarRight: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVa
           style={{ '--btn-color': '#f0c040' } as any}
         >
           <Gem size={24} />
+        </button>
+        <button
+          className={styles.navBtn}
+          onClick={() => { soundEngine.playDetailsOpen(); onOpenDetails(); }}
+          onMouseEnter={() => { soundEngine.playHover(); setStatusHint('OBJECTIVE_DETAILS'); }}
+          onMouseLeave={clearStatusHint}
+          disabled={activeObjectiveId === null}
+          style={{ '--btn-color': '#ee682b', opacity: activeObjectiveId === null ? 0.3 : 1 } as any}
+        >
+          <ClipboardList size={24} />
         </button>
       </div>
     </aside>

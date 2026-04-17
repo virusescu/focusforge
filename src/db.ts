@@ -220,6 +220,13 @@ export async function initDb() {
     // Column already exists — no action needed
   }
 
+  // Add details column to objectives
+  try {
+    await database.execute(`ALTER TABLE objectives ADD COLUMN details TEXT`);
+  } catch {
+    // Column already exists — no action needed
+  }
+
   // Migrate prestige titles to 12 titles with even 5k spacing
   try {
     await database.execute(`UPDATE game_prestige_titles SET unlock_threshold = 5000  WHERE id = 1`);
@@ -569,6 +576,7 @@ export async function getObjectives(userId: number): Promise<StrategicObjective[
     sort_order: row.sort_order as number,
     category_id: row.category_id as number | null,
     is_mission: (row.is_mission as number) ?? 1,
+    details: row.details as string | null,
   }));
 }
 
@@ -628,6 +636,14 @@ export async function updateObjectiveCategory(id: number, categoryId: number | n
   await database.execute({
     sql: 'UPDATE objectives SET category_id = ? WHERE id = ?',
     args: [categoryId, id],
+  });
+}
+
+export async function updateObjectiveDetails(id: number, details: string | null): Promise<void> {
+  const database = getDb();
+  await database.execute({
+    sql: 'UPDATE objectives SET details = ? WHERE id = ?',
+    args: [details, id],
   });
 }
 

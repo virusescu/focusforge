@@ -4,7 +4,7 @@ import { Play, Pause, RotateCcw, Zap, Target } from 'lucide-react';
 import { useFocus } from '../contexts/FocusContext';
 import { soundEngine, playChargeClickWithFile } from '../utils/audio';
 
-export const MainDisplay: FC<{ onViewAnalytics?: () => void; onViewIntel?: () => void; onViewVault?: () => void }> = ({ onViewAnalytics, onViewIntel, onViewVault }) => {
+export const MainDisplay: FC<{ onViewAnalytics?: () => void; onViewIntel?: () => void; onViewVault?: () => void; onOpenDetails?: () => void; detailsPanelOpen?: boolean }> = ({ onViewAnalytics, onViewIntel, onViewVault, onOpenDetails, detailsPanelOpen }) => {
   const { 
     activeObjectiveId, 
     objectivePool, 
@@ -79,11 +79,18 @@ export const MainDisplay: FC<{ onViewAnalytics?: () => void; onViewIntel?: () =>
         e.preventDefault();
         toggleTimer();
       } else if (e.key === 'Escape') {
+        if (detailsPanelOpen) return;
         resetTimer();
       } else if (e.key === 'Enter' && e.ctrlKey) {
         if (activeObjectiveId !== null && isActive) {
           e.preventDefault();
           handleNeutralize();
+        }
+      } else if (e.key === 'Enter' && !e.ctrlKey && !e.shiftKey) {
+        if (activeObjectiveId !== null && onOpenDetails && !detailsPanelOpen) {
+          e.preventDefault();
+          soundEngine.playDetailsOpen();
+          onOpenDetails();
         }
       } else if (e.key.toLowerCase() === 'a') {
         if (onViewAnalytics) {
@@ -105,7 +112,7 @@ export const MainDisplay: FC<{ onViewAnalytics?: () => void; onViewIntel?: () =>
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [toggleTimer, resetTimer, onViewAnalytics, onViewIntel, onViewVault, activeObjectiveId, isActive, handleNeutralize]);
+  }, [toggleTimer, resetTimer, onViewAnalytics, onViewIntel, onViewVault, activeObjectiveId, isActive, handleNeutralize, onOpenDetails, detailsPanelOpen]);
 
   const handleHover = () => {
     soundEngine.playHover();
@@ -134,8 +141,8 @@ export const MainDisplay: FC<{ onViewAnalytics?: () => void; onViewIntel?: () =>
   return (
     <main className={styles.container}>
       {activeObjective && (
-        <div 
-          className={styles.objectiveHUD} 
+        <div
+          className={styles.objectiveHUD}
           onClick={handleChargeClick}
         >
           <span className={styles.hudLabel}>ACTIVE_OBJECTIVE // LOCKED_ON</span>

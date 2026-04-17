@@ -28,6 +28,7 @@ function HudApp() {
   const [analyticsDate, setAnalyticsDate] = useState<Date>(new Date());
   const [pendingNavigation, setPendingNavigation] = useState<{ target: 'analytics' | 'intel' | 'vault'; dateStr?: string } | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [detailsPanelOpen, setDetailsPanelOpen] = useState(false);
   const { timerStatus, resetTimer } = useFocus();
   const [availableUpdate, setAvailableUpdate] = useState<Update | null>(null);
 
@@ -106,8 +107,8 @@ function HudApp() {
       {view === 'hud' ? (
         <>
           <SidebarLeft onOpenSettings={() => setIsSettingsOpen(true)} />
-          <MainDisplay onViewAnalytics={() => handleViewAnalytics()} onViewIntel={handleViewIntel} onViewVault={handleViewVault} />
-          <SidebarRight onViewAnalytics={(date) => handleViewAnalytics(date)} onViewIntel={handleViewIntel} onViewVault={handleViewVault} />
+          <MainDisplay onViewAnalytics={() => handleViewAnalytics()} onViewIntel={handleViewIntel} onViewVault={handleViewVault} onOpenDetails={() => setDetailsPanelOpen(true)} detailsPanelOpen={detailsPanelOpen} />
+          <SidebarRight onViewAnalytics={(date) => handleViewAnalytics(date)} onViewIntel={handleViewIntel} onViewVault={handleViewVault} detailsPanelOpen={detailsPanelOpen} onOpenDetails={() => setDetailsPanelOpen(true)} onCloseDetails={() => setDetailsPanelOpen(false)} />
         </>
       ) : view === 'analytics' ? (
         <AnalyticsView initialDate={analyticsDate} onBack={() => setView('hud')} />
