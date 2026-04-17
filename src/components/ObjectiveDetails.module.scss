@@ -271,14 +271,11 @@
   li {
     margin: 0.25rem 0;
 
-    // Task item layout
+    // Task item layout — keep inline flow so text + links don't become separate flex items
     &:has(> input[type="checkbox"]) {
-      display: flex;
-      align-items: center;
-
       > input[type="checkbox"] {
-        margin-right: 0.4rem;
-        flex-shrink: 0;
+        vertical-align: middle;
+        margin-right: 0.35rem;
       }
     }
   }
