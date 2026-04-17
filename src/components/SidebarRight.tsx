@@ -6,6 +6,7 @@ import { useFocus } from '../contexts/FocusContext';
 import { soundEngine } from '../utils/audio';
 import { setStatusHint, clearStatusHint } from '../utils/statusHint';
 import { isWorkDay } from '../utils/gameEconomy';
+import { formatDateWithWeekday } from '../utils/dateUtils';
 import { ObjectiveDetails } from './ObjectiveDetails';
 
 type RGB = [number, number, number];
@@ -184,7 +185,7 @@ export const SidebarRight: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVa
         {/* Interactive Hover Overlay */}
         {hoveredCell && (
           <div className={styles.hoverTooltip}>
-            {hoveredCell.date}: <span className={styles.highlight}>{hoveredCell.time}</span>
+            {formatDateWithWeekday(hoveredCell.date)}: <span className={styles.highlight}>{hoveredCell.time}</span>
           </div>
         )}
       </div>
@@ -200,7 +201,7 @@ export const SidebarRight: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVa
           ) : (
             recentSessions.map(session => (
               <div key={session.id} className={styles.recentItem}>
-                <span className={styles.sessionDate}>{session.date}</span>
+                <span className={styles.sessionDate}>{formatDateWithWeekday(session.date)}</span>
                 <span className={styles.sessionDuration}>
                   {Math.floor(session.duration_seconds / 60)}m
                 </span>
