@@ -249,11 +249,11 @@
 
   a {
     color: #00f2ff;
-    text-decoration: underline;
-    text-underline-offset: 2px;
+    text-decoration: none;
 
     &:hover {
-      opacity: 0.8;
+      text-decoration: underline;
+      text-underline-offset: 2px;
     }
   }
 
@@ -275,7 +275,11 @@
     &:has(> input[type="checkbox"]) {
       display: flex;
       align-items: center;
-      gap: 0.4rem;
+
+      > input[type="checkbox"] {
+        margin-right: 0.4rem;
+        flex-shrink: 0;
+      }
     }
   }
 
