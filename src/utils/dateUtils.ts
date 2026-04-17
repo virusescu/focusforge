@@ -6,6 +6,13 @@ export function formatDateWithWeekday(dateStr: string): string {
   return `${WEEKDAYS[d.getDay()]} ${dateStr}`;
 }
 
+export function formatDateObjWithWeekday(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return formatDateWithWeekday(`${y}-${m}-${d}`);
+}
+
 export function formatNowWithWeekday(): string {
   const now = new Date();
   const y = now.getFullYear();

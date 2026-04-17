@@ -3,6 +3,7 @@ import styles from './AnalyticsView.module.scss';
 import { ChevronLeft, ChevronRight, ArrowLeft, BarChart2, X, HelpCircle, Edit3, Check } from 'lucide-react';
 import { getSessionsForDay, deleteFocusSession, updateFocusSession, getCompletedObjectivesForDay, getKillRate, deleteObjective as dbDeleteObjective, updateObjective as dbUpdateObjective, updateObjectiveCompletedAt as dbUpdateObjectiveCompletedAt, addCategory as dbAddCategory, updateCategory as dbUpdateCategory, deleteCategory as dbDeleteCategory } from '../db';
 import { useFocus } from '../contexts/FocusContext';
+import { formatDateObjWithWeekday } from '../utils/dateUtils';
 import { useUser } from '../contexts/UserContext';
 import { useAuth } from '../contexts/AuthContext';
 import type { FocusSession, StrategicObjective } from '../types';
@@ -468,7 +469,7 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
             </button>
             <div className={styles.currentDate}>
               <span className={styles.label}>DAY:</span>
-              <span className={styles.value}>{currentDate.toLocaleDateString()}</span>
+              <span className={styles.value}>{formatDateObjWithWeekday(currentDate)}</span>
             </div>
             <button onClick={() => changeDay(1)} className={styles.navBtn} onMouseEnter={handleHover}>
               <ChevronRight size={20} />
