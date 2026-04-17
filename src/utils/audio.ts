@@ -477,13 +477,12 @@ export const playBoom = () => soundEngine.playBoom();
 
 export async function playObjectiveComplete(): Promise<void> {
   try {
-    const soundIndex = Math.floor(Math.random() * 6) + 1;
+    const count = await probeSoundCount('objective-complete');
+    if (count === 0) { soundEngine.playBoom(); return; }
+    const soundIndex = Math.floor(Math.random() * count) + 1;
     const audio = new Audio(`/sounds/objective-complete-${soundIndex}.mp3`);
-    
-    // Add slight random volume and playback rate variation for freshness
     audio.volume = 0.8 + Math.random() * 0.15;
     audio.playbackRate = 0.95 + Math.random() * 0.1;
-    
     await audio.play();
   } catch (e) {
     console.error('Failed to play reward sound:', e);
@@ -491,9 +490,30 @@ export async function playObjectiveComplete(): Promise<void> {
   }
 }
 
+// Cached counts — probed once per session by HEAD request
+const soundCounts: Record<string, number> = {};
+
+async function probeSoundCount(prefix: string, max = 6): Promise<number> {
+  if (soundCounts[prefix] !== undefined) return soundCounts[prefix];
+  let count = 0;
+  for (let i = 1; i <= max; i++) {
+    try {
+      const res = await fetch(`/sounds/${prefix}-${i}.mp3`, { method: 'HEAD' });
+      if (!res.ok) break;
+      count = i;
+    } catch {
+      break;
+    }
+  }
+  soundCounts[prefix] = count;
+  return count;
+}
+
 export async function playCheckboxCheckWithFile(): Promise<void> {
   try {
-    const soundIndex = Math.floor(Math.random() * 6) + 1;
+    const count = await probeSoundCount('checkbox-check');
+    if (count === 0) { soundEngine.playCheckboxCheck(); return; }
+    const soundIndex = Math.floor(Math.random() * count) + 1;
     const audio = new Audio(`/sounds/checkbox-check-${soundIndex}.mp3`);
     audio.volume = 0.8 + Math.random() * 0.15;
     audio.playbackRate = 0.95 + Math.random() * 0.1;
