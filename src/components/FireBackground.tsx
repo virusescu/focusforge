@@ -173,14 +173,19 @@ export const FireBackground: FC = () => {
     const draw = () => {
       raf = requestAnimationFrame(draw);
 
-      if (resetRef.current) { current = 0; resetRef.current = false; }
+      if (resetRef.current) { current = 0; currentSpeed = 0.35; resetRef.current = false; }
       const target = targetRef.current;
-      const intensityLerp = current < target ? 0.005 : 0.025;
-      current += (target - current) * intensityLerp;
-
-      // Speed lerps slowly and independently — always lags behind intensity
       const targetSpeed = 0.35 + target * 0.7;
-      currentSpeed += (targetSpeed - currentSpeed) * 0.008;
+
+      if (target === 0) {
+        // Fading out: drop intensity fast, keep speed frozen so fire looks natural
+        current += (0 - current) * 0.04;
+        if (current < 0.005) currentSpeed = 0.35; // silent reset once invisible
+      } else {
+        // Active: intensity and speed lerp independently
+        current += (target - current) * 0.005;
+        currentSpeed += (targetSpeed - currentSpeed) * 0.008;
+      }
       const animSpeed = currentSpeed;
       if (debugRef.current) {
         debugRef.current.textContent = `u_intensity: ${current.toFixed(3)}  u_speed: ${animSpeed.toFixed(3)}  target: ${target.toFixed(2)}  minutes: ${minutesRef.current.toFixed(1)}`;
