@@ -31,7 +31,9 @@
       "Bash(cargo check:*)",
       "Bash(grep -n \"title=\\\\`\" C:/Work/focusforge/src/components/AnalyticsView.tsx)",
       "Bash(grep -n \"Space\\\\|Escape\\\\|Ctrl\\\\|Enter\\\\|keyboard\\\\|shortcut\" /c/Work/focusforge/src/components/*.tsx)",
-      "Bash(xargs grep:*)"
+      "Bash(xargs grep:*)",
+      "Bash(node -e \"const l = require\\('lucide-react'\\); console.log\\(['Heading1','Heading2','Heading3','List','ListChecks'].map\\(n => n + ': ' + \\(n in l\\)\\).join\\('\\\\n'\\)\\)\")",
+      "Bash(node -e \"const l = require\\('lucide-react'\\); console.log\\(['Strikethrough','Table'].map\\(n => n + ': ' + \\(n in l\\)\\).join\\('\\\\n'\\)\\)\")"
     ]
   }
 }
