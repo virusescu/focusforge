@@ -37,7 +37,7 @@ body {
       radial-gradient(circle, transparent 20%, var(--bg-darker) 90%),
       url('/forge-bg.png');    background-size: cover;
     background-position: center;
-    opacity: 0.4;
+    opacity: 0.25;
     z-index: -1;
     filter: saturate(0.8) contrast(1.1) brightness(1);
   }

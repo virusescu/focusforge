@@ -22,6 +22,7 @@ import { NavigationGuard } from './components/NavigationGuard';
 import { RewardToast } from './components/RewardToast';
 import { SeasonTransitionModal } from './components/SeasonTransitionModal';
 import { VaultPage } from './components/VaultPage';
+import { FireBackground } from './components/FireBackground';
 
 function HudApp() {
   const [view, setView] = useState<'hud' | 'analytics' | 'intel' | 'vault'>('hud');
@@ -109,6 +110,7 @@ function HudApp() {
 
   return (
   <>
+    <FireBackground />
     <div className="hud-container">
       <GlitchOverlay />
       <Header onOpenSettings={() => setIsSettingsOpen(true)} onViewVault={handleViewVault} />
