@@ -144,7 +144,11 @@ Replace `mobile/app.json` with:
     },
     "plugins": [
       "expo-router",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-camera",
+        { "cameraPermission": "Allow FocusForge to scan the pairing QR code from your desktop." }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
@@ -178,10 +182,11 @@ Replace `mobile/tsconfig.json` with:
 Create `mobile/.env.example`:
 
 ```
-EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS=
-EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID=
 EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB=
+EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID=
 ```
+
+Only the Web client ID is required for development (Expo AuthSession proxy). The Android client ID is required before shipping the release APK (Task 15). No iOS client is needed in v1.
 
 Append to root `.gitignore`:
 ```
@@ -213,14 +218,21 @@ git commit -m "feat(mobile): scaffold Expo project for mobile companion app"
 
 ---
 
-## Task 2: Port Type Definitions
+## Task 2: Shared Type Definitions
+
+Instead of duplicating type interfaces between desktop and mobile, the four types both sides agree on live at repo root in `shared/types.ts`. Desktop re-exports them from `src/types/index.ts`; mobile re-exports from `mobile/src/types/index.ts`. A single edit to `shared/types.ts` breaks both TypeScript builds in the same way, preventing silent schema drift.
 
 **Files:**
-- Create: `mobile/src/types/index.ts`
+- Create: `shared/types.ts`
+- Modify: `tsconfig.json` (root) — add `@shared/*` path alias
+- Modify: `src/types/index.ts` (desktop) — re-export shared interfaces
+- Create: `mobile/metro.config.js` — add `../shared` to Metro `watchFolders`
+- Modify: `mobile/tsconfig.json` — add `@shared/*` path alias
+- Create: `mobile/src/types/index.ts` — re-export from `@shared/types`
 
-- [ ] **Step 1: Copy minimal type subset**
+- [ ] **Step 1: Create `shared/types.ts`**
 
-Create `mobile/src/types/index.ts` with exactly the types the mobile app uses:
+Create `shared/types.ts` with exactly the four interfaces both sides use:
 
 ```typescript
 export interface AuthUser {
@@ -257,13 +269,79 @@ export interface FocusSession {
 }
 ```
 
-**Why only these four types?** `GameState`, `ToolDefinition`, `PrestigeTitleDefinition`, etc. are desktop-only. The mobile app never reads them.
+**Why only these four types?** `GameState`, `ToolDefinition`, `PrestigeTitleDefinition`, etc. are desktop-only. Mobile never reads them, so they stay in `src/types/index.ts`.
 
-- [ ] **Step 2: Commit**
+- [ ] **Step 2: Add `@shared/*` alias to root `tsconfig.json`**
+
+Edit `tsconfig.json` at the repo root, inside `compilerOptions`:
+
+```json
+"paths": {
+  "@shared/*": ["./shared/*"]
+}
+```
+
+If `paths` already exists, merge this entry in. Vite follows TS paths via `vite-tsconfig-paths` (already used in this repo) so no Vite config change is needed.
+
+- [ ] **Step 3: Re-export shared interfaces from `src/types/index.ts`**
+
+At the top of `src/types/index.ts`, replace the local declarations of `AuthUser`, `ObjectiveCategory`, `StrategicObjective`, and `FocusSession` with:
+
+```typescript
+export type { AuthUser, ObjectiveCategory, StrategicObjective, FocusSession } from '@shared/types';
+```
+
+Leave desktop-only types (`GameState`, `ToolDefinition`, etc.) untouched.
+
+- [ ] **Step 4: Verify desktop still builds**
+
+Run: `cd C:\Work\focusforge && npm run build`
+Expected: PASS.
+
+- [ ] **Step 5: Create `mobile/metro.config.js`**
+
+Create `mobile/metro.config.js`:
+
+```javascript
+const { getDefaultConfig } = require('expo/metro-config');
+const path = require('path');
+
+const config = getDefaultConfig(__dirname);
+config.watchFolders = [path.resolve(__dirname, '../shared')];
+config.resolver.nodeModulesPaths = [path.resolve(__dirname, 'node_modules')];
+
+module.exports = config;
+```
+
+Without `watchFolders`, Metro refuses to read files outside the Expo project root.
+
+- [ ] **Step 6: Add `@shared/*` alias to `mobile/tsconfig.json`**
+
+Extend the `paths` block created in Task 1 Step 4:
+
+```json
+"paths": {
+  "@/*": ["./src/*"],
+  "@shared/*": ["../shared/*"]
+}
+```
+
+- [ ] **Step 7: Create `mobile/src/types/index.ts` as a re-export**
+
+```typescript
+export type {
+  AuthUser,
+  ObjectiveCategory,
+  StrategicObjective,
+  FocusSession,
+} from '@shared/types';
+```
+
+- [ ] **Step 8: Commit**
 
 ```bash
-git add mobile/src/types/index.ts
-git commit -m "feat(mobile): add type definitions mirroring desktop subset"
+git add shared/ tsconfig.json src/types/index.ts mobile/metro.config.js mobile/tsconfig.json mobile/src/types/index.ts
+git commit -m "feat(shared): extract shared types to shared/ used by desktop and mobile"
 ```
 
 ---
@@ -335,7 +413,9 @@ import { createClient, type Client } from '@libsql/client/web';
 let db: Client | null = null;
 
 export function initDbClient(url: string, authToken: string): void {
-  db = createClient({ url, authToken });
+  // intMode: 'number' avoids BigInt return values (lastInsertRowid, id columns).
+  // Hermes supports BigInt but mixing with regular number paths is a footgun.
+  db = createClient({ url, authToken, intMode: 'number' });
 }
 
 export function getDb(): Client {
@@ -445,11 +525,12 @@ describe('db/queries', () => {
   it('addObjective appends to end of list', async () => {
     mockExecute
       .mockResolvedValueOnce({ rows: [{ maxOrder: 3 }] })
-      .mockResolvedValueOnce({ lastInsertRowid: 42n });
+      .mockResolvedValueOnce({ lastInsertRowid: 42 });
 
     const id = await addObjective(5, 'New task', null);
 
     expect(id).toBe(42);
+    expect(typeof id).toBe('number'); // regression guard — not BigInt
     const insertCall = mockExecute.mock.calls[1][0];
     expect(insertCall.args).toContain(4); // maxOrder + 1
   });
@@ -739,32 +820,26 @@ git commit -m "feat(mobile): add SecureStore wrappers for auth credentials"
 **Files:**
 - Create: `mobile/src/auth/oauth.ts`
 
-No TDD for this task — `expo-auth-session` is a native module that cannot run in Jest without heavy mocks that add no confidence. Smoke testing happens on-device in Task 12.
+No TDD for this task — `expo-auth-session` is a native module that cannot run in Jest without heavy mocks that add no confidence. Smoke testing happens on-device in Task 14.
 
-**Prerequisite — Google Cloud Console setup (do this once before coding):**
+**Approach:** use the higher-level `expo-auth-session/providers/google` hook, which handles PKCE, auth-code exchange, and refresh internally. Less code than hand-rolling `AuthRequest`, fewer places to get wrong.
+
+**Prerequisite — Google Cloud Console setup:**
 1. Open the same Google Cloud project the desktop app uses.
-2. Create two additional OAuth 2.0 Client IDs:
-   - **iOS** — Bundle ID: `com.focusforge.mobile`
-   - **Android** — Package: `com.focusforge.mobile`, SHA-1 fingerprint from `eas credentials` or `expo-dev-client`
-3. Create a **Web** client ID as well — `expo-auth-session` proxies through it for the auth code exchange on Expo Go.
-4. Copy all three client IDs into `mobile/.env` as `EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS`, `_ANDROID`, `_WEB`.
+2. Create a **Web** OAuth 2.0 Client ID (used in development and as the auth-code exchange client). Copy into `mobile/.env` as `EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB`.
+3. **Defer the Android client ID** until Task 15 (first EAS build) — you need the SHA-1 fingerprint that `eas credentials` reports after the initial APK build. Until then, the Web client + Expo proxy is sufficient for dev.
+4. No iOS client needed (no iOS distribution in v1).
 
-- [ ] **Step 1: Implement the OAuth hook**
+- [ ] **Step 1: Implement the OAuth wrapper**
 
 Create `mobile/src/auth/oauth.ts`:
 
 ```typescript
-import * as AuthSession from 'expo-auth-session';
+import { useEffect, useRef } from 'react';
+import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
-import { Platform } from 'react-native';
 
 WebBrowser.maybeCompleteAuthSession();
-
-const DISCOVERY = {
-  authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
-  tokenEndpoint: 'https://oauth2.googleapis.com/token',
-  revocationEndpoint: 'https://oauth2.googleapis.com/revoke',
-};
 
 const USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo';
 
@@ -778,80 +853,126 @@ export interface GoogleUserInfo {
 export interface OAuthResult {
   userInfo: GoogleUserInfo;
   refreshToken: string;
+  accessToken: string;
 }
 
-function getClientId(): string {
-  if (Platform.OS === 'ios') return process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS!;
-  if (Platform.OS === 'android') return process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID!;
-  return process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB!;
-}
+type Resolver = {
+  resolve: (r: OAuthResult) => void;
+  reject: (e: Error) => void;
+};
 
-export async function signInWithGoogle(): Promise<OAuthResult> {
-  const clientId = getClientId();
-  const redirectUri = AuthSession.makeRedirectUri({ scheme: 'focusforge' });
-
-  const request = new AuthSession.AuthRequest({
-    clientId,
-    redirectUri,
+/**
+ * Hook-based Google OAuth. Caller renders this hook and calls `signIn()`
+ * to obtain an `OAuthResult`. The underlying `useAuthRequest` plumbs the
+ * browser result back through an effect, so we bridge it to a Promise.
+ */
+export function useGoogleAuth() {
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    webClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB,
+    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID,
     scopes: ['openid', 'email', 'profile'],
     extraParams: { access_type: 'offline', prompt: 'consent' },
-    usePKCE: true,
   });
 
-  await request.makeAuthUrlAsync(DISCOVERY);
-  const result = await request.promptAsync(DISCOVERY);
+  const pendingRef = useRef<Resolver | null>(null);
 
-  if (result.type !== 'success' || !result.params.code) {
-    throw new Error(`OAuth cancelled or failed: ${result.type}`);
-  }
+  useEffect(() => {
+    const pending = pendingRef.current;
+    if (!response || !pending) return;
 
-  const tokenResult = await AuthSession.exchangeCodeAsync(
-    {
-      clientId,
-      code: result.params.code,
-      redirectUri,
-      extraParams: { code_verifier: request.codeVerifier ?? '' },
-    },
-    DISCOVERY,
-  );
+    if (response.type !== 'success') {
+      pending.reject(new Error(`OAuth ${response.type}`));
+      pendingRef.current = null;
+      return;
+    }
 
-  if (!tokenResult.refreshToken) {
-    throw new Error('Google did not return a refresh token — re-auth required');
-  }
+    const { authentication } = response;
+    if (!authentication?.accessToken) {
+      pending.reject(new Error('No access token on OAuth response'));
+      pendingRef.current = null;
+      return;
+    }
+    if (!authentication.refreshToken) {
+      pending.reject(new Error('Google did not return a refresh token — re-auth required'));
+      pendingRef.current = null;
+      return;
+    }
 
-  const userInfoResp = await fetch(USERINFO_URL, {
-    headers: { Authorization: `Bearer ${tokenResult.accessToken}` },
-  });
-  if (!userInfoResp.ok) throw new Error('Failed to fetch Google user info');
-  const userInfo = (await userInfoResp.json()) as GoogleUserInfo;
+    fetch(USERINFO_URL, {
+      headers: { Authorization: `Bearer ${authentication.accessToken}` },
+    })
+      .then((r) => {
+        if (!r.ok) throw new Error('Failed to fetch Google user info');
+        return r.json() as Promise<GoogleUserInfo>;
+      })
+      .then((userInfo) => {
+        pending.resolve({
+          userInfo,
+          accessToken: authentication.accessToken,
+          refreshToken: authentication.refreshToken!,
+        });
+      })
+      .catch((e) => pending.reject(e instanceof Error ? e : new Error(String(e))))
+      .finally(() => {
+        pendingRef.current = null;
+      });
+  }, [response]);
 
-  return { userInfo, refreshToken: tokenResult.refreshToken };
+  const signIn = async (): Promise<OAuthResult> => {
+    if (!request) throw new Error('OAuth request not ready');
+    return new Promise<OAuthResult>((resolve, reject) => {
+      pendingRef.current = { resolve, reject };
+      promptAsync().catch((e) => {
+        pendingRef.current = null;
+        reject(e);
+      });
+    });
+  };
+
+  return { signIn, ready: Boolean(request) };
 }
 
+/**
+ * Refresh flow — same discovery endpoints AuthSession uses internally.
+ * Called on app startup from AuthContext when a saved refresh token exists.
+ */
 export async function refreshAccessToken(refreshToken: string): Promise<OAuthResult> {
-  const clientId = getClientId();
-  const tokenResult = await AuthSession.refreshAsync(
-    { clientId, refreshToken },
-    DISCOVERY,
-  );
-
-  const userInfoResp = await fetch(USERINFO_URL, {
-    headers: { Authorization: `Bearer ${tokenResult.accessToken}` },
+  const clientId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB!;
+  const body = new URLSearchParams({
+    client_id: clientId,
+    refresh_token: refreshToken,
+    grant_type: 'refresh_token',
   });
-  if (!userInfoResp.ok) throw new Error('Failed to fetch Google user info');
-  const userInfo = (await userInfoResp.json()) as GoogleUserInfo;
 
-  return { userInfo, refreshToken: tokenResult.refreshToken ?? refreshToken };
+  const tokenResp = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  });
+  if (!tokenResp.ok) throw new Error(`Refresh failed: ${tokenResp.status}`);
+  const tokenJson = (await tokenResp.json()) as { access_token: string; refresh_token?: string };
+
+  const userResp = await fetch(USERINFO_URL, {
+    headers: { Authorization: `Bearer ${tokenJson.access_token}` },
+  });
+  if (!userResp.ok) throw new Error('Failed to fetch Google user info');
+  const userInfo = (await userResp.json()) as GoogleUserInfo;
+
+  return {
+    userInfo,
+    accessToken: tokenJson.access_token,
+    refreshToken: tokenJson.refresh_token ?? refreshToken,
+  };
 }
 ```
 
-**Why PKCE instead of client_secret?** Mobile apps cannot safely embed client secrets — they can be extracted from the APK/IPA. PKCE replaces the secret with a per-flow code verifier, which is the Google-recommended flow for native apps. The desktop flow uses a secret because the Tauri binary is harder (though not impossible) to decompile, and that's the existing approach there.
+**Why PKCE instead of client_secret?** Mobile apps cannot safely embed client secrets — they can be extracted from the APK/IPA. PKCE replaces the secret with a per-flow code verifier, which is the Google-recommended flow for native apps. The `useAuthRequest` hook applies PKCE automatically — there is no place in this code where a client secret could leak.
 
 - [ ] **Step 2: Commit**
 
 ```bash
 git add mobile/src/auth/oauth.ts
-git commit -m "feat(mobile): implement Google OAuth with PKCE via expo-auth-session"
+git commit -m "feat(mobile): implement Google OAuth via expo-auth-session/providers/google"
 ```
 
 ---
@@ -1019,7 +1140,7 @@ import {
 } from 'react';
 import { initDbClient, resetDbClient } from '@/db/client';
 import { upsertUser } from '@/db/queries';
-import { signInWithGoogle, refreshAccessToken } from '@/auth/oauth';
+import { useGoogleAuth, refreshAccessToken } from '@/auth/oauth';
 import {
   saveRefreshToken,
   getRefreshToken,
@@ -1051,6 +1172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     name: string;
     picture?: string;
   } | null>(null);
+  const { signIn } = useGoogleAuth();
 
   useEffect(() => {
     (async () => {
@@ -1084,7 +1206,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(async () => {
-    const { userInfo, refreshToken } = await signInWithGoogle();
+    const { userInfo, refreshToken } = await signIn();
     await saveRefreshToken(refreshToken);
 
     const creds = await getTursoCredentials();
@@ -1097,7 +1219,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initDbClient(creds.url, creds.token);
     const user = await upsertUser(userInfo.sub, userInfo.email, userInfo.name, userInfo.picture);
     setAuthUser(user);
-  }, []);
+  }, [signIn]);
 
   const completeSetup = useCallback(
     async (url: string, token: string) => {
@@ -1321,6 +1443,8 @@ export default function RootLayout() {
 }
 ```
 
+**Note:** Task 16 replaces this file with a version that also runs the startup update check. Keep this minimal version for now; it's fine up until Task 16.
+
 - [ ] **Step 4: Create the auth-gated index route**
 
 Create `mobile/app/index.tsx`:
@@ -1358,11 +1482,14 @@ git commit -m "feat(mobile): set up expo-router with auth gate"
 
 ---
 
-## Task 11: Login and Setup Screens
+## Task 11: Login and QR-Pairing Setup Screens
 
 **Files:**
 - Create: `mobile/app/login.tsx`
-- Create: `mobile/app/setup.tsx`
+- Create: `mobile/app/setup.tsx` — QR scanner (primary) + manual entry fallback
+- Create: `src/components/PairPhoneModal.tsx` (desktop) — displays QR encoding `{url, token}`
+- Modify: desktop settings view to add a "Pair Phone" button that opens the modal
+- Install (desktop): `qrcode` (pure JS library, emits canvas/data URL)
 
 - [ ] **Step 1: Create the login screen**
 
@@ -1408,22 +1535,68 @@ const styles = StyleSheet.create({
 });
 ```
 
-- [ ] **Step 2: Create the setup screen**
+- [ ] **Step 2: Create the QR-pairing setup screen**
 
 Create `mobile/app/setup.tsx`:
 
 ```typescript
-import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet, ActivityIndicator } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, Alert, StyleSheet, TextInput, ActivityIndicator } from 'react-native';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useAuth } from '@/contexts/AuthContext';
+
+interface PairPayload {
+  url: string;
+  token: string;
+}
+
+function parsePayload(raw: string): PairPayload | null {
+  try {
+    const obj = JSON.parse(raw);
+    if (typeof obj?.url === 'string' && typeof obj?.token === 'string' && obj.url.startsWith('libsql://')) {
+      return { url: obj.url, token: obj.token };
+    }
+  } catch {
+    // fall through
+  }
+  return null;
+}
 
 export default function Setup() {
   const { completeSetup } = useAuth();
+  const [permission, requestPermission] = useCameraPermissions();
+  const [busy, setBusy] = useState(false);
+  const [scanned, setScanned] = useState(false);
+  const [manual, setManual] = useState(false);
   const [url, setUrl] = useState('');
   const [token, setToken] = useState('');
-  const [busy, setBusy] = useState(false);
 
-  const handleSubmit = async () => {
+  useEffect(() => {
+    if (permission && !permission.granted && permission.canAskAgain) {
+      requestPermission();
+    }
+  }, [permission, requestPermission]);
+
+  const handleScan = async ({ data }: { data: string }) => {
+    if (scanned || busy) return;
+    const payload = parsePayload(data);
+    if (!payload) {
+      Alert.alert('Invalid QR', 'The scanned code does not look like a FocusForge pairing code.');
+      return;
+    }
+    setScanned(true);
+    setBusy(true);
+    try {
+      await completeSetup(payload.url, payload.token);
+    } catch (e) {
+      Alert.alert('Setup failed', e instanceof Error ? e.message : String(e));
+      setScanned(false);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleManual = async () => {
     if (!url.startsWith('libsql://')) {
       Alert.alert('Invalid URL', 'URL must start with libsql://');
       return;
@@ -1442,53 +1615,186 @@ export default function Setup() {
     }
   };
 
+  if (manual) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>Manual entry</Text>
+        <Text style={styles.help}>
+          Paste the URL and token from Turso dashboard → your DB → Generate Token.
+        </Text>
+        <TextInput
+          placeholder="libsql://your-db.turso.io"
+          placeholderTextColor="#555"
+          value={url}
+          onChangeText={setUrl}
+          autoCapitalize="none"
+          autoCorrect={false}
+          style={styles.input}
+        />
+        <TextInput
+          placeholder="Auth token"
+          placeholderTextColor="#555"
+          value={token}
+          onChangeText={setToken}
+          autoCapitalize="none"
+          autoCorrect={false}
+          secureTextEntry
+          style={styles.input}
+        />
+        <TouchableOpacity style={styles.button} onPress={handleManual} disabled={busy}>
+          {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Connect</Text>}
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => setManual(false)}>
+          <Text style={styles.link}>Back to QR scanner</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (!permission) {
+    return <View style={styles.container}><ActivityIndicator color="#fff" /></View>;
+  }
+
+  if (!permission.granted) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>Camera required</Text>
+        <Text style={styles.help}>
+          FocusForge needs camera access to scan the pairing QR from your desktop.
+        </Text>
+        <TouchableOpacity style={styles.button} onPress={requestPermission}>
+          <Text style={styles.buttonText}>Grant permission</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => setManual(true)}>
+          <Text style={styles.link}>Enter URL and token manually</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Connect to Turso</Text>
-      <Text style={styles.help}>
-        Use the same URL and token your desktop app uses. You can find them in Turso dashboard → your DB → Generate Token.
-      </Text>
-      <TextInput
-        placeholder="libsql://your-db.turso.io"
-        placeholderTextColor="#555"
-        value={url}
-        onChangeText={setUrl}
-        autoCapitalize="none"
-        autoCorrect={false}
-        style={styles.input}
+    <View style={styles.cameraContainer}>
+      <CameraView
+        style={StyleSheet.absoluteFillObject}
+        barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+        onBarcodeScanned={scanned ? undefined : handleScan}
       />
-      <TextInput
-        placeholder="Auth token"
-        placeholderTextColor="#555"
-        value={token}
-        onChangeText={setToken}
-        autoCapitalize="none"
-        autoCorrect={false}
-        secureTextEntry
-        style={styles.input}
-      />
-      <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={busy}>
-        {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Connect</Text>}
-      </TouchableOpacity>
+      <View style={styles.overlay}>
+        <Text style={styles.overlayTitle}>Pair with desktop</Text>
+        <Text style={styles.overlayHelp}>
+          On your desktop: Settings → Pair Phone. Point the camera at the QR code.
+        </Text>
+        {busy && <ActivityIndicator color="#fff" style={{ marginTop: 12 }} />}
+        <TouchableOpacity onPress={() => setManual(true)} style={styles.manualBtn}>
+          <Text style={styles.link}>Enter URL and token manually</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: 'center', padding: 24, backgroundColor: '#0a0a0a' },
+  cameraContainer: { flex: 1, backgroundColor: '#000' },
+  overlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 24, backgroundColor: 'rgba(0,0,0,0.7)' },
+  overlayTitle: { fontSize: 20, fontWeight: '700', color: '#fff', marginBottom: 4 },
+  overlayHelp: { fontSize: 13, color: '#ccc' },
+  manualBtn: { marginTop: 16 },
   title: { fontSize: 24, fontWeight: '700', color: '#fff', marginBottom: 8 },
   help: { fontSize: 13, color: '#888', marginBottom: 24 },
   input: { borderWidth: 1, borderColor: '#333', color: '#fff', padding: 12, borderRadius: 6, marginBottom: 12, fontSize: 14 },
   button: { backgroundColor: '#4285f4', padding: 14, borderRadius: 8, alignItems: 'center', marginTop: 12 },
   buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  link: { color: '#4285f4', textAlign: 'center', marginTop: 16, fontSize: 13 },
 });
 ```
 
-- [ ] **Step 3: Commit**
+**Behavior:** camera opens → scans QR → parses JSON `{url, token}` → calls `completeSetup`, which initializes the libsql client, sanity-checks with `SELECT 1`, persists to SecureStore, and lands on the objectives tab. Manual entry remains as a fallback escape hatch.
+
+- [ ] **Step 3: Build the desktop pairing modal**
+
+Install on the desktop side (run from repo root, not `mobile/`):
 
 ```bash
-git add mobile/app/login.tsx mobile/app/setup.tsx
-git commit -m "feat(mobile): add login and Turso setup screens"
+npm install qrcode
+npm install --save-dev @types/qrcode
+```
+
+Create `src/components/PairPhoneModal.tsx`:
+
+```typescript
+import { useEffect, useState } from 'react';
+import QRCode from 'qrcode';
+import { load } from '@tauri-apps/plugin-store';
+
+const AUTO_HIDE_MS = 60_000;
+
+export function PairPhoneModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [dataUrl, setDataUrl] = useState<string | null>(null);
+  const [remaining, setRemaining] = useState(AUTO_HIDE_MS / 1000);
+
+  useEffect(() => {
+    if (!open) {
+      setDataUrl(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const store = await load('.settings.dat', { autoSave: false });
+      const url = await store.get<string>('turso_url');
+      const token = await store.get<string>('turso_token');
+      if (!url || !token) {
+        onClose();
+        return;
+      }
+      const payload = JSON.stringify({ url, token });
+      const png = await QRCode.toDataURL(payload, { errorCorrectionLevel: 'M', margin: 1, width: 320 });
+      if (!cancelled) setDataUrl(png);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, onClose]);
+
+  useEffect(() => {
+    if (!open) return;
+    setRemaining(AUTO_HIDE_MS / 1000);
+    const hideTimer = setTimeout(onClose, AUTO_HIDE_MS);
+    const tickTimer = setInterval(() => setRemaining((s) => Math.max(0, s - 1)), 1000);
+    return () => {
+      clearTimeout(hideTimer);
+      clearInterval(tickTimer);
+    };
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div className="pair-modal-backdrop" onClick={onClose}>
+      <div className="pair-modal" onClick={(e) => e.stopPropagation()}>
+        <h2>Pair your phone</h2>
+        <p>Open FocusForge on your phone and scan this code.</p>
+        {dataUrl ? <img src={dataUrl} alt="Pairing QR" width={320} height={320} /> : <div className="pair-modal-loading">Generating…</div>}
+        <p className="pair-modal-timer">Hides automatically in {remaining}s</p>
+        <button onClick={onClose}>Close</button>
+      </div>
+    </div>
+  );
+}
+```
+
+**Security:**
+- The QR is only rendered when the user explicitly clicks "Pair Phone".
+- It auto-hides after 60 seconds.
+- Anyone who photographs the screen during that window gets your Turso token. For extra caution, rotate the Turso token in the Turso dashboard after successful pairing (optional, manual step — not enforced by code).
+
+Wire the button into the existing desktop settings view (exact file depends on current layout — search for the Settings component and add a button + `useState` for the modal's open flag).
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add mobile/app/login.tsx mobile/app/setup.tsx src/components/PairPhoneModal.tsx package.json package-lock.json
+git commit -m "feat(mobile): QR-based phone pairing with desktop QR modal"
 ```
 
 ---
@@ -1831,11 +2137,13 @@ Scan the QR code with Expo Go (Android) or the iOS Camera app (iOS).
 
 1. App launches → login screen appears
 2. Tap "Sign in with Google" → browser opens → authorize with `virusescu@gmail.com`
-3. Redirects back to app → setup screen appears
-4. Paste Turso URL and token → tap Connect
-5. Objectives tab appears, showing the SAME objectives currently visible on desktop
+3. Redirects back to app → setup screen opens the camera
+4. On desktop: Settings → "Pair Phone" → QR modal appears
+5. Point phone camera at desktop screen → scan succeeds → objectives tab appears
 
-**Pass criteria:** objective list matches the desktop's Mission Objectives list exactly.
+**Pass criteria:** objective list matches the desktop's Mission Objectives list exactly. Also verify the desktop QR modal auto-hides after 60 seconds if left untouched.
+
+**Manual-entry fallback:** tap "Enter URL and token manually" on the setup screen — this path must still work (it's the recovery path if the camera is unavailable).
 
 - [ ] **Step 3: Verify add-objective syncs to desktop**
 
@@ -1867,11 +2175,290 @@ Scan the QR code with Expo Go (Android) or the iOS Camera app (iOS).
 
 **Pass criteria:** refresh token and Turso credentials persist across launches; no re-login needed.
 
-- [ ] **Step 7: Commit the .env.example update if anything changed**
+- [ ] **Step 7: Verify in-app update check**
+
+1. Note the installed APK's version (from `mobile/app.json`).
+2. On a scratch branch, bump `mobile-update.json` `version` higher than the installed version, push.
+3. Force-close and reopen the mobile app.
+4. Alert appears titled "Update available" with a button labelled "Update".
+5. Tap Update → browser opens, starts downloading the APK from the release URL.
+6. Revert `mobile-update.json` on the scratch branch (don't leave the phantom version published).
+
+**Pass criteria:** the alert fires exactly once per app launch when the manifest version is strictly greater than the installed version.
+
+- [ ] **Step 8: Commit the .env.example update if anything changed**
 
 ```bash
 git add mobile/.env.example
 git commit -m "docs(mobile): finalize .env.example based on device test" || echo "nothing to commit"
+```
+
+---
+
+## Task 15: APK Build + GitHub Release Distribution
+
+**Files:**
+- Create: `mobile/eas.json`
+- Create (optional later): `.github/workflows/mobile-release.yml`
+
+No Play Store, no iOS build, no Expo Go dependency. Android APK is built with EAS `preview` profile, downloaded from the EAS dashboard, and attached to a GitHub Release for sideload.
+
+- [ ] **Step 1: Install EAS CLI and sign in**
+
+```bash
+npm install -g eas-cli
+eas login
+```
+
+Use the Expo account you already have (or create one free).
+
+- [ ] **Step 2: Create `mobile/eas.json`**
+
+```json
+{
+  "cli": { "version": ">= 10.0.0" },
+  "build": {
+    "preview": {
+      "android": { "buildType": "apk" },
+      "distribution": "internal"
+    }
+  }
+}
+```
+
+No `production` profile — we do not publish to stores.
+
+- [ ] **Step 3: Configure project**
+
+```bash
+cd C:\Work\focusforge\mobile
+eas build:configure
+```
+
+Accept the defaults; confirm Android only.
+
+- [ ] **Step 4: First build (also generates the Android SHA-1)**
+
+```bash
+eas build --platform android --profile preview
+```
+
+Wait ~10 minutes. The dashboard output gives:
+1. An APK download URL.
+2. A SHA-1 fingerprint for the Android keystore (visible via `eas credentials` → Android → Keystore).
+
+- [ ] **Step 5: Finish Google Cloud Android OAuth client**
+
+In Google Cloud Console:
+1. Create an Android OAuth 2.0 Client ID.
+2. Package name: `com.focusforge.mobile`.
+3. SHA-1: paste from Step 4.
+4. Add `EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID=<new id>` to `mobile/.env`.
+5. Rebuild: `eas build --platform android --profile preview`.
+
+- [ ] **Step 6: Publish to GitHub Releases**
+
+1. Download the APK from EAS dashboard.
+2. Tag and release: `git tag mobile-v0.1.0 && git push origin mobile-v0.1.0`.
+3. On GitHub, create a Release from the tag, attach `focusforge.apk` as an asset, note the asset URL (needed in Task 16 for `mobile-update.json`).
+
+**Install on phone:** transfer the APK (email, Drive, cable, or direct download from the Release), tap it, approve "install from unknown sources" once, the app installs like any other Android app.
+
+- [ ] **Step 7: (Optional) Automate via GitHub Actions**
+
+Mirror the pattern in `.github/workflows/release.yml`. Triggered on `mobile-v*` tag push:
+1. `eas build --platform android --profile preview --non-interactive`
+2. Download resulting APK artifact
+3. Create/attach to GitHub Release matching the tag
+
+Defer until the manual flow feels painful. The desktop workflow already has the pattern to copy.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add mobile/eas.json
+git commit -m "feat(mobile): add EAS Build preview profile for APK sideload"
+```
+
+---
+
+## Task 16: In-App Update Check
+
+**Files:**
+- Create: `mobile-update.json` at repo root
+- Create: `mobile/src/updater/checkForUpdate.ts`
+- Modify: `mobile/app/_layout.tsx` — invoke the check once on mount
+
+**Mechanism:** on app startup, fetch a JSON manifest hosted on `raw.githubusercontent.com`. If the manifest's `version` is strictly greater than the installed app's version, show an `Alert` with an Update button that opens the APK's release URL in the phone browser. User downloads the APK and taps to install. Same mental model as the desktop's Tauri updater.
+
+- [ ] **Step 1: Create `mobile-update.json` at repo root**
+
+```json
+{
+  "version": "0.1.0",
+  "apkUrl": "https://github.com/virusescu/focusforge/releases/download/mobile-v0.1.0/focusforge.apk",
+  "notes": "Initial release"
+}
+```
+
+Committed to `master`, served via `https://raw.githubusercontent.com/virusescu/focusforge/master/mobile-update.json`. Bump `version` + `apkUrl` + `notes` every release.
+
+- [ ] **Step 2: Write the failing test**
+
+Create `mobile/__tests__/updater/checkForUpdate.test.ts`:
+
+```typescript
+import { checkForUpdate } from '@/updater/checkForUpdate';
+
+const ORIGINAL_FETCH = global.fetch;
+
+describe('checkForUpdate', () => {
+  beforeEach(() => {
+    (global.fetch as unknown) = jest.fn();
+  });
+  afterAll(() => {
+    global.fetch = ORIGINAL_FETCH;
+  });
+
+  it('returns null when installed version is current', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ version: '0.1.0', apkUrl: 'x', notes: '' }),
+    });
+    const result = await checkForUpdate('0.1.0');
+    expect(result).toBeNull();
+  });
+
+  it('returns manifest when a newer version is available', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ version: '0.2.0', apkUrl: 'u', notes: 'n' }),
+    });
+    const result = await checkForUpdate('0.1.0');
+    expect(result).toEqual({ version: '0.2.0', apkUrl: 'u', notes: 'n' });
+  });
+
+  it('returns null on network failure (silent)', async () => {
+    (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('offline'));
+    const result = await checkForUpdate('0.1.0');
+    expect(result).toBeNull();
+  });
+
+  it('handles patch-level bumps correctly', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ version: '0.1.1', apkUrl: 'u', notes: 'n' }),
+    });
+    const result = await checkForUpdate('0.1.0');
+    expect(result).not.toBeNull();
+  });
+});
+```
+
+- [ ] **Step 3: Implement `checkForUpdate.ts`**
+
+Create `mobile/src/updater/checkForUpdate.ts`:
+
+```typescript
+const MANIFEST_URL =
+  'https://raw.githubusercontent.com/virusescu/focusforge/master/mobile-update.json';
+
+export interface UpdateManifest {
+  version: string;
+  apkUrl: string;
+  notes: string;
+}
+
+function parseVersion(v: string): number[] {
+  return v.split('.').map((n) => parseInt(n, 10) || 0);
+}
+
+function isNewer(remote: string, installed: string): boolean {
+  const r = parseVersion(remote);
+  const i = parseVersion(installed);
+  const len = Math.max(r.length, i.length);
+  for (let k = 0; k < len; k++) {
+    const rv = r[k] ?? 0;
+    const iv = i[k] ?? 0;
+    if (rv > iv) return true;
+    if (rv < iv) return false;
+  }
+  return false;
+}
+
+export async function checkForUpdate(
+  installedVersion: string,
+): Promise<UpdateManifest | null> {
+  try {
+    const resp = await fetch(MANIFEST_URL, { cache: 'no-store' as RequestCache });
+    if (!resp.ok) return null;
+    const manifest = (await resp.json()) as UpdateManifest;
+    if (!manifest?.version || !manifest?.apkUrl) return null;
+    return isNewer(manifest.version, installedVersion) ? manifest : null;
+  } catch {
+    return null;
+  }
+}
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `npx jest __tests__/updater/checkForUpdate.test.ts`
+Expected: PASS, 4 tests green.
+
+- [ ] **Step 5: Wire the check into the root layout**
+
+Edit `mobile/app/_layout.tsx`:
+
+```typescript
+import { useEffect } from 'react';
+import { Alert, Linking } from 'react-native';
+import Constants from 'expo-constants';
+import { Stack } from 'expo-router';
+import { AuthProvider } from '@/contexts/AuthContext';
+import { FocusProvider } from '@/contexts/FocusContext';
+import { checkForUpdate } from '@/updater/checkForUpdate';
+
+export default function RootLayout() {
+  useEffect(() => {
+    (async () => {
+      const installed = Constants.expoConfig?.version ?? '0.0.0';
+      const update = await checkForUpdate(installed);
+      if (update) {
+        Alert.alert(
+          'Update available',
+          `Version ${update.version} is out.\n\n${update.notes}`,
+          [
+            { text: 'Later', style: 'cancel' },
+            { text: 'Update', onPress: () => Linking.openURL(update.apkUrl) },
+          ],
+        );
+      }
+    })();
+  }, []);
+
+  return (
+    <AuthProvider>
+      <FocusProvider>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="login" />
+          <Stack.Screen name="setup" />
+          <Stack.Screen name="(tabs)" />
+        </Stack>
+      </FocusProvider>
+    </AuthProvider>
+  );
+}
+```
+
+**Failure behavior:** on network error, `checkForUpdate` returns `null` silently — the app boots normally, no scary error messages. The alert only fires when a strictly newer version is published.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add mobile-update.json mobile/src/updater/checkForUpdate.ts mobile/__tests__/updater/checkForUpdate.test.ts mobile/app/_layout.tsx
+git commit -m "feat(mobile): add startup update check against GitHub-hosted manifest"
 ```
 
 ---
