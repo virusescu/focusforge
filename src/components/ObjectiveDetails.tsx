@@ -146,12 +146,26 @@ export const ObjectiveDetails: FC<Props> = ({ onClose }) => {
     soundEngine.playClick();
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
-    const selected = editText.slice(start, end) || 'text';
-    const newText = editText.slice(0, start) + before + selected + after + editText.slice(end);
+    const selected = editText.slice(start, end);
+
+    const markerBefore = editText.slice(start - before.length, start);
+    const markerAfter = editText.slice(end, end + after.length);
+    if (selected && markerBefore === before && markerAfter === after) {
+      const newText = editText.slice(0, start - before.length) + selected + editText.slice(end + after.length);
+      setEditText(newText);
+      setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(start - before.length, start - before.length + selected.length);
+      }, 0);
+      return;
+    }
+
+    const text = selected || 'text';
+    const newText = editText.slice(0, start) + before + text + after + editText.slice(end);
     setEditText(newText);
     setTimeout(() => {
       textarea.focus();
-      textarea.setSelectionRange(start + before.length, start + before.length + selected.length);
+      textarea.setSelectionRange(start + before.length, start + before.length + text.length);
     }, 0);
   }, [editText]);
 
@@ -205,11 +219,13 @@ export const ObjectiveDetails: FC<Props> = ({ onClose }) => {
     }
     if (e.ctrlKey) {
       if (e.key === 'b' || e.key === 'B') { e.preventDefault(); wrapSelection('**', '**'); return; }
-      if (e.key === 'i' || e.key === 'I') { e.preventDefault(); wrapSelection('*', '*'); return; }
+      if (e.key === 'i' || e.key === 'I') { e.preventDefault(); wrapSelection('_', '_'); return; }
       if (e.key === 's' || e.key === 'S') { e.preventDefault(); wrapSelection('~~', '~~'); return; }
       if (e.key === '1') { e.preventDefault(); insertTemplate('# '); return; }
       if (e.key === '2') { e.preventDefault(); insertTemplate('## '); return; }
       if (e.key === '3') { e.preventDefault(); insertTemplate('### '); return; }
+      if (e.key === 'l' || e.key === 'L') { e.preventDefault(); insertTemplate('- '); return; }
+      if (e.key === 't' || e.key === 'T') { e.preventDefault(); insertTemplate('- [ ] '); return; }
       if (e.key === 'd' || e.key === 'D') {
         e.preventDefault();
         soundEngine.playClick();
@@ -227,9 +243,59 @@ export const ObjectiveDetails: FC<Props> = ({ onClose }) => {
           textarea.focus();
           textarea.setSelectionRange(newPos, newPos);
         }, 0);
+        return;
+      }
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        const textarea = e.currentTarget;
+        const pos = textarea.selectionStart;
+        const value = editText;
+        const lineStart = value.lastIndexOf('\n', pos - 1) + 1;
+        const lineEndIdx = value.indexOf('\n', pos);
+        const lineEnd = lineEndIdx === -1 ? value.length : lineEndIdx;
+        const currentLine = value.slice(lineStart, lineEnd);
+        const offsetInLine = pos - lineStart;
+
+        if (e.key === 'ArrowUp' && lineStart > 0) {
+          e.preventDefault();
+          soundEngine.playClick();
+          const prevLineEnd = lineStart - 1;
+          const prevLineStart = value.lastIndexOf('\n', prevLineEnd - 1) + 1;
+          const prevLine = value.slice(prevLineStart, prevLineEnd);
+          const newText = value.slice(0, prevLineStart) + currentLine + '\n' + prevLine + value.slice(lineEnd);
+          setEditText(newText);
+          const newPos = prevLineStart + Math.min(offsetInLine, currentLine.length);
+          setTimeout(() => { textarea.focus(); textarea.setSelectionRange(newPos, newPos); }, 0);
+        } else if (e.key === 'ArrowDown' && lineEndIdx !== -1) {
+          e.preventDefault();
+          soundEngine.playClick();
+          const nextLineStart = lineEnd + 1;
+          const nextLineEndIdx = value.indexOf('\n', nextLineStart);
+          const nextLineEnd = nextLineEndIdx === -1 ? value.length : nextLineEndIdx;
+          const nextLine = value.slice(nextLineStart, nextLineEnd);
+          const newText = value.slice(0, lineStart) + nextLine + '\n' + currentLine + value.slice(nextLineEnd);
+          setEditText(newText);
+          const newPos = lineStart + nextLine.length + 1 + Math.min(offsetInLine, currentLine.length);
+          setTimeout(() => { textarea.focus(); textarea.setSelectionRange(newPos, newPos); }, 0);
+        }
       }
     }
   };
+
+  const handlePaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const pasted = e.clipboardData.getData('text/plain').trim();
+    if (!/^https?:\/\/\S+$/.test(pasted)) return;
+    const textarea = e.currentTarget;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    if (start === end) return;
+    e.preventDefault();
+    const selected = editText.slice(start, end);
+    const replacement = `[${selected}](${pasted})`;
+    const newText = editText.slice(0, start) + replacement + editText.slice(end);
+    setEditText(newText);
+    const newEnd = start + replacement.length;
+    setTimeout(() => { textarea.focus(); textarea.setSelectionRange(newEnd, newEnd); }, 0);
+  }, [editText]);
 
   const handleCheckboxToggle = useCallback((lineIndex: number) => {
     if (!activeObjective?.details) return;
@@ -276,6 +342,7 @@ export const ObjectiveDetails: FC<Props> = ({ onClose }) => {
                 value={editText}
                 onChange={e => setEditText(e.target.value)}
                 onKeyDown={handleTextareaKeyDown}
+                onPaste={handlePaste}
                 placeholder={'Write notes, tasks, links...\n\nUse - [ ] for checkboxes\nUse **bold** or *italic*\nUse [text](url) for links'}
                 spellCheck={false}
               />
@@ -296,7 +363,7 @@ export const ObjectiveDetails: FC<Props> = ({ onClose }) => {
                   <button className={styles.toolBtn} onClick={() => wrapSelection('**', '**')} title="Bold (Ctrl+B)">
                     <Bold size={13} />
                   </button>
-                  <button className={styles.toolBtn} onClick={() => wrapSelection('*', '*')} title="Italic (Ctrl+I)">
+                  <button className={styles.toolBtn} onClick={() => wrapSelection('_', '_')} title="Italic (Ctrl+I)">
                     <Italic size={13} />
                   </button>
                   <button className={styles.toolBtn} onClick={() => wrapSelection('~~', '~~')} title="Strikethrough (Ctrl+S)">

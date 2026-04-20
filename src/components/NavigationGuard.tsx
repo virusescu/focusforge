@@ -1,4 +1,4 @@
-import { type FC } from 'react';
+import { type FC, useEffect } from 'react';
 import styles from './NavigationGuard.module.scss';
 import { AlertTriangle, ChevronRight, X } from 'lucide-react';
 
@@ -8,6 +8,18 @@ interface NavigationGuardProps {
 }
 
 export const NavigationGuard: FC<NavigationGuardProps> = ({ onConfirm, onCancel }) => {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        onCancel();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [onCancel]);
+
   return (
     <div className={styles.overlay}>
       <div className={styles.modal}>
@@ -31,12 +43,12 @@ export const NavigationGuard: FC<NavigationGuardProps> = ({ onConfirm, onCancel 
         </div>
 
         <div className={styles.footer}>
-          <button className={styles.btnCancel} onClick={onCancel}>
-            <X size={16} />
-            <span>ABORT_NAVIGATION</span>
-          </button>
           <button className={styles.btnConfirm} onClick={onConfirm}>
-            <span>PROCEED_AND_SAVE</span>
+            <X size={16} />
+            <span>END_SESSION</span>
+          </button>
+          <button className={styles.btnCancel} onClick={onCancel}>
+            <span>KEEP_FORGING</span>
             <ChevronRight size={16} />
           </button>
         </div>
