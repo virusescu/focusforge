@@ -4,16 +4,24 @@
 
 **Goal:** Build a minimal Expo (React Native) mobile companion app that logs in with the same Google account, hits the same Turso database directly (no backend), lists and adds objectives, runs a focus timer, and marks objectives complete — acting as a controller while the desktop app remains the full dashboard.
 
-**Architecture:** The phone app talks directly to Turso over HTTPS using `@libsql/client/web` — same URL + auth token the desktop uses. Google OAuth runs natively via `expo-auth-session` with a deep-link callback (no local HTTP server like the desktop's Rust `oauth.rs`). Refresh token and Turso credentials are stored in `expo-secure-store`. The mobile app reads and writes the same `users`, `objectives`, `objective_categories`, and `focus_sessions` tables the desktop already owns. Desktop ↔ mobile consistency is achieved by polling `focus_sessions` on the desktop side; no realtime channel is added.
+**Architecture:** The phone app talks directly to Turso over HTTPS using `@libsql/client/web` — same URL + auth token the desktop uses. Google OAuth runs natively via `expo-auth-session/providers/google` (PKCE handled by the provider hook). Refresh token and Turso credentials are stored in `expo-secure-store`. The mobile app reads and writes the same `users`, `objectives`, `objective_categories`, and `focus_sessions` tables the desktop already owns. Desktop ↔ mobile consistency is achieved by polling `focus_sessions` on the desktop side; no realtime channel is added.
+
+**Pairing model:** instead of typing a Turso URL and auth token on the phone, the desktop app shows a QR code (from settings → "Pair Phone") encoding `{url, token}`. The mobile app scans it once via `expo-camera` during setup. No pairing server is involved — the handoff is a local optical transfer.
+
+**Distribution:** Android APK only (no iOS, no Play Store in v1). Built via EAS `preview` profile, attached to GitHub Releases, sideloaded manually. The app checks a GitHub-hosted `mobile-update.json` manifest on startup and prompts the user to download the latest APK when a newer version is available — same mental model as the desktop's Tauri updater.
+
+**Code reuse:** the four shared type interfaces (`AuthUser`, `ObjectiveCategory`, `StrategicObjective`, `FocusSession`) live in a root `shared/types.ts` imported by both desktop and mobile, preventing schema drift.
 
 **Tech Stack:**
-- **Expo SDK 52+** (managed workflow) — React Native framework
+- **Expo SDK 53** if available (falls back to 52+) — React Native framework, New Architecture default on 53
 - **TypeScript** — same strictness as desktop
-- **@libsql/client** `^0.17.2` — HTTP mode (`@libsql/client/web`) for RN compatibility
-- **expo-auth-session** + **expo-crypto** — Google OAuth with PKCE
+- **@libsql/client** `^0.17.2` — HTTP mode (`@libsql/client/web`) for RN compatibility; `intMode: 'number'`
+- **expo-auth-session/providers/google** — higher-level Google OAuth hook (handles PKCE + refresh internally)
 - **expo-secure-store** — refresh token + Turso token storage
+- **expo-camera** — QR code pairing scanner
 - **expo-router** — file-based navigation
-- **Jest** + **@testing-library/react-native** — unit tests
+- **EAS Build** (`preview` profile) — Android APK output for sideload
+- **Jest** + **@testing-library/react-native** (≥ 12.4, with built-in matchers) — unit tests
 - No state management library — React Context, matching desktop
 
 **Out of scope (desktop-only features):** coin economy, streaks, prestige, tools, seasons, daily challenges, stats views, daily logs, pause-penalty UI. The `focus_sessions` rows written by mobile will still be picked up by the desktop's economy calculations on next read — that is intentional.
@@ -22,34 +30,41 @@
 
 ## File Structure
 
-The mobile app lives in a new `mobile/` directory at the repo root, sibling to `src/` and `src-tauri/`. It has its own `package.json` and build pipeline so Expo tooling does not collide with Vite/Tauri.
+The mobile app lives in a new `mobile/` directory at the repo root, sibling to `src/` and `src-tauri/`. It has its own `package.json` and build pipeline so Expo tooling does not collide with Vite/Tauri. Four shared type interfaces live at root in `shared/`, imported by both sides.
 
 ```
+shared/
+└── types.ts                         # AuthUser, ObjectiveCategory, StrategicObjective, FocusSession
+mobile-update.json                   # version manifest polled by the mobile app at startup
 mobile/
 ├── package.json                    # Expo + RN deps, isolated from root package.json
 ├── app.json                         # Expo config: slug, scheme, bundle IDs
-├── tsconfig.json                    # extends expo/tsconfig.base
+├── eas.json                         # EAS Build profiles (preview = APK for sideload)
+├── tsconfig.json                    # extends expo/tsconfig.base, aliases @/* and @shared/*
+├── metro.config.js                  # watchFolders points at ../shared
 ├── babel.config.js                  # babel-preset-expo
-├── .env.example                     # VITE_GOOGLE_CLIENT_ID_IOS, _ANDROID, TURSO_URL, TURSO_TOKEN template
+├── .env.example                     # EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB, _ANDROID
 ├── .gitignore                       # node_modules, .env, .expo
 ├── app/                             # expo-router routes
-│   ├── _layout.tsx                  # root layout, providers, auth gate
+│   ├── _layout.tsx                  # root layout, providers, auth gate, update check
 │   ├── index.tsx                    # redirects based on auth state
 │   ├── login.tsx                    # Google sign-in screen
-│   ├── setup.tsx                    # Turso URL + token entry
+│   ├── setup.tsx                    # QR scanner (with manual-entry fallback)
 │   └── (tabs)/
 │       ├── _layout.tsx              # tab navigator
 │       ├── objectives.tsx           # list, add, edit, complete
 │       └── timer.tsx                # start/stop + optional selected-objective context
 ├── src/
 │   ├── db/
-│   │   ├── client.ts                # createClient singleton
+│   │   ├── client.ts                # createClient singleton (intMode: 'number')
 │   │   └── queries.ts               # subset of desktop db.ts functions
 │   ├── auth/
-│   │   ├── oauth.ts                 # expo-auth-session Google flow
+│   │   ├── oauth.ts                 # expo-auth-session/providers/google wrapper
 │   │   └── storage.ts               # SecureStore wrappers
+│   ├── updater/
+│   │   └── checkForUpdate.ts        # polls mobile-update.json, shows Alert
 │   ├── contexts/
-│   │   ├── AuthContext.tsx          # mirrors desktop, adapted for SecureStore + expo-auth-session
+│   │   ├── AuthContext.tsx          # mirrors desktop, SecureStore + provider hook
 │   │   └── FocusContext.tsx         # objectives list + add + complete + session save
 │   ├── hooks/
 │   │   └── useTimer.ts              # port of src/hooks/useTimer.ts, swap window events for callbacks
@@ -58,14 +73,15 @@ mobile/
 │   │   ├── AddObjectiveInput.tsx
 │   │   └── TimerDisplay.tsx
 │   └── types/
-│       └── index.ts                 # subset: AuthUser, StrategicObjective, ObjectiveCategory, FocusSession
+│       └── index.ts                 # re-exports from @shared/types
 └── __tests__/
     ├── db/queries.test.ts
     ├── auth/storage.test.ts
+    ├── updater/checkForUpdate.test.ts
     └── hooks/useTimer.test.ts
 ```
 
-**Why a sibling folder, not a monorepo tool?** Expo's Metro bundler and Vite do not share a resolver, and introducing `pnpm` / `turborepo` adds more complexity than this project needs. A sibling `mobile/` folder with its own `package.json` stays simple and keeps the desktop build untouched.
+**Why a sibling folder, not a monorepo tool?** Expo's Metro bundler and Vite do not share a resolver, and introducing `pnpm` / `turborepo` adds more complexity than this project needs. A sibling `mobile/` folder with its own `package.json` stays simple and keeps the desktop build untouched. `shared/` is reachable via Metro `watchFolders` on the mobile side and a `@shared/*` path alias on both sides — no bundler glue beyond that.
 
 ---
 
@@ -94,12 +110,17 @@ Expected: `mobile/` directory created with `package.json`, `tsconfig.json`, `App
 Run:
 ```bash
 cd C:\Work\focusforge\mobile
-npx expo install expo-router expo-auth-session expo-crypto expo-secure-store expo-linking expo-web-browser react-native-safe-area-context react-native-screens
+npx expo install expo-router expo-auth-session expo-crypto expo-secure-store expo-linking expo-web-browser expo-camera expo-constants react-native-safe-area-context react-native-screens
 npm install @libsql/client
-npm install --save-dev @testing-library/react-native @testing-library/jest-native jest-expo
+npm install --save-dev @testing-library/react-native jest-expo
 ```
 
 Expected: All packages install. `@libsql/client` is a plain npm package (not an Expo module), so use `npm install`, not `expo install`.
+
+**Notes:**
+- `@testing-library/jest-native` is intentionally NOT installed — it's deprecated and its matchers are built into `@testing-library/react-native` ≥ 12.4.
+- `expo-camera` is the QR scanner used in Task 11 (setup/pairing screen).
+- `expo-constants` exposes the app version for the update check (Task 16).
 
 - [ ] **Step 3: Configure app.json for OAuth deep link and router**
 
