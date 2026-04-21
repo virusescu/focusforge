@@ -68,13 +68,28 @@ export async function initDb() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
       text TEXT NOT NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       sort_order INTEGER DEFAULT 0,
       completed_at TEXT,
       category_id INTEGER REFERENCES objective_categories(id),
+      is_mission INTEGER DEFAULT 1,
+      last_interacted_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id)
     )
   `);
+
+  // Migrations: add missing columns if they don't exist
+  try {
+    await database.execute('ALTER TABLE objectives ADD COLUMN is_mission INTEGER DEFAULT 1');
+  } catch (e) { /* already exists or other error */ }
+
+  try {
+    await database.execute('ALTER TABLE objectives ADD COLUMN details TEXT');
+  } catch (e) { /* already exists or other error */ }
+
+  try {
+    await database.execute('ALTER TABLE objectives ADD COLUMN last_interacted_at TEXT DEFAULT CURRENT_TIMESTAMP');
+  } catch (e) { /* already exists or other error */ }
 
   await database.execute(`
     CREATE TABLE IF NOT EXISTS session_pauses (
@@ -577,7 +592,16 @@ export async function getObjectives(userId: number): Promise<StrategicObjective[
     category_id: row.category_id as number | null,
     is_mission: (row.is_mission as number) ?? 1,
     details: row.details as string | null,
+    last_interacted_at: (row.last_interacted_at as string) || (row.created_at as string),
   }));
+}
+
+export async function updateObjectiveInteractionTime(id: number): Promise<void> {
+  const database = getDb();
+  await database.execute({
+    sql: 'UPDATE objectives SET last_interacted_at = CURRENT_TIMESTAMP WHERE id = ?',
+    args: [id],
+  });
 }
 
 export async function addObjective(
@@ -649,17 +673,19 @@ export async function updateObjectiveDetails(id: number, details: string | null)
 
 export async function moveObjectiveToOtherList(id: number, targetIsMission: number): Promise<void> {
   const database = getDb();
-  const obj = await database.execute({
+  const objResult = await database.execute({
     sql: 'SELECT user_id FROM objectives WHERE id = ?',
     args: [id],
   });
-  if (obj.rows.length === 0) return;
-  const userId = obj.rows[0].user_id as number;
+  if (objResult.rows.length === 0) return;
+  const userId = objResult.rows[0].user_id as number;
+
   const maxResult = await database.execute({
     sql: 'SELECT MAX(sort_order) as maxOrder FROM objectives WHERE user_id = ? AND is_mission = ? AND completed_at IS NULL',
     args: [userId, targetIsMission],
   });
   const maxOrder = (maxResult.rows[0]?.maxOrder as number | null) ?? -1;
+
   await database.execute({
     sql: 'UPDATE objectives SET is_mission = ?, sort_order = ? WHERE id = ?',
     args: [targetIsMission, maxOrder + 1, id],

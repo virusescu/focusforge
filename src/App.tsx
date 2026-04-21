@@ -34,6 +34,11 @@ function HudApp() {
   const [availableUpdate, setAvailableUpdate] = useState<Update | null>(null);
 
   useEffect(() => {
+    // Track app use time for internal analytics/logic
+    localStorage.setItem('last_app_use', Date.now().toString());
+  }, []);
+
+  useEffect(() => {
     console.log('Checking for updates...');
     check().then(update => {
       if (update) {
@@ -118,7 +123,14 @@ function HudApp() {
         <>
           <SidebarLeft onOpenSettings={() => setIsSettingsOpen(true)} />
           <MainDisplay onViewAnalytics={() => handleViewAnalytics()} onViewIntel={handleViewIntel} onViewVault={handleViewVault} onOpenDetails={() => setDetailsPanelOpen(true)} detailsPanelOpen={detailsPanelOpen} />
-          <SidebarRight onViewAnalytics={(date) => handleViewAnalytics(date)} onViewIntel={handleViewIntel} onViewVault={handleViewVault} detailsPanelOpen={detailsPanelOpen} onOpenDetails={() => setDetailsPanelOpen(true)} onCloseDetails={() => setDetailsPanelOpen(false)} />
+          <SidebarRight 
+            onViewAnalytics={(date) => handleViewAnalytics(date)} 
+            onViewIntel={handleViewIntel} 
+            onViewVault={handleViewVault} 
+            detailsPanelOpen={detailsPanelOpen} 
+            onOpenDetails={() => setDetailsPanelOpen(true)} 
+            onCloseDetails={() => setDetailsPanelOpen(false)} 
+          />
         </>
       ) : view === 'analytics' ? (
         <AnalyticsView initialDate={analyticsDate} onBack={() => setView('hud')} />

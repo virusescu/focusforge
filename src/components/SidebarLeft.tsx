@@ -106,11 +106,24 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, categories, onSele
     setIsEditing(true);
   };
 
+  const decayLevel = useMemo(() => {
+    const lastDate = new Date(obj.last_interacted_at || obj.created_at);
+    // Use a fixed timestamp for the calculation to satisfy React purity rules.
+    // This value won't update automatically during a long session, but it will 
+    // be refreshed whenever the component re-renders (e.g. on focus/interaction).
+    const diffDays = (Date.now() - lastDate.getTime()) / (1000 * 60 * 60 * 24);
+    if (diffDays > 7) return 2; // Decayed
+    if (diffDays > 3) return 1; // Stale
+    return 0; // Fresh
+  }, [obj.last_interacted_at, obj.created_at]);
+
+  const decayClass = decayLevel === 2 ? styles.decayed : decayLevel === 1 ? styles.stale : '';
+
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`${styles.objectiveItem} ${isActive ? styles.activeObjective : ''}`}
+      className={`${styles.objectiveItem} ${isActive ? styles.activeObjective : ''} ${decayClass}`}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       onMouseEnter={onHover}
@@ -315,53 +328,83 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenSettings }) => {
     setActiveObjective(id === activeObjectiveId ? null : id);
   };
 
-  // Arrow key shortcuts: Left/Right switch view; Up/Down select adjacent; Shift+Up/Down/Home/End reorder
+  // Arrow key shortcuts: Left/Right switch view; Shift+Left/Right move task; Up/Down select adjacent; Shift+Up/Down reorder
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (!e.shiftKey) {
-        if (e.key === 'ArrowLeft') { switchObjectiveView('mission'); return; }
-        if (e.key === 'ArrowRight') { switchObjectiveView('backlog'); return; }
-        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-          e.preventDefault();
-          if (displayedObjectives.length === 0) return;
-          const idx = displayedObjectives.findIndex(o => o.id === activeObjectiveId);
-          let nextIdx: number;
-          if (idx === -1) {
-            nextIdx = e.key === 'ArrowDown' ? 0 : displayedObjectives.length - 1;
-          } else {
-            nextIdx = e.key === 'ArrowUp' ? Math.max(0, idx - 1) : Math.min(displayedObjectives.length - 1, idx + 1);
-          }
-          if (nextIdx !== idx) {
-            setActiveObjective(displayedObjectives[nextIdx].id);
-            soundEngine.playNavSelect();
-          }
-          return;
+      
+      const isArrowLR = e.key === 'ArrowLeft' || e.key === 'ArrowRight';
+      const isArrowUD = e.key === 'ArrowUp' || e.key === 'ArrowDown';
+
+      // 1. View Switching (Works always with Left/Right)
+      if (isArrowLR && !e.shiftKey) {
+        const target = e.key === 'ArrowLeft' ? 'mission' : 'backlog';
+        console.log('[SidebarLeft] Switching view to:', target);
+        switchObjectiveView(target);
+        return;
+      }
+
+      // 2. Task Selection (Works with Up/Down)
+      if (isArrowUD && !e.shiftKey) {
+        e.preventDefault();
+        if (displayedObjectives.length === 0) return;
+        const idx = displayedObjectives.findIndex(o => o.id === activeObjectiveId);
+        let nextIdx: number;
+        if (idx === -1) {
+          nextIdx = e.key === 'ArrowDown' ? 0 : displayedObjectives.length - 1;
+        } else {
+          nextIdx = e.key === 'ArrowUp' ? Math.max(0, idx - 1) : Math.min(displayedObjectives.length - 1, idx + 1);
+        }
+        if (nextIdx !== idx) {
+          setActiveObjective(displayedObjectives[nextIdx].id);
+          soundEngine.playNavSelect();
         }
         return;
       }
-      if (activeObjectiveId === null) return;
-      const idx = displayedObjectives.findIndex(o => o.id === activeObjectiveId);
-      if (idx === -1) return;
-      let newOrder: typeof displayedObjectives | null = null;
-      if (e.key === 'ArrowUp' && idx > 0) {
-        newOrder = arrayMove(displayedObjectives, idx, idx - 1);
-      } else if (e.key === 'ArrowDown' && idx < displayedObjectives.length - 1) {
-        newOrder = arrayMove(displayedObjectives, idx, idx + 1);
-      } else if (e.key === 'Home' && idx > 0) {
-        newOrder = arrayMove(displayedObjectives, idx, 0);
-      } else if (e.key === 'End' && idx < displayedObjectives.length - 1) {
-        newOrder = arrayMove(displayedObjectives, idx, displayedObjectives.length - 1);
-      }
-      if (newOrder) {
-        e.preventDefault();
-        soundEngine.playReorder();
-        reorderObjectives(newOrder.map(o => o.id));
+
+      // 3. Shift Actions (Move or Reorder)
+      if (e.shiftKey && activeObjectiveId !== null) {
+        const idx = displayedObjectives.findIndex(o => o.id === activeObjectiveId);
+        
+        // Move Task between lists
+        if (isArrowLR) {
+          const isTaskInMission = missionObjectives.some(o => o.id === activeObjectiveId);
+          const wantsToMoveToBacklog = e.key === 'ArrowRight' && isTaskInMission;
+          const wantsToMoveToMission = e.key === 'ArrowLeft' && !isTaskInMission;
+          
+          if (wantsToMoveToBacklog || wantsToMoveToMission) {
+            console.log('[SidebarLeft] Shortcut: Moving task', activeObjectiveId);
+            e.preventDefault();
+            moveObjectiveToOtherList(activeObjectiveId);
+            soundEngine.playClick();
+          }
+          return;
+        }
+
+        // Reorder Task
+        if (idx !== -1) {
+          let newOrder: typeof displayedObjectives | null = null;
+          if (e.key === 'ArrowUp' && idx > 0) {
+            newOrder = arrayMove(displayedObjectives, idx, idx - 1);
+          } else if (e.key === 'ArrowDown' && idx < displayedObjectives.length - 1) {
+            newOrder = arrayMove(displayedObjectives, idx, idx + 1);
+          } else if (e.key === 'Home' && idx > 0) {
+            newOrder = arrayMove(displayedObjectives, idx, 0);
+          } else if (e.key === 'End' && idx < displayedObjectives.length - 1) {
+            newOrder = arrayMove(displayedObjectives, idx, displayedObjectives.length - 1);
+          }
+          
+          if (newOrder) {
+            e.preventDefault();
+            soundEngine.playReorder();
+            reorderObjectives(newOrder.map(o => o.id));
+          }
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [switchObjectiveView, activeObjectiveId, displayedObjectives, reorderObjectives, setActiveObjective]);
+  }, [switchObjectiveView, activeObjectiveId, displayedObjectives, missionObjectives, reorderObjectives, setActiveObjective, moveObjectiveToOtherList]);
 
   if (loading) return <aside className={styles.sidebar} data-details-barrier>LOADING...</aside>;
 

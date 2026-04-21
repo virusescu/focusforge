@@ -21,7 +21,8 @@ import {
   updateCategory as dbUpdateCategory,
   deleteCategory as dbDeleteCategory,
   updateObjectiveCategory as dbUpdateObjectiveCategory,
-  updateObjectiveDetails as dbUpdateObjectiveDetails
+  updateObjectiveDetails as dbUpdateObjectiveDetails,
+  updateObjectiveInteractionTime as dbUpdateObjectiveInteractionTime
 } from '../db';
 
 interface FocusContextType {
@@ -183,8 +184,16 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
   }, [activeObjectiveId, refreshData]);
 
   const updateObjective = useCallback(async (id: number, text: string) => {
-    await dbUpdateObjective(id, text);
-    await refreshData();
+    // Optimistic
+    setObjectivePool(prev => prev.map(o => o.id === id ? { ...o, text, last_interacted_at: new Date().toISOString() } : o));
+    
+    try {
+      await dbUpdateObjective(id, text);
+      await dbUpdateObjectiveInteractionTime(id);
+    } catch (e) {
+      console.error('Update failed', e);
+      await refreshData(); // Revert on actual error
+    }
   }, [refreshData]);
 
   const setActiveObjective = useCallback((id: number | null) => {
@@ -203,27 +212,61 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const switchObjectiveView = useCallback((view: 'mission' | 'backlog') => {
+    console.log('[FocusContext] Switching view to:', view);
     setObjectiveView(view);
   }, []);
 
   const moveObjectiveToOtherList = useCallback(async (id: number) => {
-    const targetIsMission = objectiveView === 'mission' ? 0 : 1;
-    await dbMoveObjectiveToOtherList(id, targetIsMission);
+    const obj = objectivePool.find(o => o.id === id);
+    if (!obj) return;
+
+    const targetIsMission = obj.is_mission === 1 ? 0 : 1;
+    console.log('[FocusContext] Move:', id, 'to', targetIsMission === 1 ? 'mission' : 'backlog');
+
+    // 1. Instantly update local state
+    setObjectivePool(prev => prev.map(o => 
+      o.id === id ? { ...o, is_mission: targetIsMission, last_interacted_at: new Date().toISOString() } : o
+    ));
+
     if (activeObjectiveId === id) {
       setActiveObjectiveId(null);
     }
-    await refreshData();
-  }, [objectiveView, activeObjectiveId, refreshData]);
+
+    // 2. Sync DB in background WITHOUT refreshData (to avoid stale read race)
+    try {
+      await dbMoveObjectiveToOtherList(id, targetIsMission);
+      await dbUpdateObjectiveInteractionTime(id);
+    } catch (error) {
+      console.error('[FocusContext] DB sync failed, reverting UI:', error);
+      await refreshData();
+    }
+  }, [objectivePool, activeObjectiveId, refreshData]);
 
   const updateObjectiveCategory = useCallback(async (id: number, categoryId: number | null) => {
-    await dbUpdateObjectiveCategory(id, categoryId);
-    await refreshData();
+    // Optimistic
+    setObjectivePool(prev => prev.map(o => o.id === id ? { ...o, category_id: categoryId, last_interacted_at: new Date().toISOString() } : o));
+    
+    try {
+      await dbUpdateObjectiveCategory(id, categoryId);
+      await dbUpdateObjectiveInteractionTime(id);
+    } catch (e) {
+      console.error('Category update failed', e);
+      await refreshData();
+    }
   }, [refreshData]);
 
   const updateObjectiveDetails = useCallback(async (id: number, details: string | null) => {
-    await dbUpdateObjectiveDetails(id, details);
-    setObjectivePool(prev => prev.map(o => o.id === id ? { ...o, details } : o));
-  }, []);
+    // Optimistic
+    setObjectivePool(prev => prev.map(o => o.id === id ? { ...o, details, last_interacted_at: new Date().toISOString() } : o));
+    
+    try {
+      await dbUpdateObjectiveDetails(id, details);
+      await dbUpdateObjectiveInteractionTime(id);
+    } catch (e) {
+      console.error('Details update failed', e);
+      await refreshData();
+    }
+  }, [refreshData]);
 
   const addCategory = useCallback(async (label: string, color: string, coinBounty?: number) => {
     if (!authUser) return;
@@ -265,10 +308,13 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
   }, [activeObjectiveId, objectivePool, categories, refreshData]);
 
   useEffect(() => {
-    const handleTimerSaved = (e: Event) => {
+    const handleTimerSaved = async (e: Event) => {
       const customEvent = e as CustomEvent<{ durationSeconds: number; startTime: string; pauseTimes?: string[] }>;
       if (customEvent.detail && customEvent.detail.durationSeconds) {
-        saveSession(
+        if (activeObjectiveId) {
+          await dbUpdateObjectiveInteractionTime(activeObjectiveId);
+        }
+        await saveSession(
           customEvent.detail.startTime,
           customEvent.detail.durationSeconds,
           customEvent.detail.pauseTimes || []
@@ -292,7 +338,7 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
       window.removeEventListener('timer-paused', handlePaused);
       window.removeEventListener('timer-reset', handleReset);
     };
-  }, [saveSession]);
+  }, [saveSession, activeObjectiveId]);
 
   return (
     <FocusContext.Provider value={{

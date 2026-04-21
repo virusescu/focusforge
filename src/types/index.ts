@@ -56,6 +56,7 @@ export interface StrategicObjective {
   category_id?: number | null;
   is_mission: number; // 1 = Mission Objectives, 0 = Backlog
   details?: string | null;
+  last_interacted_at: string;
 }
 
 // ─── Game Economy Types ─────────────────────────────────────────
