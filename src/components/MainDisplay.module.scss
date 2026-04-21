@@ -51,6 +51,37 @@
     transition: all 0.2s ease;
   }
 
+  .hudSubTask {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: #facc15; // Yellow
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 600;
+    text-align: center;
+    max-width: 80%;
+    margin-top: -0.25rem;
+    padding: 0.25rem 1rem;
+    background: rgba(250, 204, 21, 0.05);
+    border-radius: 2px;
+    animation: fadeIn 0.5s ease-out;
+    pointer-events: auto; // Enable interaction for links
+
+    a {
+      color: #facc15;
+      text-decoration: none;
+      border-bottom: 1px dashed rgba(250, 204, 21, 0.4);
+      transition: all 0.2s ease;
+      cursor: pointer;
+
+      &:hover {
+        color: #ffffff;
+        border-bottom-color: #ffffff;
+        text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+      }
+    }
+  }
+
 
   &:hover .hudText {
     background: rgba(255, 102, 0, 0.15);

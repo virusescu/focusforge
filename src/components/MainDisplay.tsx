@@ -1,8 +1,20 @@
 import { type FC, useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
 import styles from './MainDisplay.module.scss';
 import { Play, Pause, RotateCcw, Zap, Target } from 'lucide-react';
 import { useFocus } from '../contexts/FocusContext';
 import { soundEngine, playChargeClickWithFile } from '../utils/audio';
+import { open } from '@tauri-apps/plugin-shell';
+
+const ExternalLink: FC<any> = ({ href, children, ...props }) => (
+  <a
+    {...props}
+    href={href}
+    onClick={(e) => { e.preventDefault(); if (href) open(href); }}
+  >
+    {children}
+  </a>
+);
 
 export const MainDisplay: FC<{ onViewAnalytics?: () => void; onViewIntel?: () => void; onViewVault?: () => void; onOpenDetails?: () => void; detailsPanelOpen?: boolean }> = ({ onViewAnalytics, onViewIntel, onViewVault, onOpenDetails, detailsPanelOpen }) => {
   const { 
@@ -23,10 +35,41 @@ export const MainDisplay: FC<{ onViewAnalytics?: () => void; onViewIntel?: () =>
   const chargeRef = useRef(0);
   const lastClickTime = useRef(0);
 
-  const activeObjective = useMemo(() => 
-    objectivePool.find(o => o.id === activeObjectiveId),
-    [objectivePool, activeObjectiveId]
-  );
+  const extractCurrentSubTask = useCallback((details: string | null | undefined): string | null => {
+    if (!details) return null;
+    const lines = details.split('\n');
+    const taskRegex = /^\s*-\s*\[ \]\s*(.*)$/;
+    
+    let firstUnchecked: string | null = null;
+
+    for (const line of lines) {
+      const match = line.match(taskRegex);
+      if (match) {
+        const taskText = match[1].trim();
+        // Priority: FULLY wrapped in bold: **something**
+        const isFullyBold = taskText.startsWith('**') && taskText.endsWith('**') && taskText.length >= 4;
+        
+        if (isFullyBold) {
+          return taskText;
+        }
+        
+        if (!firstUnchecked) {
+          firstUnchecked = taskText;
+        }
+      }
+    }
+    
+    return firstUnchecked;
+  }, []);
+
+  const activeObjective = useMemo(() => {
+    const obj = objectivePool.find(o => o.id === activeObjectiveId);
+    if (!obj) return null;
+    return {
+      ...obj,
+      currentSubTask: extractCurrentSubTask(obj.details)
+    };
+  }, [objectivePool, activeObjectiveId, extractCurrentSubTask]);
 
   const handleNeutralize = useCallback(() => {
     if (activeObjectiveId !== null) {
@@ -148,6 +191,11 @@ export const MainDisplay: FC<{ onViewAnalytics?: () => void; onViewIntel?: () =>
         >
           <span className={styles.hudLabel}>ACTIVE_OBJECTIVE // LOCKED_ON</span>
           <div className={styles.hudText}>{activeObjective.text}</div>
+          {activeObjective.currentSubTask && (
+            <div className={styles.hudSubTask}>
+              <ReactMarkdown components={{ p: 'span', a: ExternalLink }}>{activeObjective.currentSubTask}</ReactMarkdown>
+            </div>
+          )}
         </div>
       )}
 
