@@ -12,7 +12,6 @@ const FRAG = `
 precision mediump float;
 uniform float u_time;
 uniform float u_intensity;
-uniform float u_speed;
 uniform vec2 u_res;
 
 float hash(vec2 p) {
@@ -48,9 +47,9 @@ void main() {
   float aspect = u_res.x / u_res.y;
 
   vec2 nUV = vec2(uv.x * aspect * 5.0, uv.y * 5.0);
-  nUV.y -= u_time * u_speed;
+  nUV.y -= u_time;
 
-  float warp = fbm(nUV + fbm(nUV + u_time * 0.15));
+  float warp = fbm(nUV + fbm(nUV + u_time * 0.4));
 
   // Intensity drives height; smoothstep fade-out avoids abrupt cut
   float fireTop = u_intensity * 0.95;
@@ -150,7 +149,6 @@ export const FireBackground: FC = () => {
 
     const uTime      = gl.getUniformLocation(prog, 'u_time');
     const uIntensity = gl.getUniformLocation(prog, 'u_intensity');
-    const uSpeed     = gl.getUniformLocation(prog, 'u_speed');
     const uRes       = gl.getUniformLocation(prog, 'u_res');
 
     // Additive blending — fire adds light, no dark fringing
@@ -167,6 +165,8 @@ export const FireBackground: FC = () => {
 
     let raf: number;
     const startTime = performance.now();
+    let lastTime = startTime;
+    let accumulatedTime = 0;
     let current = 0;
     let currentSpeed = 0.35;
 
@@ -186,18 +186,23 @@ export const FireBackground: FC = () => {
         current += (target - current) * 0.005;
         currentSpeed += (targetSpeed - currentSpeed) * 0.008;
       }
-      const animSpeed = currentSpeed;
+      
+      const now = performance.now();
+      const deltaTime = (now - lastTime) / 1000;
+      lastTime = now;
+      
+      // Integrate speed over time to prevent phase jumps
+      accumulatedTime += deltaTime * currentSpeed;
+
       if (debugRef.current) {
-        debugRef.current.textContent = `u_intensity: ${current.toFixed(3)}  u_speed: ${animSpeed.toFixed(3)}  target: ${target.toFixed(2)}  minutes: ${minutesRef.current.toFixed(1)}`;
+        debugRef.current.textContent = `u_intensity: ${current.toFixed(3)}  u_speed: ${currentSpeed.toFixed(3)}  accTime: ${accumulatedTime.toFixed(2)}  minutes: ${minutesRef.current.toFixed(1)}`;
       }
 
       gl.clear(gl.COLOR_BUFFER_BIT);
       if (current < 0.005) return;
 
-      const t = (performance.now() - startTime) / 1000;
-      gl.uniform1f(uTime, t);
+      gl.uniform1f(uTime, accumulatedTime);
       gl.uniform1f(uIntensity, current);
-      gl.uniform1f(uSpeed, animSpeed);
       gl.uniform2f(uRes, canvas.width, canvas.height);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
     };
