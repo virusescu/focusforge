@@ -677,7 +677,7 @@ export async function updateObjectiveCompletedAt(id: number, completedAt: string
 export async function completeObjective(id: number): Promise<void> {
   const database = getDb();
   await database.execute({
-    sql: 'UPDATE objectives SET completed_at = ? WHERE id = ?',
+    sql: 'UPDATE objectives SET completed_at = ?, details = NULL WHERE id = ?',
     args: [new Date().toISOString(), id],
   });
 }

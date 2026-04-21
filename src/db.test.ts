@@ -73,7 +73,7 @@ describe('db utility functions', () => {
       });
     });
 
-    it('completeObjective sets completed_at timestamp', async () => {
+    it('completeObjective sets completed_at timestamp and clears details', async () => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date('2026-03-25T14:30:00.000Z'));
       mockExecute.mockResolvedValueOnce({ rows: [], rowsAffected: 1 });
@@ -81,7 +81,7 @@ describe('db utility functions', () => {
       await completeObjective(42);
 
       expect(mockExecute).toHaveBeenCalledWith({
-        sql: expect.stringContaining('UPDATE objectives SET completed_at = ?'),
+        sql: expect.stringContaining('UPDATE objectives SET completed_at = ?, details = NULL'),
         args: ['2026-03-25T14:30:00.000Z', 42],
       });
 

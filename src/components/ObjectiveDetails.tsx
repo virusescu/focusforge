@@ -98,6 +98,12 @@ export const ObjectiveDetails: FC<Props> = ({ onClose }) => {
   }, [onClose]);
 
   useEffect(() => {
+    if (!activeObjectiveId) {
+      onClose();
+    }
+  }, [activeObjectiveId, onClose]);
+
+  useEffect(() => {
     setIsEditing(false);
   }, [activeObjectiveId]);
 
