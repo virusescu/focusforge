@@ -12,7 +12,7 @@ vi.mock('@libsql/client', () => ({
   }),
 }));
 
-import { initDbClient, saveFocusSession, getRecentSessions, deleteFocusSession, getObjectives, addObjective, deleteObjective, completeObjective, getKillRate, getAllSessions, getFragmentationStats } from './db';
+import { initDbClient, saveFocusSession, getRecentSessions, deleteFocusSession, getObjectives, addObjective, deleteObjective, completeObjective, getKillRate, getAllSessions, getFragmentationStats, getAlarms, addAlarm, toggleAlarm, deleteAlarm } from './db';
 
 describe('db utility functions', () => {
   beforeEach(() => {
@@ -163,6 +163,53 @@ describe('db utility functions', () => {
       expect(mockExecute).toHaveBeenCalledWith({
         sql: expect.stringContaining('WHERE fs.user_id = ?'),
         args: [1],
+      });
+    });
+  });
+
+  describe('Alarms Methods', () => {
+    it('getAlarms returns all alarms for a user', async () => {
+      mockExecute.mockResolvedValueOnce({ rows: [], rowsAffected: 0 });
+
+      await getAlarms(1);
+
+      expect(mockExecute).toHaveBeenCalledWith({
+        sql: expect.stringContaining('SELECT * FROM alarms WHERE user_id = ?'),
+        args: [1],
+      });
+    });
+
+    it('addAlarm inserts a new alarm', async () => {
+      mockExecute.mockResolvedValueOnce({ lastInsertRowid: BigInt(123), rowsAffected: 1, rows: [] });
+
+      const id = await addAlarm(1, 'Wake Up', '08:00', [1, 2, 3, 4, 5]);
+
+      expect(mockExecute).toHaveBeenCalledWith({
+        sql: expect.stringContaining('INSERT INTO alarms (user_id, title, time, days_of_week, is_active)'),
+        args: [1, 'Wake Up', '08:00', '[1,2,3,4,5]'],
+      });
+      expect(id).toBe(123);
+    });
+
+    it('toggleAlarm updates the is_active status', async () => {
+      mockExecute.mockResolvedValueOnce({ rowsAffected: 1, rows: [] });
+
+      await toggleAlarm(42, true);
+
+      expect(mockExecute).toHaveBeenCalledWith({
+        sql: expect.stringContaining('UPDATE alarms SET is_active = ? WHERE id = ?'),
+        args: [1, 42],
+      });
+    });
+
+    it('deleteAlarm removes an alarm by id', async () => {
+      mockExecute.mockResolvedValueOnce({ rowsAffected: 1, rows: [] });
+
+      await deleteAlarm(42);
+
+      expect(mockExecute).toHaveBeenCalledWith({
+        sql: expect.stringContaining('DELETE FROM alarms WHERE id = ?'),
+        args: [42],
       });
     });
   });

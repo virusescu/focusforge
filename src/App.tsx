@@ -15,14 +15,17 @@ import { LoginScreen } from './components/LoginScreen';
 import { SetupScreen } from './components/SetupScreen';
 import { useFocus } from './contexts/FocusContext';
 import { useAuth } from './contexts/AuthContext';
+import { useAlarms } from './contexts/AlarmContext';
 import { UserProvider } from './contexts/UserContext';
 import { FocusProvider } from './contexts/FocusContext';
 import { GameProvider } from './contexts/GameContext';
+import { AlarmProvider } from './contexts/AlarmContext';
 import { NavigationGuard } from './components/NavigationGuard';
 import { RewardToast } from './components/RewardToast';
 import { SeasonTransitionModal } from './components/SeasonTransitionModal';
 import { VaultPage } from './components/VaultPage';
 import { FireBackground } from './components/FireBackground';
+import AlarmOverlay from './components/AlarmOverlay';
 
 function HudApp() {
   const [view, setView] = useState<'hud' | 'analytics' | 'intel' | 'vault'>('hud');
@@ -31,22 +34,16 @@ function HudApp() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [detailsPanelOpen, setDetailsPanelOpen] = useState(false);
   const { timerStatus, resetTimer, activeObjectiveId } = useFocus();
+  const { activeAlarm, dismissAlarm } = useAlarms();
   const [availableUpdate, setAvailableUpdate] = useState<Update | null>(null);
 
   useEffect(() => {
-    // Track app use time for internal analytics/logic
     localStorage.setItem('last_app_use', Date.now().toString());
   }, []);
 
   useEffect(() => {
-    console.log('Checking for updates...');
     check().then(update => {
-      if (update) {
-        console.log('Update found:', update.version);
-        setAvailableUpdate(update);
-      } else {
-        console.log('No updates available');
-      }
+      if (update) setAvailableUpdate(update);
     }).catch(err => {
       console.error('Update check failed:', err);
     });
@@ -65,12 +62,8 @@ function HudApp() {
       setPendingNavigation({ target: 'analytics', dateStr });
       return;
     }
-
-    if (dateStr) {
-      setAnalyticsDate(new Date(dateStr));
-    } else {
-      setAnalyticsDate(new Date());
-    }
+    if (dateStr) setAnalyticsDate(new Date(dateStr));
+    else setAnalyticsDate(new Date());
     setView('analytics');
   };
 
@@ -93,13 +86,9 @@ function HudApp() {
   const handleConfirmNavigation = () => {
     if (!pendingNavigation) return;
     resetTimer();
-
     if (pendingNavigation.target === 'analytics') {
-      if (pendingNavigation.dateStr) {
-        setAnalyticsDate(new Date(pendingNavigation.dateStr));
-      } else {
-        setAnalyticsDate(new Date());
-      }
+      if (pendingNavigation.dateStr) setAnalyticsDate(new Date(pendingNavigation.dateStr));
+      else setAnalyticsDate(new Date());
       setView('analytics');
     } else if (pendingNavigation.target === 'vault') {
       setView('vault');
@@ -114,53 +103,66 @@ function HudApp() {
   };
 
   return (
-  <>
-    <FireBackground />
-    <div className="hud-container">
-      <GlitchOverlay />
-      <Header onOpenSettings={() => setIsSettingsOpen(true)} onViewVault={handleViewVault} />
-      {view === 'hud' ? (
-        <>
-          <SidebarLeft onOpenSettings={() => setIsSettingsOpen(true)} />
-          <MainDisplay onViewAnalytics={() => handleViewAnalytics()} onViewIntel={handleViewIntel} onViewVault={handleViewVault} onOpenDetails={() => setDetailsPanelOpen(true)} detailsPanelOpen={detailsPanelOpen} />
-          <SidebarRight 
-            onViewAnalytics={(date) => handleViewAnalytics(date)} 
-            onViewIntel={handleViewIntel} 
-            onViewVault={handleViewVault} 
-            detailsPanelOpen={detailsPanelOpen} 
-            onOpenDetails={() => setDetailsPanelOpen(true)} 
-            onCloseDetails={() => setDetailsPanelOpen(false)} 
-          />
-        </>
-      ) : view === 'analytics' ? (
-        <AnalyticsView initialDate={analyticsDate} onBack={() => setView('hud')} />
-      ) : view === 'vault' ? (
-        <VaultPage onBack={() => setView('hud')} />
-      ) : (
-        <IntelligenceHub onBack={() => setView('hud')} />
-      )}
-      <Footer />
+    <>
+      <FireBackground />
+      <div className="hud-container">
+        <GlitchOverlay />
+        <Header onOpenSettings={() => setIsSettingsOpen(true)} onViewVault={handleViewVault} />
+        {view === 'hud' ? (
+          <>
+            <SidebarLeft onOpenSettings={() => setIsSettingsOpen(true)} />
+            <MainDisplay 
+              onViewAnalytics={() => handleViewAnalytics()} 
+              onViewIntel={handleViewIntel} 
+              onViewVault={handleViewVault} 
+              onOpenDetails={() => setDetailsPanelOpen(true)} 
+              detailsPanelOpen={detailsPanelOpen} 
+            />
+            <SidebarRight 
+              onViewAnalytics={(date) => handleViewAnalytics(date)} 
+              onViewIntel={handleViewIntel} 
+              onViewVault={handleViewVault} 
+              detailsPanelOpen={detailsPanelOpen} 
+              onOpenDetails={() => setDetailsPanelOpen(true)} 
+              onCloseDetails={() => setDetailsPanelOpen(false)} 
+            />
+          </>
+        ) : view === 'analytics' ? (
+          <AnalyticsView initialDate={analyticsDate} onBack={() => setView('hud')} />
+        ) : view === 'vault' ? (
+          <VaultPage onBack={() => setView('hud')} />
+        ) : (
+          <IntelligenceHub onBack={() => setView('hud')} />
+        )}
+        <Footer />
 
-      {pendingNavigation && (
-        <NavigationGuard
-          onConfirm={handleConfirmNavigation}
-          onCancel={handleCancelNavigation}
+        {pendingNavigation && (
+          <NavigationGuard
+            onConfirm={handleConfirmNavigation}
+            onCancel={handleCancelNavigation}
+          />
+        )}
+      </div>
+      <RewardToast />
+      <SeasonTransitionModal />
+      {isSettingsOpen && (
+        <SettingsModal onClose={() => setIsSettingsOpen(false)} />
+      )}
+      {availableUpdate && (
+        <UpdatePrompt
+          update={availableUpdate}
+          onSkip={() => setAvailableUpdate(null)}
         />
       )}
-    </div>
-    <RewardToast />
-    <SeasonTransitionModal />
-    {isSettingsOpen && (
-      <SettingsModal onClose={() => setIsSettingsOpen(false)} />
-    )}
-    {availableUpdate && (
-      <UpdatePrompt
-        update={availableUpdate}
-        onSkip={() => setAvailableUpdate(null)}
-      />
-    )}
-  </>
+      {activeAlarm && (
+        <AlarmOverlay alarm={activeAlarm} onDismiss={dismissAlarm} />
+      )}
+    </>
   );
+}
+
+function AppContent() {
+  return <HudApp />;
 }
 
 function App() {
@@ -186,17 +188,13 @@ function App() {
     <UserProvider>
       <FocusProvider>
         <GameProvider>
-          <AppContent />
+          <AlarmProvider>
+            <AppContent />
+          </AlarmProvider>
         </GameProvider>
       </FocusProvider>
     </UserProvider>
   );
-}
-
-// Extract the content that uses context hooks to a separate component
-// so that context providers are available when the hooks are called.
-function AppContent() {
-  return <HudApp />;
 }
 
 export default App;

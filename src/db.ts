@@ -1,5 +1,5 @@
 import { createClient, type Client, type InArgs } from '@libsql/client';
-import type { FocusSession, DailyStat, StrategicObjective, ObjectiveCategory, AuthUser, UserSettings, GameSeason, GameState, ToolDefinition, PrestigeTitleDefinition, SeasonArchive, StreakLogEntry } from './types';
+import type { FocusSession, DailyStat, StrategicObjective, ObjectiveCategory, AuthUser, UserSettings, GameSeason, GameState, ToolDefinition, PrestigeTitleDefinition, SeasonArchive, StreakLogEntry, Alarm } from './types';
 import { getQuarter, getSeasonDates, getSeasonLabel, getSeasonName, getSeasonBadgeColor } from './utils/gameEconomy';
 
 let db: Client | null = null;
@@ -214,6 +214,18 @@ export async function initDb() {
       had_session INTEGER NOT NULL DEFAULT 0,
       streak_day INTEGER NOT NULL DEFAULT 0,
       UNIQUE(user_id, season_id, date)
+    )
+  `);
+
+  await database.execute(`
+    CREATE TABLE IF NOT EXISTS alarms (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      time TEXT NOT NULL,
+      days_of_week TEXT NOT NULL,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      FOREIGN KEY (user_id) REFERENCES users(id)
     )
   `);
 
@@ -731,7 +743,7 @@ export async function getCompletedObjectivesForDay(userId: number, date: string,
   })();
 
   const result = await database.execute({
-    sql: `SELECT id, text, completed_at, category_id FROM objectives
+    sql: `SELECT id, text, created_at, completed_at, category_id, is_mission, last_interacted_at FROM objectives
           WHERE user_id = ? AND completed_at IS NOT NULL
             AND datetime(completed_at, 'localtime') >= ? || ' ' || ?
             AND datetime(completed_at, 'localtime') < ? || ' ' || ?
@@ -742,10 +754,11 @@ export async function getCompletedObjectivesForDay(userId: number, date: string,
   return result.rows.map(row => ({
     id: row.id as number,
     text: row.text as string,
-    created_at: '',
+    created_at: row.created_at as string,
     completed_at: row.completed_at as string,
     category_id: row.category_id as number | null,
     is_mission: (row.is_mission as number) ?? 1,
+    last_interacted_at: (row.last_interacted_at as string) || (row.created_at as string),
   }));
 }
 
@@ -1122,4 +1135,55 @@ export async function getStreakLog(userId: number, seasonId: number): Promise<St
     had_session: row.had_session as number,
     streak_day: row.streak_day as number,
   }));
+}
+
+// ─── Alarms ─────────────────────────────────────────────────────
+
+export async function getAlarms(userId: number): Promise<Alarm[]> {
+  const database = getDb();
+  const result = await database.execute({
+    sql: 'SELECT * FROM alarms WHERE user_id = ? ORDER BY time ASC',
+    args: [userId],
+  });
+  return result.rows.map(row => ({
+    id: row.id as number,
+    user_id: row.user_id as number,
+    title: row.title as string,
+    time: row.time as string,
+    days_of_week: JSON.parse(row.days_of_week as string),
+    is_active: Boolean(row.is_active),
+  }));
+}
+
+export async function addAlarm(userId: number, title: string, time: string, daysOfWeek: number[]): Promise<number> {
+  const database = getDb();
+  const result = await database.execute({
+    sql: 'INSERT INTO alarms (user_id, title, time, days_of_week, is_active) VALUES (?, ?, ?, ?, 1)',
+    args: [userId, title, time, JSON.stringify(daysOfWeek)],
+  });
+  return Number(result.lastInsertRowid);
+}
+
+export async function updateAlarm(id: number, title: string, time: string, daysOfWeek: number[]): Promise<void> {
+  const database = getDb();
+  await database.execute({
+    sql: 'UPDATE alarms SET title = ?, time = ?, days_of_week = ? WHERE id = ?',
+    args: [title, time, JSON.stringify(daysOfWeek), id],
+  });
+}
+
+export async function toggleAlarm(id: number, isActive: boolean): Promise<void> {
+  const database = getDb();
+  await database.execute({
+    sql: 'UPDATE alarms SET is_active = ? WHERE id = ?',
+    args: [isActive ? 1 : 0, id],
+  });
+}
+
+export async function deleteAlarm(id: number): Promise<void> {
+  const database = getDb();
+  await database.execute({
+    sql: 'DELETE FROM alarms WHERE id = ?',
+    args: [id],
+  });
 }

@@ -399,6 +399,26 @@ class SoundEngine {
     osc.stop(t + 0.07);
   }
 
+  playObjectiveAdded() {
+    const ctx = this.init();
+    const t = ctx.currentTime;
+    const playTone = (freq: number, start: number, dur: number, vol: number) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, t + start);
+      osc.frequency.exponentialRampToValueAtTime(freq * 1.5, t + start + dur);
+      gain.gain.setValueAtTime(vol, t + start);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + start + dur);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t + start);
+      osc.stop(t + start + dur + 0.01);
+    };
+    playTone(440, 0, 0.1, 0.07);
+    playTone(660, 0.05, 0.15, 0.05);
+  }
+
   playCheckboxCheck() {
     const ctx = this.init();
     const t = ctx.currentTime;
@@ -521,6 +541,14 @@ export async function playCheckboxCheckWithFile(): Promise<void> {
   } catch {
     soundEngine.playCheckboxCheck();
   }
+}
+
+export async function playAlarmFile(): Promise<HTMLAudioElement> {
+  const audio = new Audio('/sounds/alarm.mp3');
+  audio.loop = true;
+  audio.volume = 1.0;
+  await audio.play();
+  return audio;
 }
 
 export async function playChargeClickWithFile(step: number): Promise<void> {

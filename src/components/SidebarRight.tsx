@@ -1,6 +1,6 @@
 import { type FC, useEffect, useRef, useState, useCallback } from 'react';
 import styles from './SidebarRight.module.scss';
-import { Terminal, Activity, History, BarChart2, Gem, ClipboardList } from 'lucide-react';
+import { Terminal, Activity, History, BarChart2, Gem, ClipboardList, Clock } from 'lucide-react';
 import { useSystemLog } from '../hooks/useSystemLog';
 import { useFocus } from '../contexts/FocusContext';
 import { soundEngine } from '../utils/audio';
@@ -8,6 +8,7 @@ import { setStatusHint, clearStatusHint } from '../utils/statusHint';
 import { isWorkDay } from '../utils/gameEconomy';
 import { formatDateWithWeekday } from '../utils/dateUtils';
 import { ObjectiveDetails } from './ObjectiveDetails';
+import { AlarmsModal } from './AlarmsModal';
 
 type RGB = [number, number, number];
 
@@ -64,6 +65,7 @@ interface Props {
 export const SidebarRight: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVault, detailsPanelOpen, onOpenDetails, onCloseDetails }) => {
   const { logs } = useSystemLog();
   const { dailyStats, recentSessions, activeObjectiveId } = useFocus();
+  const [showAlarms, setShowAlarms] = useState(false);
 
   useEffect(() => {
     if (!detailsPanelOpen) return;
@@ -142,6 +144,11 @@ export const SidebarRight: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVa
     soundEngine.playClick();
     onViewVault();
   }, [onViewVault]);
+
+  const handleAlarmClick = useCallback(() => {
+    soundEngine.playClick();
+    setShowAlarms(true);
+  }, []);
 
   if (detailsPanelOpen) {
     return <ObjectiveDetails onClose={() => { soundEngine.playDetailsClose(); onCloseDetails(); }} />;
@@ -223,6 +230,15 @@ export const SidebarRight: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVa
         </button>
         <button
           className={styles.navBtn}
+          onClick={handleAlarmClick}
+          onMouseEnter={() => { soundEngine.playHover(); setStatusHint('ALARM_SYSTEM'); }}
+          onMouseLeave={clearStatusHint}
+          style={{ '--btn-color': '#00ff88' } as any}
+        >
+          <Clock size={24} />
+        </button>
+        <button
+          className={styles.navBtn}
           onClick={handleIntelClick}
           onMouseEnter={() => { soundEngine.playHover(); setStatusHint('INTELLIGENCE_HUB'); }}
           onMouseLeave={clearStatusHint}
@@ -250,6 +266,8 @@ export const SidebarRight: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVa
           <ClipboardList size={24} />
         </button>
       </div>
+
+      {showAlarms && <AlarmsModal onClose={() => setShowAlarms(false)} />}
     </aside>
   );
 };

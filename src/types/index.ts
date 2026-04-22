@@ -56,7 +56,7 @@ export interface StrategicObjective {
   category_id?: number | null;
   is_mission: number; // 1 = Mission Objectives, 0 = Backlog
   details?: string | null;
-  last_interacted_at: string;
+  last_interacted_at?: string;
 }
 
 // ─── Game Economy Types ─────────────────────────────────────────
@@ -143,6 +143,15 @@ export interface StreakLogEntry {
   date: string;
   had_session: number;
   streak_day: number;
+}
+
+export interface Alarm {
+  id: number;
+  user_id: number;
+  title: string;
+  time: string; // HH:MM
+  days_of_week: number[]; // 0-6 (Sun-Sat)
+  is_active: boolean;
 }
 
 export interface RewardToastData {

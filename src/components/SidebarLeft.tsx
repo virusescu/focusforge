@@ -27,6 +27,7 @@ import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifi
 import type { StrategicObjective, ObjectiveCategory } from '../types';
 import { CategoryDotPicker } from './CategoryDotPicker';
 import { CategoryManagerModal } from './CategoryManagerModal';
+import { AlarmsModal } from './AlarmsModal';
 
 interface SortableItemProps {
   obj: StrategicObjective;
@@ -242,6 +243,7 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenSettings }) => {
   const [newCategoryId, setNewCategoryId] = useState<number | null>(null);
   const [showNewCategoryPicker, setShowNewCategoryPicker] = useState(false);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const [showAlarms, setShowAlarms] = useState(false);
 
   const displayedObjectives = objectiveView === 'mission' ? missionObjectives : backlogObjectives;
 
@@ -579,6 +581,11 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenSettings }) => {
         </DndContext>
       </div>
 
+      {showAlarms && (
+        <AlarmsModal
+          onClose={() => setShowAlarms(false)}
+        />
+      )}
       {showCategoryManager && (
         <CategoryManagerModal
           categories={categories}
