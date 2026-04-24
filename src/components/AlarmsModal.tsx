@@ -3,7 +3,7 @@ import styles from './AlarmsModal.module.scss';
 import { useAlarms } from '../contexts/AlarmContext';
 import { soundEngine } from '../utils/audio';
 import type { Alarm } from '../types';
-import { Edit2, Trash2, X, Check, Plus } from 'lucide-react';
+import { Edit2, Trash2, X, Plus } from 'lucide-react';
 
 interface AlarmsModalProps {
   onClose: () => void;
