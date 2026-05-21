@@ -110,7 +110,7 @@ function HudApp() {
         <Header onOpenSettings={() => setIsSettingsOpen(true)} onViewVault={handleViewVault} />
         {view === 'hud' ? (
           <>
-            <SidebarLeft onOpenSettings={() => setIsSettingsOpen(true)} />
+            <SidebarLeft onOpenSettings={() => setIsSettingsOpen(true)} onOpenDetails={() => setDetailsPanelOpen(true)} />
             <MainDisplay 
               onViewAnalytics={() => handleViewAnalytics()} 
               onViewIntel={handleViewIntel} 
@@ -118,13 +118,12 @@ function HudApp() {
               onOpenDetails={() => setDetailsPanelOpen(true)} 
               detailsPanelOpen={detailsPanelOpen} 
             />
-            <SidebarRight 
-              onViewAnalytics={(date) => handleViewAnalytics(date)} 
-              onViewIntel={handleViewIntel} 
-              onViewVault={handleViewVault} 
-              detailsPanelOpen={detailsPanelOpen} 
-              onOpenDetails={() => setDetailsPanelOpen(true)} 
-              onCloseDetails={() => setDetailsPanelOpen(false)} 
+            <SidebarRight
+              onViewAnalytics={(date) => handleViewAnalytics(date)}
+              onViewIntel={handleViewIntel}
+              onViewVault={handleViewVault}
+              detailsPanelOpen={detailsPanelOpen}
+              onCloseDetails={() => setDetailsPanelOpen(false)}
             />
           </>
         ) : view === 'analytics' ? (

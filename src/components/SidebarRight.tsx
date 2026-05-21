@@ -1,6 +1,6 @@
 import { type FC, useEffect, useRef, useState, useCallback } from 'react';
 import styles from './SidebarRight.module.scss';
-import { Terminal, Activity, History, BarChart2, Gem, ClipboardList, Clock } from 'lucide-react';
+import { Terminal, Activity, History, BarChart2, Gem, Clock } from 'lucide-react';
 import { useSystemLog } from '../hooks/useSystemLog';
 import { useFocus } from '../contexts/FocusContext';
 import { soundEngine } from '../utils/audio';
@@ -58,13 +58,12 @@ interface Props {
   onViewIntel: () => void;
   onViewVault: () => void;
   detailsPanelOpen: boolean;
-  onOpenDetails: () => void;
   onCloseDetails: () => void;
 }
 
-export const SidebarRight: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVault, detailsPanelOpen, onOpenDetails, onCloseDetails }) => {
+export const SidebarRight: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVault, detailsPanelOpen, onCloseDetails }) => {
   const { logs } = useSystemLog();
-  const { dailyStats, recentSessions, activeObjectiveId } = useFocus();
+  const { dailyStats, recentSessions } = useFocus();
   const [showAlarms, setShowAlarms] = useState(false);
 
   useEffect(() => {
@@ -254,16 +253,6 @@ export const SidebarRight: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVa
           style={{ '--btn-color': '#f0c040' } as any}
         >
           <Gem size={24} />
-        </button>
-        <button
-          className={styles.navBtn}
-          onClick={() => { soundEngine.playDetailsOpen(); onOpenDetails(); }}
-          onMouseEnter={() => { soundEngine.playHover(); setStatusHint('OBJECTIVE_DETAILS'); }}
-          onMouseLeave={clearStatusHint}
-          disabled={activeObjectiveId === null}
-          style={{ '--btn-color': '#ee682b', opacity: activeObjectiveId === null ? 0.3 : 1 } as any}
-        >
-          <ClipboardList size={24} />
         </button>
       </div>
 

@@ -78,8 +78,8 @@ interface Props {
 }
 
 export const ObjectiveDetails: FC<Props> = ({ onClose }) => {
-  const { activeObjectiveId, objectivePool, updateObjectiveDetails } = useFocus();
-  const activeObjective = objectivePool.find(o => o.id === activeObjectiveId) ?? null;
+  const { viewedObjectiveId, objectivePool, updateObjectiveDetails } = useFocus();
+  const activeObjective = objectivePool.find(o => o.id === viewedObjectiveId) ?? null;
 
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState('');
@@ -98,14 +98,14 @@ export const ObjectiveDetails: FC<Props> = ({ onClose }) => {
   }, [onClose]);
 
   useEffect(() => {
-    if (!activeObjectiveId) {
+    if (!viewedObjectiveId) {
       onClose();
     }
-  }, [activeObjectiveId, onClose]);
+  }, [viewedObjectiveId, onClose]);
 
   useEffect(() => {
     setIsEditing(false);
-  }, [activeObjectiveId]);
+  }, [viewedObjectiveId]);
 
   // Enter in preview mode → enter edit mode
   useEffect(() => {
@@ -332,7 +332,7 @@ export const ObjectiveDetails: FC<Props> = ({ onClose }) => {
         <div className={styles.header}>
           <div className={styles.titleRow}>
             <ClipboardList size={14} />
-            <h4>OBJECTIVE_DETAILS</h4>
+            <h4>{activeObjective?.text ?? 'OBJECTIVE_DETAILS'}</h4>
           </div>
           <button className={styles.closeBtn} onClick={onClose} title="Close (Esc)">
             <X size={14} />

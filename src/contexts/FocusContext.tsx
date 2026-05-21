@@ -36,6 +36,7 @@ interface FocusContextType {
   } | null;
   objectivePool: StrategicObjective[];
   activeObjectiveId: number | null;
+  viewedObjectiveId: number | null;
   isGlitching: boolean;
   completedObjectiveText: string | null;
   categories: ObjectiveCategory[];
@@ -47,6 +48,7 @@ interface FocusContextType {
   updateObjectiveCategory: (id: number, categoryId: number | null) => Promise<void>;
   updateObjectiveDetails: (id: number, details: string | null) => Promise<void>;
   setActiveObjective: (id: number | null) => void;
+  setViewedObjective: (id: number | null) => void;
   neutralizeObjective: (id: number) => Promise<void>;
   reorderObjectives: (orderedIds: number[]) => Promise<void>;
   moveObjectiveToOtherList: (id: number) => Promise<void>;
@@ -102,6 +104,7 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
     [objectivePool]
   );
   const [activeObjectiveId, setActiveObjectiveId] = useState<number | null>(null);
+  const [viewedObjectiveId, setViewedObjectiveId] = useState<number | null>(null);
   const [isGlitching, setIsGlitching] = useState(false);
   const [completedObjectiveText, setCompletedObjectiveText] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -198,6 +201,17 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
 
   const setActiveObjective = useCallback((id: number | null) => {
     setActiveObjectiveId(id);
+    if (id !== null) {
+      setViewedObjectiveId(id);
+      setObjectivePool(prev => prev.map(o =>
+        o.id === id ? { ...o, last_interacted_at: new Date().toISOString() } : o
+      ));
+      dbUpdateObjectiveInteractionTime(id);
+    }
+  }, []);
+
+  const setViewedObjective = useCallback((id: number | null) => {
+    setViewedObjectiveId(id);
   }, []);
 
   const reorderObjectives = useCallback(async (orderedIds: number[]) => {
@@ -347,6 +361,7 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
       globalStats,
       objectivePool,
       activeObjectiveId,
+      viewedObjectiveId,
       isGlitching,
       completedObjectiveText,
       categories,
@@ -358,6 +373,7 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
       updateObjectiveCategory,
       updateObjectiveDetails,
       setActiveObjective,
+      setViewedObjective,
       neutralizeObjective,
       reorderObjectives,
       moveObjectiveToOtherList,
