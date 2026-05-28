@@ -266,7 +266,7 @@
   // Task list — remove default bullet
   ul:has(li > input[type="checkbox"]) {
     list-style: none;
-    padding-left: 0;
+    padding-left: 0.25em;
   }
 
   li {
@@ -274,17 +274,12 @@
 
     // Task item layout — hanging indent so wrapped lines align with text, not checkbox
     &:has(> input[type="checkbox"]) {
-      display: flex;
-      align-items: baseline;
+      padding-left: 1.5em;
 
       > input[type="checkbox"] {
-        flex-shrink: 0;
-        margin-right: 0.4rem;
+        margin-left: -1.5em;
+        margin-right: 0.4em;
         vertical-align: middle;
-      }
-
-      > p {
-        margin: 0;
       }
     }
   }
