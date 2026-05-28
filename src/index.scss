@@ -76,6 +76,47 @@ body {
   position: relative;
 }
 
+.right-sidebar-wrapper {
+  position: relative;
+  display: flex;
+  min-height: 0;
+
+  > :last-child {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+.resize-handle {
+  position: absolute;
+  left: -6px;
+  top: 0;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 10;
+  border-radius: 2px;
+  transition: background 0.15s;
+
+  &::after {
+    content: "";
+    position: absolute;
+    left: 3px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 2px;
+    height: 40px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 1px;
+    transition: background 0.15s, height 0.15s;
+  }
+
+  &:hover::after {
+    background: var(--primary);
+    height: 60px;
+  }
+}
+
 .card {
   background: var(--bg-card);
   backdrop-filter: var(--glass);

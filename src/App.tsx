@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { check } from '@tauri-apps/plugin-updater';
 import type { Update } from '@tauri-apps/plugin-updater';
 import { UpdatePrompt } from './components/UpdatePrompt';
@@ -33,6 +33,8 @@ function HudApp() {
   const [pendingNavigation, setPendingNavigation] = useState<{ target: 'analytics' | 'intel' | 'vault'; dateStr?: string } | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [detailsPanelOpen, setDetailsPanelOpen] = useState(false);
+  const [rightSidebarWidth, setRightSidebarWidth] = useState(350);
+  const resizingRef = useRef(false);
   const { timerStatus, resetTimer, activeObjectiveId } = useFocus();
   const { activeAlarm, dismissAlarm } = useAlarms();
   const [availableUpdate, setAvailableUpdate] = useState<Update | null>(null);
@@ -102,30 +104,54 @@ function HudApp() {
     setPendingNavigation(null);
   };
 
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    resizingRef.current = true;
+    const startX = e.clientX;
+    const startWidth = rightSidebarWidth;
+    const onMouseMove = (ev: MouseEvent) => {
+      const delta = startX - ev.clientX;
+      setRightSidebarWidth(Math.max(280, Math.min(700, startWidth + delta)));
+    };
+    const onMouseUp = () => {
+      resizingRef.current = false;
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, [rightSidebarWidth]);
+
   return (
     <>
       <FireBackground />
-      <div className="hud-container">
+      <div className="hud-container" style={{ gridTemplateColumns: `350px 1fr ${rightSidebarWidth}px` }}>
         <GlitchOverlay />
         <Header onOpenSettings={() => setIsSettingsOpen(true)} onViewVault={handleViewVault} />
         {view === 'hud' ? (
           <>
-            <SidebarLeft onOpenSettings={() => setIsSettingsOpen(true)} />
-            <MainDisplay 
-              onViewAnalytics={() => handleViewAnalytics()} 
-              onViewIntel={handleViewIntel} 
-              onViewVault={handleViewVault} 
-              onOpenDetails={() => setDetailsPanelOpen(true)} 
-              detailsPanelOpen={detailsPanelOpen} 
+            <SidebarLeft onOpenSettings={() => setIsSettingsOpen(true)} onOpenDetails={() => setDetailsPanelOpen(true)} />
+            <MainDisplay
+              onViewAnalytics={() => handleViewAnalytics()}
+              onViewIntel={handleViewIntel}
+              onViewVault={handleViewVault}
+              onOpenDetails={() => setDetailsPanelOpen(true)}
+              detailsPanelOpen={detailsPanelOpen}
             />
-            <SidebarRight 
-              onViewAnalytics={(date) => handleViewAnalytics(date)} 
-              onViewIntel={handleViewIntel} 
-              onViewVault={handleViewVault} 
-              detailsPanelOpen={detailsPanelOpen} 
-              onOpenDetails={() => setDetailsPanelOpen(true)} 
-              onCloseDetails={() => setDetailsPanelOpen(false)} 
-            />
+            <div className="right-sidebar-wrapper">
+              <div className="resize-handle" data-details-barrier onMouseDown={handleResizeStart} />
+              <SidebarRight
+                onViewAnalytics={(date) => handleViewAnalytics(date)}
+                onViewIntel={handleViewIntel}
+                onViewVault={handleViewVault}
+                detailsPanelOpen={detailsPanelOpen}
+                onCloseDetails={() => setDetailsPanelOpen(false)}
+              />
+            </div>
           </>
         ) : view === 'analytics' ? (
           <AnalyticsView initialDate={analyticsDate} onBack={() => setView('hud')} />

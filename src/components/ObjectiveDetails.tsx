@@ -78,8 +78,8 @@ interface Props {
 }
 
 export const ObjectiveDetails: FC<Props> = ({ onClose }) => {
-  const { activeObjectiveId, objectivePool, updateObjectiveDetails } = useFocus();
-  const activeObjective = objectivePool.find(o => o.id === activeObjectiveId) ?? null;
+  const { viewedObjectiveId, objectivePool, updateObjectiveDetails } = useFocus();
+  const activeObjective = objectivePool.find(o => o.id === viewedObjectiveId) ?? null;
 
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState('');
@@ -98,14 +98,14 @@ export const ObjectiveDetails: FC<Props> = ({ onClose }) => {
   }, [onClose]);
 
   useEffect(() => {
-    if (!activeObjectiveId) {
+    if (!viewedObjectiveId) {
       onClose();
     }
-  }, [activeObjectiveId, onClose]);
+  }, [viewedObjectiveId, onClose]);
 
   useEffect(() => {
     setIsEditing(false);
-  }, [activeObjectiveId]);
+  }, [viewedObjectiveId]);
 
   // Enter in preview mode → enter edit mode
   useEffect(() => {
@@ -303,28 +303,54 @@ export const ObjectiveDetails: FC<Props> = ({ onClose }) => {
     setTimeout(() => { textarea.focus(); textarea.setSelectionRange(newEnd, newEnd); }, 0);
   }, [editText]);
 
-  const handleCheckboxToggle = useCallback((lineIndex: number) => {
-    if (!activeObjective?.details) return;
-    const lines = activeObjective.details.split('\n');
-    const line = lines[lineIndex];
-    if (/\[ \]/.test(line)) {
-      lines[lineIndex] = line.replace('[ ]', '[x]');
-      playCheckboxCheckWithFile();
-    } else if (/\[x\]/i.test(line)) {
-      lines[lineIndex] = line.replace(/\[x\]/i, '[ ]');
-      soundEngine.playCheckboxUncheck();
-    }
-    updateObjectiveDetails(activeObjective.id, lines.join('\n'));
-  }, [activeObjective, updateObjectiveDetails]);
-
   const details = activeObjective?.details ?? null;
 
   // Markdown collapses multiple blank lines into one paragraph break.
   // Replace each extra blank line with a zero-width-space paragraph so the
   // visual spacing the user typed in the textarea is preserved in preview.
-  const renderedDetails = details
-    ? details.replace(/\n{3,}/g, m => '\n\n' + '\u200b\n\n'.repeat(m.length - 2))
-    : null;
+  // We also build a line index map: renderedLine \u2192 originalLine so checkbox
+  // toggles target the correct line in the original source.
+  const { renderedDetails, lineMap } = (() => {
+    if (!details) return { renderedDetails: null, lineMap: [] as number[] };
+    const originalLines = details.split('\n');
+    const resultLines: string[] = [];
+    const map: number[] = [];
+    for (let i = 0; i < originalLines.length; i++) {
+      resultLines.push(originalLines[i]);
+      map.push(i);
+      if (originalLines[i] === '' && i > 0 && i < originalLines.length - 1) {
+        let consecutive = 0;
+        let j = i + 1;
+        while (j < originalLines.length && originalLines[j] === '') {
+          consecutive++;
+          j++;
+        }
+        if (consecutive > 0) {
+          for (let k = 0; k < consecutive; k++) {
+            resultLines.push('\u200b');
+            map.push(i + 1 + k);
+          }
+        }
+      }
+    }
+    return { renderedDetails: resultLines.join('\n'), lineMap: map };
+  })();
+
+  const handleCheckboxToggle = useCallback((renderedLineIndex: number) => {
+    if (!activeObjective?.details) return;
+    const originalLineIndex = lineMap[renderedLineIndex] ?? renderedLineIndex;
+    const lines = activeObjective.details.split('\n');
+    const line = lines[originalLineIndex];
+    if (!line) return;
+    if (/\[ \]/.test(line)) {
+      lines[originalLineIndex] = line.replace('[ ]', '[x]');
+      playCheckboxCheckWithFile();
+    } else if (/\[x\]/i.test(line)) {
+      lines[originalLineIndex] = line.replace(/\[x\]/i, '[ ]');
+      soundEngine.playCheckboxUncheck();
+    }
+    updateObjectiveDetails(activeObjective.id, lines.join('\n'));
+  }, [activeObjective, updateObjectiveDetails, lineMap]);
 
   return (
     <aside className={styles.sidebar} ref={asideRef as any}>
@@ -332,7 +358,7 @@ export const ObjectiveDetails: FC<Props> = ({ onClose }) => {
         <div className={styles.header}>
           <div className={styles.titleRow}>
             <ClipboardList size={14} />
-            <h4>OBJECTIVE_DETAILS</h4>
+            <h4>{activeObjective?.text ?? 'OBJECTIVE_DETAILS'}</h4>
           </div>
           <button className={styles.closeBtn} onClick={onClose} title="Close (Esc)">
             <X size={14} />

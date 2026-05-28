@@ -551,6 +551,17 @@ export async function playAlarmFile(): Promise<HTMLAudioElement> {
   return audio;
 }
 
+// Preload start sound so playback is instant and reliable
+const preloadedStartAudio = new Audio(`/sounds/start-1.mp3`);
+preloadedStartAudio.load();
+
+export function playStartSound(): void {
+  const audio = preloadedStartAudio.cloneNode(true) as HTMLAudioElement;
+  audio.volume = 0.8 + Math.random() * 0.15;
+  audio.playbackRate = 0.95 + Math.random() * 0.1;
+  audio.play().catch(() => soundEngine.playStart());
+}
+
 export async function playChargeClickWithFile(step: number): Promise<void> {
   try {
     const audio = new Audio(`./sounds/charge-${step}.mp3`);

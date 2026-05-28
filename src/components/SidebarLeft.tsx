@@ -4,7 +4,7 @@ import { User, Zap, Flame, Star, Plus, X, GripVertical, Edit3, Check } from 'luc
 import { useUser } from '../contexts/UserContext';
 import { useFocus } from '../contexts/FocusContext';
 import { useGame } from '../contexts/GameContext';
-import { soundEngine } from '../utils/audio';
+import { soundEngine, playStartSound } from '../utils/audio';
 import { setStatusHint, clearStatusHint } from '../utils/statusHint';
 import {
   DndContext,
@@ -32,8 +32,10 @@ import { AlarmsModal } from './AlarmsModal';
 interface SortableItemProps {
   obj: StrategicObjective;
   isActive: boolean;
+  isViewed: boolean;
   categories: ObjectiveCategory[];
   onSelect: (id: number) => void;
+  onActivate: (id: number) => void;
   onDelete: (e: React.MouseEvent, id: number) => void;
   onUpdate: (id: number, text: string) => void;
   onCategoryChange: (id: number, categoryId: number | null) => void;
@@ -43,7 +45,7 @@ interface SortableItemProps {
   objectiveView: 'mission' | 'backlog';
 }
 
-const SortableItem: FC<SortableItemProps> = ({ obj, isActive, categories, onSelect, onDelete, onUpdate, onCategoryChange, onManageCategories, onHover, onMove, objectiveView }) => {
+const SortableItem: FC<SortableItemProps> = ({ obj, isActive, isViewed, categories, onSelect, onActivate, onDelete, onUpdate, onCategoryChange, onManageCategories, onHover, onMove, objectiveView }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: obj.id });
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(obj.text);
@@ -103,9 +105,21 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, categories, onSele
   const handleDoubleClick = (e: React.MouseEvent) => {
     if (isEditing) return;
     e.stopPropagation();
-    soundEngine.playEditStart();
-    setIsEditing(true);
+    onActivate(obj.id);
   };
+
+  useEffect(() => {
+    if (!isViewed) return;
+    const handleF2 = (e: KeyboardEvent) => {
+      if (e.key === 'F2' && !isEditing) {
+        e.preventDefault();
+        soundEngine.playEditStart();
+        setIsEditing(true);
+      }
+    };
+    window.addEventListener('keydown', handleF2);
+    return () => window.removeEventListener('keydown', handleF2);
+  }, [isViewed, isEditing]);
 
   const decayLevel = useMemo(() => {
     const lastDate = new Date(obj.last_interacted_at || obj.created_at);
@@ -124,7 +138,7 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, categories, onSele
     <div
       ref={setNodeRef}
       style={style}
-      className={`${styles.objectiveItem} ${isActive ? styles.activeObjective : ''} ${decayClass}`}
+      className={`${styles.objectiveItem} ${isActive ? styles.activeObjective : ''} ${isViewed ? styles.viewedObjective : ''} ${decayClass}`}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       onMouseEnter={onHover}
@@ -215,9 +229,10 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, categories, onSele
 
 interface SidebarLeftProps {
   onOpenSettings: () => void;
+  onOpenDetails: () => void;
 }
 
-export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenSettings }) => {
+export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenSettings, onOpenDetails }) => {
   const { name, avatar, loading } = useUser();
   const {
     objectivePool,
@@ -226,11 +241,13 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenSettings }) => {
     objectiveView,
     switchObjectiveView,
     activeObjectiveId,
+    viewedObjectiveId,
     addObjective,
     deleteObjective,
     updateObjective,
     updateObjectiveCategory,
     setActiveObjective,
+    setViewedObjective,
     reorderObjectives,
     moveObjectiveToOtherList,
     categories,
@@ -327,7 +344,18 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenSettings }) => {
 
   const handleSelectObjective = (id: number) => {
     soundEngine.playClick();
-    setActiveObjective(id === activeObjectiveId ? null : id);
+    setViewedObjective(id);
+    onOpenDetails();
+  };
+
+  const handleActivateObjective = (id: number) => {
+    if (id === activeObjectiveId) {
+      soundEngine.playClick();
+      setActiveObjective(null);
+    } else {
+      playStartSound();
+      setActiveObjective(id);
+    }
   };
 
   // Arrow key shortcuts: Left/Right switch view; Shift+Left/Right move task; Up/Down select adjacent; Shift+Up/Down reorder
@@ -350,7 +378,7 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenSettings }) => {
       if (isArrowUD && !e.shiftKey) {
         e.preventDefault();
         if (displayedObjectives.length === 0) return;
-        const idx = displayedObjectives.findIndex(o => o.id === activeObjectiveId);
+        const idx = displayedObjectives.findIndex(o => o.id === viewedObjectiveId);
         let nextIdx: number;
         if (idx === -1) {
           nextIdx = e.key === 'ArrowDown' ? 0 : displayedObjectives.length - 1;
@@ -358,26 +386,26 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenSettings }) => {
           nextIdx = e.key === 'ArrowUp' ? Math.max(0, idx - 1) : Math.min(displayedObjectives.length - 1, idx + 1);
         }
         if (nextIdx !== idx) {
-          setActiveObjective(displayedObjectives[nextIdx].id);
+          setViewedObjective(displayedObjectives[nextIdx].id);
           soundEngine.playNavSelect();
         }
         return;
       }
 
       // 3. Shift Actions (Move or Reorder)
-      if (e.shiftKey && activeObjectiveId !== null) {
-        const idx = displayedObjectives.findIndex(o => o.id === activeObjectiveId);
-        
+      if (e.shiftKey && viewedObjectiveId !== null) {
+        const idx = displayedObjectives.findIndex(o => o.id === viewedObjectiveId);
+
         // Move Task between lists
         if (isArrowLR) {
-          const isTaskInMission = missionObjectives.some(o => o.id === activeObjectiveId);
+          const isTaskInMission = missionObjectives.some(o => o.id === viewedObjectiveId);
           const wantsToMoveToBacklog = e.key === 'ArrowRight' && isTaskInMission;
           const wantsToMoveToMission = e.key === 'ArrowLeft' && !isTaskInMission;
-          
+
           if (wantsToMoveToBacklog || wantsToMoveToMission) {
-            console.log('[SidebarLeft] Shortcut: Moving task', activeObjectiveId);
+            console.log('[SidebarLeft] Shortcut: Moving task', viewedObjectiveId);
             e.preventDefault();
-            moveObjectiveToOtherList(activeObjectiveId);
+            moveObjectiveToOtherList(viewedObjectiveId);
             soundEngine.playClick();
           }
           return;
@@ -406,7 +434,7 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenSettings }) => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [switchObjectiveView, activeObjectiveId, displayedObjectives, missionObjectives, reorderObjectives, setActiveObjective, moveObjectiveToOtherList]);
+  }, [switchObjectiveView, viewedObjectiveId, displayedObjectives, missionObjectives, reorderObjectives, setViewedObjective, moveObjectiveToOtherList]);
 
   if (loading) return <aside className={styles.sidebar} data-details-barrier>LOADING...</aside>;
 
@@ -559,8 +587,10 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenSettings }) => {
                     key={obj.id}
                     obj={obj}
                     isActive={activeObjectiveId === obj.id}
+                    isViewed={viewedObjectiveId === obj.id}
                     categories={categories}
                     onSelect={handleSelectObjective}
+                    onActivate={handleActivateObjective}
                     onDelete={handleDeleteObjective}
                     onUpdate={handleUpdateObjective}
                     onCategoryChange={handleObjectiveCategoryChange}

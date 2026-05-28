@@ -51,6 +51,8 @@ vi.mock('../db', () => ({
   updateCategory: vi.fn().mockResolvedValue(undefined),
   deleteCategory: vi.fn().mockResolvedValue(undefined),
   updateObjectiveCategory: vi.fn().mockResolvedValue(undefined),
+  updateObjectiveInteractionTime: vi.fn().mockResolvedValue(undefined),
+  moveObjectiveToOtherList: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Mock UserContext
