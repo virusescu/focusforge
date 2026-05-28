@@ -551,21 +551,12 @@ export async function playAlarmFile(): Promise<HTMLAudioElement> {
   return audio;
 }
 
-// Pre-probe start sound count on module load so playStartSound is always synchronous
-probeSoundCount('start');
+// Preload start sound so playback is instant and reliable
+const preloadedStartAudio = new Audio(`/sounds/start-1.mp3`);
+preloadedStartAudio.load();
 
 export function playStartSound(): void {
-  const count = soundCounts['start'];
-  if (count === undefined || count === 0) {
-    // Probe may not have resolved yet — try the file directly before falling back
-    const audio = new Audio(`/sounds/start-1.mp3`);
-    audio.volume = 0.8 + Math.random() * 0.15;
-    audio.playbackRate = 0.95 + Math.random() * 0.1;
-    audio.play().catch(() => soundEngine.playStart());
-    return;
-  }
-  const soundIndex = Math.floor(Math.random() * count) + 1;
-  const audio = new Audio(`/sounds/start-${soundIndex}.mp3`);
+  const audio = preloadedStartAudio.cloneNode(true) as HTMLAudioElement;
   audio.volume = 0.8 + Math.random() * 0.15;
   audio.playbackRate = 0.95 + Math.random() * 0.1;
   audio.play().catch(() => soundEngine.playStart());
