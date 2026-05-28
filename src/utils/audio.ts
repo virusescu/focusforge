@@ -557,7 +557,11 @@ probeSoundCount('start');
 export function playStartSound(): void {
   const count = soundCounts['start'];
   if (count === undefined || count === 0) {
-    soundEngine.playStart();
+    // Probe may not have resolved yet — try the file directly before falling back
+    const audio = new Audio(`/sounds/start-1.mp3`);
+    audio.volume = 0.8 + Math.random() * 0.15;
+    audio.playbackRate = 0.95 + Math.random() * 0.1;
+    audio.play().catch(() => soundEngine.playStart());
     return;
   }
   const soundIndex = Math.floor(Math.random() * count) + 1;
