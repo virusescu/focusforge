@@ -88,7 +88,7 @@ export async function initDb() {
   } catch (e) { /* already exists or other error */ }
 
   try {
-    await database.execute('ALTER TABLE objectives ADD COLUMN last_interacted_at TEXT DEFAULT CURRENT_TIMESTAMP');
+    await database.execute('ALTER TABLE objectives ADD COLUMN last_interacted_at TEXT');
   } catch (e) { /* already exists or other error */ }
 
   await database.execute(`
