@@ -13,72 +13,96 @@ const DAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 const TimePicker: React.FC<{ value: string; onChange: (val: string) => void }> = ({ value, onChange }) => {
   const [h, m] = value.split(':').map(Number);
-  const dragData = useRef<{ startY: number; startVal: number; type: 'h' | 'm'; otherVal: number } | null>(null);
+  const [hInput, setHInput] = useState(String(h).padStart(2, '0'));
+  const [mInput, setMInput] = useState(String(m).padStart(2, '0'));
+  const dragData = useRef<{ startY: number; startVal: number; type: 'h' | 'm'; isDragging: boolean } | null>(null);
+
+  useEffect(() => {
+    const [ph, pm] = value.split(':').map(Number);
+    if (ph !== parseInt(hInput)) setHInput(String(ph).padStart(2, '0'));
+    if (pm !== parseInt(mInput)) setMInput(String(pm).padStart(2, '0'));
+  }, [value]);
+
+  const updateParent = (newH: number, newM: number) => {
+    onChange(`${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}`);
+  };
 
   const adjustHour = (delta: number) => {
     let next = h + delta;
     while (next > 23) next -= 24;
     while (next < 0) next += 24;
-    onChange(`${String(next).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+    updateParent(next, m);
   };
 
   const adjustMin = (delta: number) => {
     let next = m + delta;
     while (next > 59) next -= 60;
     while (next < 0) next += 60;
-    onChange(`${String(h).padStart(2, '0')}:${String(next).padStart(2, '0')}`);
+    updateParent(h, next);
   };
 
   const onPointerDown = (e: React.PointerEvent, type: 'h' | 'm') => {
-    // Only drag with left mouse button
     if (e.button !== 0) return;
-    
     dragData.current = {
       startY: e.clientY,
       startVal: type === 'h' ? h : m,
       type,
-      otherVal: type === 'h' ? m : h
+      isDragging: false
     };
-    
-    const target = e.currentTarget as HTMLElement;
-    target.setPointerCapture(e.pointerId);
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
     if (!dragData.current) return;
     
-    const { startY, startVal, type, otherVal } = dragData.current;
-    const delta = Math.round((startY - e.clientY) / 10);
+    const { startY, startVal, type, isDragging } = dragData.current;
+    const deltaY = startY - e.clientY;
+    
+    if (!isDragging && Math.abs(deltaY) < 5) return;
+    
+    if (!isDragging) {
+      dragData.current.isDragging = true;
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    }
+    
+    const delta = Math.round(deltaY / 10);
     
     if (type === 'h') {
       let next = startVal + delta;
       while (next > 23) next -= 24;
       while (next < 0) next += 24;
-      onChange(`${String(next).padStart(2, '0')}:${String(otherVal).padStart(2, '0')}`);
+      updateParent(next, m);
     } else {
       let next = startVal + delta;
       while (next > 59) next -= 60;
       while (next < 0) next += 60;
-      onChange(`${String(otherVal).padStart(2, '0')}:${String(next).padStart(2, '0')}`);
+      updateParent(h, next);
     }
   };
 
   const onPointerUp = (e: React.PointerEvent) => {
     if (!dragData.current) return;
+    if (dragData.current.isDragging) {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    }
     dragData.current = null;
-    const target = e.currentTarget as HTMLElement;
-    target.releasePointerCapture(e.pointerId);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'h' | 'm') => {
-    const val = parseInt(e.target.value.replace(/[^0-9]/g, '')) || 0;
+    const raw = e.target.value.replace(/[^0-9]/g, '').slice(0, 2);
     if (type === 'h') {
-      const clamped = Math.min(23, Math.max(0, val));
-      onChange(`${String(clamped).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+      setHInput(raw);
+      const val = parseInt(raw);
+      if (!isNaN(val)) updateParent(Math.min(23, val), m);
     } else {
-      const clamped = Math.min(59, Math.max(0, val));
-      onChange(`${String(h).padStart(2, '0')}:${String(clamped).padStart(2, '0')}`);
+      setMInput(raw);
+      const val = parseInt(raw);
+      if (!isNaN(val)) updateParent(h, Math.min(59, val));
     }
+  };
+
+  const onBlur = () => {
+    setHInput(String(h).padStart(2, '0'));
+    setMInput(String(m).padStart(2, '0'));
   };
 
   return (
@@ -88,13 +112,13 @@ const TimePicker: React.FC<{ value: string; onChange: (val: string) => void }> =
         <input 
           type="text"
           className={styles.bigNum} 
-          value={String(h).padStart(2, '0')}
+          value={hInput}
           onPointerDown={e => onPointerDown(e, 'h')}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
           onChange={e => handleInputChange(e, 'h')}
-          maxLength={2}
+          onBlur={onBlur}
         />
         <button type="button" onClick={() => adjustHour(-1)}>▼</button>
       </div>
@@ -104,13 +128,13 @@ const TimePicker: React.FC<{ value: string; onChange: (val: string) => void }> =
         <input 
           type="text"
           className={styles.bigNum} 
-          value={String(m).padStart(2, '0')}
+          value={mInput}
           onPointerDown={e => onPointerDown(e, 'm')}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
           onChange={e => handleInputChange(e, 'm')}
-          maxLength={2}
+          onBlur={onBlur}
         />
         <button type="button" onClick={() => adjustMin(-1)}>▼</button>
       </div>
