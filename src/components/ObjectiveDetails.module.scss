@@ -214,6 +214,16 @@
   line-height: 1.65;
   color: var(--text);
   word-break: break-word;
+  user-select: text;
+  cursor: text;
+
+  // The global `* { user-select: none }` reset (src/index.scss) applies
+  // directly to every descendant, not just this container, so it must be
+  // overridden on descendants explicitly rather than relying on inheritance.
+  * {
+    user-select: text;
+    cursor: text;
+  }
 
   p {
     margin: 0 0 0.5rem;
