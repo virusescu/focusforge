@@ -16,7 +16,7 @@ All core systems are implemented and shipping:
 - **Intelligence Hub** — Focus-by-hour patterns, day-of-week analysis, session length distribution, fragmentation index
 - **Objective Categories** — Color-coded categories with inline assignment, drag-and-drop reorder
 - **Kill Rate** — Objective throughput metric (day/week/all-time) in operator diagnostics
-- **Vault (Game Economy)** — Coin earnings, streaks, daily challenges, prestige titles (10 ranks), seasonal resets with archives
+- **Vault (Score & Progression)** — Coins as a score (no spending), streaks, daily challenge, prestige titles (12 ranks), seasonal resets with archives. Tool shop, streak repair and reward toasts were removed — see [economy.md](economy.md)
 - **Google OAuth** — Multi-user auth via system browser callback
 - **Cloud Database** — Turso (LibSQL) with user_id scoping
 - **OTA Updates** — Tauri updater plugin, GitHub Actions CI/CD, signed releases, update prompt on startup

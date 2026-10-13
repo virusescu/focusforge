@@ -1,10 +1,13 @@
 # FocusForge
 
-FocusForge is a desktop productivity HUD (Heads-Up Display) built with **Tauri 2**, **React 19**, and **TypeScript**. It combines a precision focus timer with a full gamification economy — coins, streaks, prestige ranks, and seasonal resets — designed to reinforce sustained deep work through game-loop psychology.
+FocusForge is a desktop productivity HUD (Heads-Up Display) built with **Tauri 2**, **React 19**, and **TypeScript**. It combines a precision focus timer with a light scoring layer — coins as a score, streaks, prestige ranks, and seasonal resets — designed to reinforce sustained deep work.
+
+**Documentation:** [Architecture](docs/architecture.md) · [Database](docs/database.md) · [Game economy](docs/economy.md) · [Build & release](docs/release.md)
 
 ## Getting Started
 
 ### Prerequisites
+Run `setup.bat` to check that everything below is installed.
 - [Node.js](https://nodejs.org/) (latest LTS)
 - [Rust](https://www.rust-lang.org/) (for Tauri)
 - A [Turso](https://turso.tech/) account — FocusForge uses Turso as its database. Each user brings their own database. Create a free account at [turso.tech](https://turso.tech), create a database, and copy the **Database URL** and **Auth Token**. The app will ask for these on first launch — no `.env` needed for end users.
@@ -45,7 +48,7 @@ FocusForge is a desktop productivity HUD (Heads-Up Display) built with **Tauri 2
 
 ### Building & Releasing
 
-Run `deploy_release.bat` to ship a new version:
+Run `deploy_release.bat` to ship a new version (full pipeline in [docs/release.md](docs/release.md)):
 1. Auto-increments the patch version across `tauri.conf.json`, `Cargo.toml`, and `package.json`
 2. Commits the version bump, tags it, and pushes to GitHub
 3. GitHub Actions takes over — builds, signs, and publishes the release automatically
@@ -92,25 +95,27 @@ Drag-and-drop prioritized objectives with custom color-coded categories. Inline 
 ### Intelligence Hub
 Aggregated diagnostics: focus-by-hour heatmap, day-of-week patterns, session length distribution, and fragmentation analysis (pause counts per session).
 
-### Vault (Game Economy)
-Full coin economy with earning, spending, and progression:
+### Vault (Score & Progression)
+Coins are a score, not a currency — nothing is bought with them. See [docs/economy.md](docs/economy.md) for the exact formulas.
 
-- **Coin Earnings**: 1 coin/min base, scaled by duration milestones (up to 2x at 60+ min), pause penalties, streak multipliers (up to 3x), and daily challenge bonuses.
-- **Streaks**: Consecutive work-day chains (Mon–Fri) where completing the daily challenge (3 sessions of 30+ min) extends the streak. Broken streaks can be repaired with coins.
-- **Prestige Titles**: 10 ranks from Initiate to Forge Legend, unlocked by total coins earned per season.
-- **Seasons**: Quarterly resets (Q1–Q4). All coins reset, but full snapshots are archived with badges and stats.
+- **Coin Earnings**: 1 coin/min base, scaled by duration milestones (up to 2x at 60+ min), pause penalties, streak multipliers, and the daily challenge bonus. Neutralized objectives pay a per-category bounty. Each gain flashes `+N ⟐` in the header.
+- **Streaks**: Consecutive work-day chains (Mon–Fri) where completing the daily challenge (3 sessions of 30+ min) extends the streak. A missed work day breaks it.
+- **Prestige Titles**: 12 ranks from Initiate (5,000) to Singularity (60,000), unlocked by total coins earned per season.
+- **Seasons**: Quarterly resets (Q1–Q4). Coins, streaks and rank reset; each finished season is archived with a badge and stats.
 
-### Reward Toasts
-Post-session notification showing base coins, multipliers applied, streak status, and total earned. Accompanied by coin and milestone sound effects.
+### Alarms
+Recurring alarms by time and weekday with a full-screen overlay, snooze and dismiss.
 
 ## Architecture
-- **`src/contexts/`** — State providers: Auth, Focus (timer/objectives), Game (economy), User (settings)
+Full details in [docs/architecture.md](docs/architecture.md).
+
+- **`src/contexts/`** — State providers: Auth, User (settings), Focus (timer/objectives), Game (score/streaks/seasons), Alarm
 - **`src/components/`** — UI components: MainDisplay, AnalyticsView, IntelligenceHub, VaultPage, SidebarLeft, Header, etc.
 - **`src/hooks/`** — Reusable logic: `useTimer`, `useSystemLog`
 - **`src/utils/`** — Audio synthesis engine, game economy calculations, logging
-- **`src/db.ts`** — Turso database layer (100+ functions covering all tables)
+- **`src/db.ts`** — Turso database layer ([schema](docs/database.md))
 - **`src/auth.ts`** — Google OAuth flow
-- **`src-tauri/`** — Rust backend with Tauri plugins (logging, shell, store)
+- **`src-tauri/`** — Rust backend: OAuth loopback callback, Tauri plugins (shell, store, updater, log)
 
 ## Keyboard Shortcuts
 | Key | Action |
@@ -121,3 +126,5 @@ Post-session notification showing base coins, multipliers applied, streak status
 | A | Toggle Analytics |
 | I | Toggle Intelligence Hub |
 | V | Toggle Vault |
+
+The full list — objective navigation, Analytics and the details editor — is in [docs/architecture.md](docs/architecture.md#keyboard-shortcuts).
