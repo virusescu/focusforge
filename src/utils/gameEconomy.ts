@@ -1,4 +1,4 @@
-import type { SessionRewardInput, SessionRewardOutput, ToolDefinition, ObjectiveBountyInput, ObjectiveBountyOutput } from '../types';
+import type { SessionRewardInput, SessionRewardOutput, ObjectiveBountyInput, ObjectiveBountyOutput } from '../types';
 
 /**
  * Pure functions for the FocusForge game economy.
@@ -41,11 +41,7 @@ export function calculateSessionReward(input: SessionRewardInput): SessionReward
   const dailyMult = sessionsTodayAfter >= 3 ? 2.0 : 1.0;
   const dailyJustCompleted = countsForProgress && input.sessionsToday < 3 && sessionsTodayAfter >= 3;
 
-  // Active tool multiplier: sum of all active tool percents
-  const activePercent = input.ownedActiveToolPercents.reduce((sum, p) => sum + p, 0);
-  const activeMult = 1.0 + activePercent / 100;
-
-  const total = Math.round(base * pauseAdjustedMult * streakMult * dailyMult * activeMult);
+  const total = Math.round(base * pauseAdjustedMult * streakMult * dailyMult);
 
   return {
     baseCoins: base,
@@ -55,7 +51,6 @@ export function calculateSessionReward(input: SessionRewardInput): SessionReward
     pausePenalty,
     streakMultiplier: streakMult,
     dailyBonusMultiplier: dailyMult,
-    activeToolMultiplier: activeMult,
     totalCoins: total,
     dailyChallengeJustCompleted: dailyJustCompleted,
     countsForProgress,
@@ -64,24 +59,13 @@ export function calculateSessionReward(input: SessionRewardInput): SessionReward
 
 export function calculateObjectiveBounty(input: ObjectiveBountyInput): ObjectiveBountyOutput {
   const streakMult = getStreakMultiplier(input.currentStreakDays);
-  const activePercent = input.ownedActiveToolPercents.reduce((sum, p) => sum + p, 0);
-  const activeMult = 1.0 + activePercent / 100;
-  const total = Math.round(input.baseBounty * streakMult * activeMult);
+  const total = Math.round(input.baseBounty * streakMult);
 
   return {
     baseBounty: input.baseBounty,
     streakMultiplier: streakMult,
-    activeToolMultiplier: activeMult,
     totalCoins: total,
   };
-}
-
-export function calculatePassiveIncomePerHour(ownedPassiveTools: ToolDefinition[]): number {
-  return ownedPassiveTools.reduce((sum, tool) => sum + tool.passive_per_hour, 0);
-}
-
-export function getStreakExtendCost(currentStreakDays: number): number {
-  return 100 + currentStreakDays * 50;
 }
 
 /**

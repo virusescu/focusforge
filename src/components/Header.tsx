@@ -9,13 +9,16 @@ import { useGame } from '../contexts/GameContext';
 import { getVersion } from '@tauri-apps/api/app';
 
 function GameIndicators() {
-  const { coins, currentStreakDays, season, seasonDaysRemaining, rewardToast, totalCoinsEarned } = useGame();
+  const { coins, currentStreakDays, season, seasonDaysRemaining, totalCoinsEarned, coinGain } = useGame();
 
   return (
     <div className={styles.gameIndicators}>
-      <span className={`${styles.coinCount} ${rewardToast ? styles.coinPulse : ''}`}>
+      <span className={styles.coinCount}>
         ⟐ {Math.floor(coins).toLocaleString()}
       </span>
+      {coinGain && (
+        <span key={coinGain.key} className={styles.coinGain}>+{coinGain.amount.toLocaleString()} ⟐</span>
+      )}
       <div className={styles.streakBars}>
         {[0, 1, 2, 3].map(i => (
           <span

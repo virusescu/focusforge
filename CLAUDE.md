@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-FocusForge is a desktop productivity app — a precision focus timer with a gamification economy (coins, tools, streaks, prestige ranks, seasonal resets). Built with **Tauri 2** (Rust backend) + **React 19** + **TypeScript** frontend, using **Turso** (LibSQL) for cloud database and **Google OAuth** for authentication.
+FocusForge is a desktop productivity app — a precision focus timer with a gamification economy (coins, streaks, prestige ranks, seasonal resets). Built with **Tauri 2** (Rust backend) + **React 19** + **TypeScript** frontend, using **Turso** (LibSQL) for cloud database and **Google OAuth** for authentication.
 
 ## Commands
 
@@ -27,10 +27,10 @@ FocusForge is a desktop productivity app — a precision focus timer with a gami
 **4 React Contexts** drive all state:
 - **AuthContext** — Google OAuth login/logout, token storage via Tauri plugin-store, Turso DB init on login
 - **FocusContext** — Timer state, focus sessions, objectives pool, categories. Uses `useTimer` hook
-- **GameContext** — Active season, coins, owned tools, streaks, daily challenges, prestige titles, reward toasts
+- **GameContext** — Active season, coins, streaks, daily challenges, prestige titles, reward toasts
 - **UserContext** — User settings and profile
 
-**Database layer** (`src/db.ts`) — 100+ async functions for CRUD on 14+ tables (sessions, objectives, categories, game state, coin transactions, tools, prestige, season archives, etc.)
+**Database layer** (`src/db.ts`) — 100+ async functions for CRUD on 14+ tables (sessions, objectives, categories, game state, coin transactions, prestige, season archives, etc.)
 
 **Game economy** (`src/utils/gameEconomy.ts`) — Pure calculation functions with no side effects. Session rewards use base rate (1 coin/min) with duration milestones, pause penalties, streak multipliers, daily challenge bonuses, and tool bonuses. Contexts call these to compute rewards before writing to DB.
 

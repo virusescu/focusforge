@@ -21,7 +21,6 @@ import { FocusProvider } from './contexts/FocusContext';
 import { GameProvider } from './contexts/GameContext';
 import { AlarmProvider } from './contexts/AlarmContext';
 import { NavigationGuard } from './components/NavigationGuard';
-import { RewardToast } from './components/RewardToast';
 import { SeasonTransitionModal } from './components/SeasonTransitionModal';
 import { VaultPage } from './components/VaultPage';
 import { FireBackground } from './components/FireBackground';
@@ -169,7 +168,6 @@ function HudApp() {
           />
         )}
       </div>
-      <RewardToast />
       <SeasonTransitionModal />
       {isSettingsOpen && (
         <SettingsModal onClose={() => setIsSettingsOpen(false)} />

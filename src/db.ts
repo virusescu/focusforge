@@ -1,5 +1,5 @@
 import { createClient, type Client, type InArgs } from '@libsql/client';
-import type { FocusSession, DailyStat, StrategicObjective, ObjectiveCategory, AuthUser, UserSettings, GameSeason, GameState, ToolDefinition, PrestigeTitleDefinition, SeasonArchive, StreakLogEntry, Alarm } from './types';
+import type { FocusSession, DailyStat, StrategicObjective, ObjectiveCategory, AuthUser, UserSettings, GameSeason, GameState, PrestigeTitleDefinition, SeasonArchive, StreakLogEntry, Alarm } from './types';
 import { getQuarter, getSeasonDates, getSeasonLabel, getSeasonName, getSeasonBadgeColor } from './utils/gameEconomy';
 
 let db: Client | null = null;
@@ -135,33 +135,6 @@ export async function initDb() {
   `);
 
   await database.execute(`
-    CREATE TABLE IF NOT EXISTS game_tool_definitions (
-      id INTEGER PRIMARY KEY,
-      name TEXT NOT NULL,
-      display_name TEXT NOT NULL,
-      description TEXT NOT NULL,
-      cost INTEGER NOT NULL,
-      effect_type TEXT NOT NULL,
-      passive_per_hour REAL NOT NULL DEFAULT 0,
-      active_percent REAL NOT NULL DEFAULT 0,
-      icon TEXT NOT NULL,
-      unlock_order INTEGER NOT NULL,
-      prerequisite_id INTEGER REFERENCES game_tool_definitions(id)
-    )
-  `);
-
-  await database.execute(`
-    CREATE TABLE IF NOT EXISTS game_owned_tools (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL,
-      season_id INTEGER NOT NULL,
-      tool_id INTEGER NOT NULL,
-      purchased_at TEXT NOT NULL DEFAULT (datetime('now')),
-      UNIQUE(user_id, season_id, tool_id)
-    )
-  `);
-
-  await database.execute(`
     CREATE TABLE IF NOT EXISTS game_prestige_titles (
       id INTEGER PRIMARY KEY,
       name TEXT NOT NULL,
@@ -270,7 +243,6 @@ export async function initDb() {
     // Table may not exist yet — seed will handle it
   }
 
-  await seedToolDefinitions();
   await seedPrestigeTitles();
 }
 
@@ -795,27 +767,6 @@ export async function getKillRate(userId: number) {
 
 // ─── Game Economy: Seed Data ────────────────────────────────────
 
-async function seedToolDefinitions() {
-  const database = getDb();
-  const tools = [
-    [1, 'COFFEE_MAKER', 'Coffee Maker', '+5 coins/hour passive income', 200, 'passive', 5, 0, '☕', 1, null],
-    [2, 'STANDING_DESK', 'Standing Desk', '+15% coins during active sessions', 300, 'active', 0, 15, '🖥️', 1, null],
-    [3, 'ERGONOMIC_CHAIR', 'Ergonomic Chair', '+10 coins/hour passive income', 400, 'passive', 10, 0, '🪑', 2, 1],
-    [4, 'NC_HEADPHONES', 'NC Headphones', '+25% coins during active sessions', 500, 'active', 0, 25, '🎧', 2, 2],
-    [5, 'SECOND_MONITOR', 'Second Monitor', '+20 coins/hour passive income', 750, 'passive', 20, 0, '🖥️', 3, 3],
-    [6, 'SMART_LIGHTING', 'Smart Lighting', '+30% coins during active sessions', 1000, 'active', 0, 30, '💡', 3, 4],
-    [7, 'PRODUCTIVITY_SUITE', 'Productivity Suite', '+50 coins/hour passive income', 1500, 'passive', 50, 0, '📊', 4, 5],
-    [8, 'ELITE_WORKSTATION', 'Elite Workstation', '+40% active + 100 coins/hr passive', 2000, 'prestige', 100, 40, '⚡', 5, null],
-  ];
-  for (const t of tools) {
-    await database.execute({
-      sql: `INSERT OR IGNORE INTO game_tool_definitions (id, name, display_name, description, cost, effect_type, passive_per_hour, active_percent, icon, unlock_order, prerequisite_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      args: t,
-    });
-  }
-}
-
 async function seedPrestigeTitles() {
   const database = getDb();
   const titles = [
@@ -924,15 +875,6 @@ export async function archiveSeason(userId: number, seasonId: number): Promise<v
   });
   const totalSessions = (sessionsResult.rows[0]?.count as number) || 0;
 
-  // Get owned tools names
-  const toolsResult = await database.execute({
-    sql: `SELECT td.display_name FROM game_owned_tools ot
-          JOIN game_tool_definitions td ON td.id = ot.tool_id
-          WHERE ot.user_id = ? AND ot.season_id = ?`,
-    args: [userId, seasonId],
-  });
-  const toolNames = toolsResult.rows.map(r => r.display_name as string);
-
   // Get highest prestige title reached
   const prestigeResult = await database.execute({
     sql: `SELECT display_name FROM game_prestige_titles WHERE unlock_threshold <= ? ORDER BY unlock_threshold DESC`,
@@ -956,7 +898,7 @@ export async function archiveSeason(userId: number, seasonId: number): Promise<v
       state.total_coins_earned as number,
       totalSessions,
       state.streaks_completed as number,
-      JSON.stringify(toolNames),
+      '[]', // tools_purchased: legacy column, tool shop removed
       JSON.stringify(prestigeTitles),
       state.peak_coins_per_hour as number,
       state.streaks_completed as number,
@@ -987,7 +929,6 @@ export async function getSeasonArchives(userId: number): Promise<SeasonArchive[]
     total_coins_earned: row.total_coins_earned as number,
     total_sessions: row.total_sessions as number,
     total_streaks: row.total_streaks as number,
-    tools_purchased: row.tools_purchased as string,
     cosmetics_purchased: row.cosmetics_purchased as string,
     peak_coins_per_hour: row.peak_coins_per_hour as number,
     longest_streak: row.longest_streak as number,
@@ -1049,49 +990,6 @@ export async function addCoinTransaction(userId: number, seasonId: number, amoun
     sql: `UPDATE game_state SET coins = coins + ?, total_coins_earned = CASE WHEN ? > 0 THEN total_coins_earned + ? ELSE total_coins_earned END WHERE user_id = ? AND season_id = ?`,
     args: [amount, amount, amount, userId, seasonId],
   });
-}
-
-// ─── Game Economy: Tools ────────────────────────────────────────
-
-export async function getToolDefinitions(): Promise<ToolDefinition[]> {
-  const database = getDb();
-  const result = await database.execute('SELECT * FROM game_tool_definitions ORDER BY unlock_order ASC, id ASC');
-  return result.rows.map(row => ({
-    id: row.id as number,
-    name: row.name as string,
-    display_name: row.display_name as string,
-    description: row.description as string,
-    cost: row.cost as number,
-    effect_type: row.effect_type as 'passive' | 'active' | 'prestige',
-    passive_per_hour: row.passive_per_hour as number,
-    active_percent: row.active_percent as number,
-    icon: row.icon as string,
-    unlock_order: row.unlock_order as number,
-    prerequisite_id: row.prerequisite_id as number | null,
-  }));
-}
-
-export async function getOwnedTools(userId: number, seasonId: number): Promise<number[]> {
-  const database = getDb();
-  const result = await database.execute({
-    sql: 'SELECT tool_id FROM game_owned_tools WHERE user_id = ? AND season_id = ?',
-    args: [userId, seasonId],
-  });
-  return result.rows.map(row => row.tool_id as number);
-}
-
-export async function purchaseTool(userId: number, seasonId: number, toolId: number, cost: number): Promise<void> {
-  const database = getDb();
-  // Check balance
-  const state = await getGameState(userId, seasonId);
-  if (!state || state.coins < cost) throw new Error('Insufficient coins');
-  // Insert ownership
-  await database.execute({
-    sql: 'INSERT OR IGNORE INTO game_owned_tools (user_id, season_id, tool_id) VALUES (?, ?, ?)',
-    args: [userId, seasonId, toolId],
-  });
-  // Deduct coins via transaction
-  await addCoinTransaction(userId, seasonId, -cost, 'tool_purchase', JSON.stringify({ tool_id: toolId }));
 }
 
 // ─── Game Economy: Prestige Titles ──────────────────────────────

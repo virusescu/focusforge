@@ -243,25 +243,6 @@ class SoundEngine {
     osc2.stop(t + 0.08);
   }
 
-  playPurchase() {
-    const ctx = this.init();
-    const t = ctx.currentTime;
-    const playTone = (freq: number, start: number, dur: number) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'square';
-      osc.frequency.setValueAtTime(freq, t + start);
-      gain.gain.setValueAtTime(0.05, t + start);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + start + dur);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(t + start);
-      osc.stop(t + start + dur);
-    };
-    playTone(880, 0, 0.1);
-    playTone(660, 0.08, 0.12);
-  }
-
   playStreakMilestone() {
     const ctx = this.init();
     const t = ctx.currentTime;

@@ -86,20 +86,6 @@ export interface GameState {
   peak_coins_per_hour: number;
 }
 
-export interface ToolDefinition {
-  id: number;
-  name: string;
-  display_name: string;
-  description: string;
-  cost: number;
-  effect_type: 'passive' | 'active' | 'prestige';
-  passive_per_hour: number;
-  active_percent: number;
-  icon: string;
-  unlock_order: number;
-  prerequisite_id: number | null;
-}
-
 export interface PrestigeTitleDefinition {
   id: number;
   name: string;
@@ -130,7 +116,6 @@ export interface SeasonArchive {
   total_coins_earned: number;
   total_sessions: number;
   total_streaks: number;
-  tools_purchased: string;
   cosmetics_purchased: string;
   peak_coins_per_hour: number;
   longest_streak: number;
@@ -154,37 +139,14 @@ export interface Alarm {
   is_active: boolean;
 }
 
-export interface RewardToastData {
-  baseCoins: number;
-  totalCoins: number;
-  durationMinutes: number;
-  milestoneMultiplier: number;
-  milestoneName: string;
-  pausePenalty: number;
-  streakMultiplier: number;
-  dailyBonusMultiplier: number;
-  activeToolMultiplier: number;
-  currentStreakDays: number;
-  sessionsToday: number;
-  dailyChallengeJustCompleted: boolean;
-  streakJustCompleted: boolean;
-  objectiveBounty?: {
-    baseBounty: number;
-    streakMultiplier: number;
-    activeToolMultiplier: number;
-  };
-}
-
 export interface ObjectiveBountyInput {
   baseBounty: number;
   currentStreakDays: number;
-  ownedActiveToolPercents: number[];
 }
 
 export interface ObjectiveBountyOutput {
   baseBounty: number;
   streakMultiplier: number;
-  activeToolMultiplier: number;
   totalCoins: number;
 }
 
@@ -194,7 +156,6 @@ export interface SessionRewardInput {
   currentStreakDays: number;
   streaksCompletedThisSeason: number;
   sessionsToday: number;
-  ownedActiveToolPercents: number[];
 }
 
 export interface SessionRewardOutput {
@@ -205,7 +166,6 @@ export interface SessionRewardOutput {
   pausePenalty: number;
   streakMultiplier: number;
   dailyBonusMultiplier: number;
-  activeToolMultiplier: number;
   totalCoins: number;
   dailyChallengeJustCompleted: boolean;
   /** True if session is 15+ minutes — only these count toward daily challenge and streaks */

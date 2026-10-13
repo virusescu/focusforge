@@ -1,8 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   calculateSessionReward,
-  calculatePassiveIncomePerHour,
-  getStreakExtendCost,
   getStreakMultiplier,
   getQuarter,
   getSeasonLabel,
@@ -15,7 +13,6 @@ import {
   getNextWorkDay,
   formatDateStr,
 } from './gameEconomy';
-import type { ToolDefinition } from '../types';
 
 describe('calculateSessionReward', () => {
   const baseInput = {
@@ -24,7 +21,6 @@ describe('calculateSessionReward', () => {
     currentStreakDays: 0,
     streaksCompletedThisSeason: 0,
     sessionsToday: 0,
-    ownedActiveToolPercents: [],
   };
 
   it('awards 1 coin per minute as base', () => {
@@ -153,16 +149,6 @@ describe('calculateSessionReward', () => {
     expect(result.dailyChallengeJustCompleted).toBe(false);
   });
 
-  it('applies active tool multiplier', () => {
-    const result = calculateSessionReward({
-      ...baseInput,
-      ownedActiveToolPercents: [15, 25],
-    });
-    expect(result.activeToolMultiplier).toBe(1.4);
-    // 30 * 1.5 * 1.4 = 63
-    expect(result.totalCoins).toBe(63);
-  });
-
   it('stacks all multipliers correctly', () => {
     const result = calculateSessionReward({
       durationSeconds: 3600,  // 60 min → 2.0x SUPER_FORGE
@@ -170,35 +156,9 @@ describe('calculateSessionReward', () => {
       currentStreakDays: 4,   // streak day 4: 3.0x
       streaksCompletedThisSeason: 2,
       sessionsToday: 2,       // daily bonus: 2.0x
-      ownedActiveToolPercents: [15, 25], // tools: 1.4x
     });
-    // 60 * 2.0 * 3.0 * 2.0 * 1.4 = 1008
-    expect(result.totalCoins).toBe(1008);
-  });
-});
-
-describe('calculatePassiveIncomePerHour', () => {
-  it('returns 0 with no tools', () => {
-    expect(calculatePassiveIncomePerHour([])).toBe(0);
-  });
-
-  it('sums passive tool income', () => {
-    const tools = [
-      { passive_per_hour: 5 },
-      { passive_per_hour: 10 },
-      { passive_per_hour: 20 },
-    ] as ToolDefinition[];
-    expect(calculatePassiveIncomePerHour(tools)).toBe(35);
-  });
-});
-
-describe('getStreakExtendCost', () => {
-  it('returns correct costs for each streak day', () => {
-    expect(getStreakExtendCost(0)).toBe(100);
-    expect(getStreakExtendCost(1)).toBe(150);
-    expect(getStreakExtendCost(2)).toBe(200);
-    expect(getStreakExtendCost(3)).toBe(250);
-    expect(getStreakExtendCost(4)).toBe(300);
+    // 60 * 2.0 * 3.0 * 2.0 = 720
+    expect(result.totalCoins).toBe(720);
   });
 });
 

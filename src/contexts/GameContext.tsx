@@ -1,12 +1,10 @@
-import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
-import type { GameSeason, GameState, ToolDefinition, PrestigeTitleDefinition, SeasonArchive, RewardToastData } from '../types';
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import type { GameSeason, GameState, PrestigeTitleDefinition, SeasonArchive } from '../types';
 import { useAuth } from './AuthContext';
 import { soundEngine } from '../utils/audio';
 import {
   calculateSessionReward,
   calculateObjectiveBounty,
-  calculatePassiveIncomePerHour,
-  getStreakExtendCost,
   getStreakMultiplier,
   getSeasonDaysRemaining,
   isWorkDay,
@@ -18,9 +16,6 @@ import {
   getGameState,
   updateGameState,
   addCoinTransaction,
-  getToolDefinitions,
-  getOwnedTools,
-  purchaseTool as dbPurchaseTool,
   getPrestigeTitles,
   getSeasonArchives,
   archiveSeason,
@@ -36,8 +31,6 @@ interface GameContextType {
   // Economy
   coins: number;
   totalCoinsEarned: number;
-  passiveIncomePerHour: number;
-  activeMultiplierPercent: number;
 
   // Streak
   currentStreakDays: number;
@@ -49,9 +42,7 @@ interface GameContextType {
   sessionsToday: number;
   dailyBonusActive: boolean;
 
-  // Tools & prestige
-  toolDefinitions: ToolDefinition[];
-  ownedToolIds: Set<number>;
+  // Prestige
   prestigeTitles: PrestigeTitleDefinition[];
   currentTitle: PrestigeTitleDefinition | null;
 
@@ -60,15 +51,14 @@ interface GameContextType {
 
   // UI state
   loading: boolean;
-  rewardToast: RewardToastData | null;
   showSeasonTransition: boolean;
 
   // Actions
-  purchaseTool: (toolId: number) => Promise<boolean>;
-  extendStreak: () => Promise<boolean>;
   startNewSeason: () => Promise<void>;
-  dismissRewardToast: () => void;
   refreshGameData: () => Promise<void>;
+
+  // Latest coin gain, shown briefly in the header
+  coinGain: { amount: number; key: number } | null;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
@@ -78,16 +68,17 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
 
   const [season, setSeason] = useState<GameSeason | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
-  const [toolDefinitions, setToolDefinitions] = useState<ToolDefinition[]>([]);
-  const [ownedToolIds, setOwnedToolIds] = useState<Set<number>>(new Set());
   const [prestigeTitles, setPrestigeTitles] = useState<PrestigeTitleDefinition[]>([]);
   const [archives, setArchives] = useState<SeasonArchive[]>([]);
   const [loading, setLoading] = useState(true);
-  const [rewardToast, setRewardToast] = useState<RewardToastData | null>(null);
   const [showSeasonTransition, setShowSeasonTransition] = useState(false);
+  const [coinGain, setCoinGain] = useState<{ amount: number; key: number } | null>(null);
 
-  const passiveAccumRef = useRef(0);
-  const lastPassiveWriteRef = useRef(Date.now());
+  const announceCoinGain = useCallback((amount: number) => {
+    const key = Date.now();
+    setCoinGain({ amount, key });
+    setTimeout(() => setCoinGain(g => (g?.key === key ? null : g)), 2500);
+  }, []);
 
   // Derived values
   const coins = gameState?.coins ?? 0;
@@ -127,11 +118,6 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
 
   const seasonDaysRemaining = season ? getSeasonDaysRemaining(season.end_date) : 0;
 
-  const ownedPassiveTools = toolDefinitions.filter(t => ownedToolIds.has(t.id) && (t.effect_type === 'passive' || t.effect_type === 'prestige'));
-  const ownedActiveTools = toolDefinitions.filter(t => ownedToolIds.has(t.id) && (t.effect_type === 'active' || t.effect_type === 'prestige'));
-  const passiveIncomePerHour = calculatePassiveIncomePerHour(ownedPassiveTools);
-  const activeMultiplierPercent = ownedActiveTools.reduce((sum, t) => sum + t.active_percent, 0);
-
   // Current prestige title — highest unlocked based on total coins earned this season
   const currentTitle = [...prestigeTitles].reverse().find(t => totalCoinsEarned >= t.unlock_threshold) ?? null;
 
@@ -148,17 +134,13 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
         setShowSeasonTransition(true);
       }
 
-      const [state, tools, owned, titles, arcs] = await Promise.all([
+      const [state, titles, arcs] = await Promise.all([
         getGameState(authUser.id, activeSeason.id),
-        getToolDefinitions(),
-        getOwnedTools(authUser.id, activeSeason.id),
         getPrestigeTitles(),
         getSeasonArchives(authUser.id),
       ]);
 
       setGameState(state);
-      setToolDefinitions(tools);
-      setOwnedToolIds(new Set(owned));
       setPrestigeTitles(titles);
       setArchives(arcs);
     } catch (e) {
@@ -197,7 +179,6 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
         currentStreakDays: gameState.current_streak_days,
         streaksCompletedThisSeason: gameState.streaks_completed,
         sessionsToday: currentSessionsToday,
-        ownedActiveToolPercents: ownedActiveTools.map(t => t.active_percent),
       });
 
       // Persist coins
@@ -209,7 +190,6 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
           pausePenalty: reward.pausePenalty,
           streak: reward.streakMultiplier,
           daily: reward.dailyBonusMultiplier,
-          tools: reward.activeToolMultiplier,
         },
       }));
 
@@ -257,6 +237,7 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
 
       // Play sounds
       soundEngine.playCoinEarned();
+      announceCoinGain(reward.totalCoins);
       if (reward.dailyChallengeJustCompleted) {
         setTimeout(() => soundEngine.playDailyBonusUnlocked(), 200);
       }
@@ -264,29 +245,12 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
         setTimeout(() => soundEngine.playStreakMilestone(), 400);
       }
 
-      // Show toast
-      setRewardToast({
-        baseCoins: reward.baseCoins,
-        totalCoins: reward.totalCoins,
-        durationMinutes: reward.durationMinutes,
-        milestoneMultiplier: reward.milestoneMultiplier,
-        milestoneName: reward.milestoneName,
-        pausePenalty: reward.pausePenalty,
-        streakMultiplier: reward.streakMultiplier,
-        dailyBonusMultiplier: reward.dailyBonusMultiplier,
-        activeToolMultiplier: reward.activeToolMultiplier,
-        currentStreakDays: newStreakDays,
-        sessionsToday: newSessionsToday,
-        dailyChallengeJustCompleted: reward.dailyChallengeJustCompleted,
-        streakJustCompleted,
-      });
-
       await refreshGameData();
     };
 
     window.addEventListener('timer-saved', handleTimerSaved);
     return () => window.removeEventListener('timer-saved', handleTimerSaved);
-  }, [authUser, season, gameState, ownedActiveTools, refreshGameData]);
+  }, [authUser, season, gameState, refreshGameData, announceCoinGain]);
 
   // ─── Objective Neutralized Listener ─────────────────────────────
 
@@ -299,102 +263,24 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
       const reward = calculateObjectiveBounty({
         baseBounty,
         currentStreakDays: gameState.current_streak_days,
-        ownedActiveToolPercents: ownedActiveTools.map(t => t.active_percent),
       });
 
       await addCoinTransaction(authUser.id, season.id, reward.totalCoins, 'objective_complete', JSON.stringify({
         baseBounty: reward.baseBounty,
-        multipliers: { streak: reward.streakMultiplier, tools: reward.activeToolMultiplier },
+        multipliers: { streak: reward.streakMultiplier },
       }));
 
       soundEngine.playCoinEarned();
-
-      setRewardToast({
-        baseCoins: reward.baseBounty,
-        totalCoins: reward.totalCoins,
-        durationMinutes: 0,
-        milestoneMultiplier: 1,
-        milestoneName: 'NONE',
-        pausePenalty: 0,
-        streakMultiplier: reward.streakMultiplier,
-        dailyBonusMultiplier: 1,
-        activeToolMultiplier: reward.activeToolMultiplier,
-        currentStreakDays: gameState.current_streak_days,
-        sessionsToday: gameState.sessions_today,
-        dailyChallengeJustCompleted: false,
-        streakJustCompleted: false,
-        objectiveBounty: {
-          baseBounty: reward.baseBounty,
-          streakMultiplier: reward.streakMultiplier,
-          activeToolMultiplier: reward.activeToolMultiplier,
-        },
-      });
+      announceCoinGain(reward.totalCoins);
 
       await refreshGameData();
     };
 
     window.addEventListener('objective-neutralized', handleObjectiveNeutralized);
     return () => window.removeEventListener('objective-neutralized', handleObjectiveNeutralized);
-  }, [authUser, season, gameState, ownedActiveTools, refreshGameData]);
-
-  // ─── Passive Income Tick ────────────────────────────────────────
-
-  useEffect(() => {
-    if (!authUser || !season || passiveIncomePerHour <= 0) return;
-
-    const interval = setInterval(async () => {
-      const perMinute = passiveIncomePerHour / 60;
-      passiveAccumRef.current += perMinute;
-
-      // Write to DB every 5 minutes
-      const now = Date.now();
-      if (now - lastPassiveWriteRef.current >= 5 * 60 * 1000 && passiveAccumRef.current > 0) {
-        const amount = Math.round(passiveAccumRef.current * 100) / 100;
-        await addCoinTransaction(authUser.id, season.id, amount, 'passive_income');
-        passiveAccumRef.current = 0;
-        lastPassiveWriteRef.current = now;
-        await refreshGameData();
-      }
-    }, 60 * 1000); // Every minute
-
-    return () => clearInterval(interval);
-  }, [authUser, season, passiveIncomePerHour, refreshGameData]);
+  }, [authUser, season, gameState, refreshGameData, announceCoinGain]);
 
   // ─── Actions ────────────────────────────────────────────────────
-
-  const purchaseTool = useCallback(async (toolId: number): Promise<boolean> => {
-    if (!authUser || !season) return false;
-    const tool = toolDefinitions.find(t => t.id === toolId);
-    if (!tool || coins < tool.cost || ownedToolIds.has(toolId)) return false;
-
-    try {
-      await dbPurchaseTool(authUser.id, season.id, toolId, tool.cost);
-      soundEngine.playPurchase();
-      await refreshGameData();
-      return true;
-    } catch {
-      return false;
-    }
-  }, [authUser, season, toolDefinitions, coins, ownedToolIds, refreshGameData]);
-
-  const extendStreak = useCallback(async (): Promise<boolean> => {
-    if (!authUser || !season || !gameState) return false;
-    const cost = getStreakExtendCost(currentStreakDays);
-    if (coins < cost) return false;
-
-    try {
-      await addCoinTransaction(authUser.id, season.id, -cost, 'streak_extend');
-      await updateGameState(authUser.id, season.id, {
-        current_streak_days: Math.max(currentStreakDays, 1),
-        streak_last_date: formatDateStr(getPreviousWorkDay(new Date())),
-      });
-      soundEngine.playClick();
-      await refreshGameData();
-      return true;
-    } catch {
-      return false;
-    }
-  }, [authUser, season, gameState, currentStreakDays, coins, refreshGameData]);
 
   const startNewSeason = useCallback(async () => {
     if (!authUser || !season) return;
@@ -402,21 +288,11 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
     // Archive current season
     await archiveSeason(authUser.id, season.id);
 
-    // Flush passive income
-    if (passiveAccumRef.current > 0) {
-      await addCoinTransaction(authUser.id, season.id, Math.round(passiveAccumRef.current * 100) / 100, 'passive_income');
-      passiveAccumRef.current = 0;
-    }
-
     // Create new season (initOrGetActiveSeason will make a new one since old one is deactivated)
     await createNewSeason(authUser.id);
     setShowSeasonTransition(false);
     await refreshGameData();
   }, [authUser, season, refreshGameData]);
-
-  const dismissRewardToast = useCallback(() => {
-    setRewardToast(null);
-  }, []);
 
   return (
     <GameContext.Provider value={{
@@ -424,26 +300,19 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
       seasonDaysRemaining,
       coins,
       totalCoinsEarned,
-      passiveIncomePerHour,
-      activeMultiplierPercent,
       currentStreakDays,
       streaksCompletedThisSeason,
       streakMultiplier,
       streakIsBroken,
       sessionsToday,
       dailyBonusActive,
-      toolDefinitions,
-      ownedToolIds,
+      coinGain,
       prestigeTitles,
       currentTitle,
       archives,
       loading,
-      rewardToast,
       showSeasonTransition,
-      purchaseTool,
-      extendStreak,
       startNewSeason,
-      dismissRewardToast,
       refreshGameData,
     }}>
       {children}
@@ -457,26 +326,19 @@ const defaultGameContext: GameContextType = {
   seasonDaysRemaining: 0,
   coins: 0,
   totalCoinsEarned: 0,
-  passiveIncomePerHour: 0,
-  activeMultiplierPercent: 0,
   currentStreakDays: 0,
   streaksCompletedThisSeason: 0,
   streakMultiplier: 1,
   streakIsBroken: false,
   sessionsToday: 0,
   dailyBonusActive: false,
-  toolDefinitions: [],
-  ownedToolIds: new Set(),
+  coinGain: null,
   prestigeTitles: [],
   currentTitle: null,
   archives: [],
   loading: true,
-  rewardToast: null,
   showSeasonTransition: false,
-  purchaseTool: async () => false,
-  extendStreak: async () => false,
   startNewSeason: async () => {},
-  dismissRewardToast: () => {},
   refreshGameData: async () => {},
 };
 

@@ -1,6 +1,6 @@
 # FocusForge
 
-FocusForge is a desktop productivity HUD (Heads-Up Display) built with **Tauri 2**, **React 19**, and **TypeScript**. It combines a precision focus timer with a full gamification economy — coins, tools, streaks, prestige ranks, and seasonal resets — designed to reinforce sustained deep work through game-loop psychology.
+FocusForge is a desktop productivity HUD (Heads-Up Display) built with **Tauri 2**, **React 19**, and **TypeScript**. It combines a precision focus timer with a full gamification economy — coins, streaks, prestige ranks, and seasonal resets — designed to reinforce sustained deep work through game-loop psychology.
 
 ## Getting Started
 
@@ -96,10 +96,9 @@ Aggregated diagnostics: focus-by-hour heatmap, day-of-week patterns, session len
 Full coin economy with earning, spending, and progression:
 
 - **Coin Earnings**: 1 coin/min base, scaled by duration milestones (up to 2x at 60+ min), pause penalties, streak multipliers (up to 3x), and daily challenge bonuses.
-- **Tool Shop**: 8 purchasable tools — passive income generators and active session multipliers, culminating in the Elite Workstation prestige tool.
 - **Streaks**: Consecutive work-day chains (Mon–Fri) where completing the daily challenge (3 sessions of 30+ min) extends the streak. Broken streaks can be repaired with coins.
 - **Prestige Titles**: 10 ranks from Initiate to Forge Legend, unlocked by total coins earned per season.
-- **Seasons**: Quarterly resets (Q1–Q4). All coins and tools reset, but full snapshots are archived with badges and stats.
+- **Seasons**: Quarterly resets (Q1–Q4). All coins reset, but full snapshots are archived with badges and stats.
 
 ### Reward Toasts
 Post-session notification showing base coins, multipliers applied, streak status, and total earned. Accompanied by coin and milestone sound effects.
