@@ -1,6 +1,6 @@
 import { type FC, useEffect, useRef, useState, useCallback } from 'react';
 import styles from './SidebarRight.module.scss';
-import { Terminal, Activity, History, BarChart2, Gem, Clock } from 'lucide-react';
+import { Terminal, Activity, History, BarChart2, Gem, Clock, LayoutGrid } from 'lucide-react';
 import { useSystemLog } from '../hooks/useSystemLog';
 import { useFocus } from '../contexts/FocusContext';
 import { soundEngine } from '../utils/audio';
@@ -57,11 +57,12 @@ interface Props {
   onViewAnalytics: (date?: string) => void;
   onViewIntel: () => void;
   onViewVault: () => void;
+  onViewBuckets: () => void;
   detailsPanelOpen: boolean;
   onCloseDetails: () => void;
 }
 
-export const SidebarRight: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVault, detailsPanelOpen, onCloseDetails }) => {
+export const SidebarRight: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVault, onViewBuckets, detailsPanelOpen, onCloseDetails }) => {
   const { logs } = useSystemLog();
   const { dailyStats, recentSessions } = useFocus();
   const [showAlarms, setShowAlarms] = useState(false);
@@ -144,6 +145,11 @@ export const SidebarRight: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVa
     onViewVault();
   }, [onViewVault]);
 
+  const handleBucketsClick = useCallback(() => {
+    soundEngine.playClick();
+    onViewBuckets();
+  }, [onViewBuckets]);
+
   const handleAlarmClick = useCallback(() => {
     soundEngine.playClick();
     setShowAlarms(true);
@@ -218,6 +224,16 @@ export const SidebarRight: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVa
       </div>
 
       <div className={styles.navRow}>
+        <button
+          className={styles.navBtn}
+          onClick={handleBucketsClick}
+          onMouseEnter={() => { soundEngine.playHover(); setStatusHint('OPEN_BUCKETS'); }}
+          onMouseLeave={clearStatusHint}
+          style={{ '--btn-color': '#b388ff' } as React.CSSProperties}
+          title="Buckets (B)"
+        >
+          <LayoutGrid size={24} />
+        </button>
         <button
           className={styles.navBtn}
           onClick={handleAnalyticsClick}

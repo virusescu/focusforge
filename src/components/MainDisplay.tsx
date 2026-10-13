@@ -5,6 +5,7 @@ import { Play, Pause, RotateCcw, Zap, Target } from 'lucide-react';
 import { useFocus } from '../contexts/FocusContext';
 import { soundEngine, playChargeClickWithFile } from '../utils/audio';
 import { open } from '@tauri-apps/plugin-shell';
+import { BucketTag } from './BucketTag';
 
 const ExternalLink: FC<any> = ({ href, children, ...props }) => (
   <a
@@ -16,10 +17,11 @@ const ExternalLink: FC<any> = ({ href, children, ...props }) => (
   </a>
 );
 
-export const MainDisplay: FC<{ onViewAnalytics?: () => void; onViewIntel?: () => void; onViewVault?: () => void; onOpenDetails?: () => void; detailsPanelOpen?: boolean }> = ({ onViewAnalytics, onViewIntel, onViewVault, onOpenDetails, detailsPanelOpen }) => {
+export const MainDisplay: FC<{ onViewAnalytics?: () => void; onViewIntel?: () => void; onViewVault?: () => void; onViewBuckets?: () => void; onOpenDetails?: () => void; detailsPanelOpen?: boolean }> = ({ onViewAnalytics, onViewIntel, onViewVault, onViewBuckets, onOpenDetails, detailsPanelOpen }) => {
   const { 
     activeObjectiveId, 
-    objectivePool, 
+    objectivePool,
+    buckets,
     neutralizeObjective,
     seconds,
     isActive,
@@ -70,6 +72,8 @@ export const MainDisplay: FC<{ onViewAnalytics?: () => void; onViewIntel?: () =>
       currentSubTask: extractCurrentSubTask(obj.details)
     };
   }, [objectivePool, activeObjectiveId, extractCurrentSubTask]);
+
+  const activeBucket = activeObjective ? buckets.find(b => b.id === activeObjective.bucket_id) : undefined;
 
   const handleNeutralize = useCallback(() => {
     if (activeObjectiveId !== null) {
@@ -150,12 +154,17 @@ export const MainDisplay: FC<{ onViewAnalytics?: () => void; onViewIntel?: () =>
           soundEngine.playClick();
           onViewVault();
         }
+      } else if (e.key.toLowerCase() === 'b') {
+        if (onViewBuckets) {
+          soundEngine.playTab();
+          onViewBuckets();
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [toggleTimer, resetTimer, onViewAnalytics, onViewIntel, onViewVault, activeObjectiveId, isActive, handleNeutralize, onOpenDetails, detailsPanelOpen]);
+  }, [toggleTimer, resetTimer, onViewAnalytics, onViewIntel, onViewVault, onViewBuckets, activeObjectiveId, isActive, handleNeutralize, onOpenDetails, detailsPanelOpen]);
 
   const handleHover = () => {
     soundEngine.playHover();
@@ -189,7 +198,10 @@ export const MainDisplay: FC<{ onViewAnalytics?: () => void; onViewIntel?: () =>
           onClick={handleChargeClick}
           role="button"
         >
-          <span className={styles.hudLabel}>ACTIVE_OBJECTIVE // LOCKED_ON</span>
+          <span className={styles.hudLabel}>
+            ACTIVE_OBJECTIVE // LOCKED_ON
+            {activeBucket && <> // <BucketTag bucket={activeBucket} /></>}
+          </span>
           <div className={styles.hudText}>{activeObjective.text}</div>
           {activeObjective.currentSubTask && (
             <div className={styles.hudSubTask}>

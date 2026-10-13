@@ -12,7 +12,7 @@ vi.mock('@libsql/client', () => ({
   }),
 }));
 
-import { initDbClient, saveFocusSession, getRecentSessions, deleteFocusSession, getObjectives, addObjective, deleteObjective, completeObjective, getKillRate, getAllSessions, getFragmentationStats, getAlarms, addAlarm, toggleAlarm, deleteAlarm } from './db';
+import { initDbClient, saveFocusSession, getRecentSessions, deleteFocusSession, getObjectives, addObjective, deleteObjective, completeObjective, getKillRate, getAllSessions, getFragmentationStats, getAlarms, addAlarm, toggleAlarm, deleteAlarm, ensureSystemBuckets, getBuckets, deleteBucket, moveObjectiveToBucket, reorderBucketObjectives, bringBucketToFront } from './db';
 
 describe('db utility functions', () => {
   beforeEach(() => {
@@ -91,13 +91,15 @@ describe('db utility functions', () => {
     it('addObjective inserts with user_id', async () => {
       mockExecute
         .mockResolvedValueOnce({ rows: [{ maxOrder: 0 }], rowsAffected: 0 })
+        .mockResolvedValueOnce({ rows: [{ id: 2 }], rowsAffected: 0 })
+        .mockResolvedValueOnce({ rows: [{ maxOrder: null }], rowsAffected: 0 })
         .mockResolvedValueOnce({ lastInsertRowid: BigInt(123), rows: [], rowsAffected: 1 });
 
       const id = await addObjective(1, 'Test Objective');
 
       expect(mockExecute).toHaveBeenCalledWith({
-        sql: expect.stringContaining('INSERT INTO objectives (user_id, text, sort_order, category_id, is_mission)'),
-        args: [1, 'Test Objective', 1, null, 1],
+        sql: expect.stringContaining('INSERT INTO objectives (user_id, text, sort_order, category_id, is_mission, bucket_id, bucket_sort_order)'),
+        args: [1, 'Test Objective', 1, null, 1, 2, 0],
       });
       expect(id).toBe(123);
     });
@@ -211,6 +213,191 @@ describe('db utility functions', () => {
         sql: expect.stringContaining('DELETE FROM alarms WHERE id = ?'),
         args: [42],
       });
+    });
+  });
+
+  describe('Bucket Methods', () => {
+    it('ensureSystemBuckets creates missing system buckets and backfills objectives', async () => {
+      mockExecute
+        .mockResolvedValueOnce({ rows: [], rowsAffected: 0 })                       // SELECT kinds
+        .mockResolvedValueOnce({ rows: [], rowsAffected: 1, lastInsertRowid: 1n })  // INSERT mission
+        .mockResolvedValueOnce({ rows: [], rowsAffected: 1, lastInsertRowid: 2n })  // INSERT unsorted
+        .mockResolvedValueOnce({ rows: [{ id: 2 }], rowsAffected: 0 })              // SELECT unsorted id
+        .mockResolvedValueOnce({ rows: [], rowsAffected: 3 });                      // UPDATE backfill
+
+      await ensureSystemBuckets(7);
+
+      expect(mockExecute).toHaveBeenCalledWith(expect.objectContaining({
+        sql: expect.stringContaining('INTO buckets'),
+        args: expect.arrayContaining([7, 'mission']),
+      }));
+      expect(mockExecute).toHaveBeenCalledWith(expect.objectContaining({
+        sql: expect.stringContaining('INTO buckets'),
+        args: expect.arrayContaining([7, 'unsorted']),
+      }));
+      expect(mockExecute).toHaveBeenLastCalledWith({
+        sql: expect.stringMatching(/UPDATE objectives SET bucket_id = \?, bucket_sort_order = COALESCE\(bucket_sort_order, sort_order\) WHERE user_id = \? AND bucket_id IS NULL/),
+        args: [2, 7],
+      });
+    });
+
+    it('ensureSystemBuckets does not insert when both system buckets exist', async () => {
+      mockExecute
+        .mockResolvedValueOnce({ rows: [{ kind: 'mission' }, { kind: 'unsorted' }], rowsAffected: 0 })
+        .mockResolvedValueOnce({ rows: [{ id: 2 }], rowsAffected: 0 })
+        .mockResolvedValueOnce({ rows: [], rowsAffected: 0 });
+
+      await ensureSystemBuckets(7);
+
+      const sqls = mockExecute.mock.calls.map(c => (c[0] as { sql: string }).sql);
+      expect(sqls.some(s => s.includes('INTO buckets'))).toBe(false);
+    });
+
+    it('ensureSystemBuckets inserts with OR IGNORE so concurrent calls cannot duplicate', async () => {
+      mockExecute
+        .mockResolvedValueOnce({ rows: [], rowsAffected: 0 })
+        .mockResolvedValueOnce({ rows: [], rowsAffected: 1 })
+        .mockResolvedValueOnce({ rows: [], rowsAffected: 1 })
+        .mockResolvedValueOnce({ rows: [{ id: 2 }], rowsAffected: 0 })
+        .mockResolvedValueOnce({ rows: [], rowsAffected: 0 });
+
+      await ensureSystemBuckets(7);
+
+      const inserts = mockExecute.mock.calls
+        .map(c => (c[0] as { sql: string }).sql)
+        .filter(s => s.includes('INTO buckets'));
+      expect(inserts).toHaveLength(2);
+      for (const sql of inserts) expect(sql).toMatch(/^INSERT OR IGNORE INTO buckets/);
+    });
+
+    it('ensureSystemBuckets shares one run between overlapping calls for the same user', async () => {
+      mockExecute
+        .mockResolvedValueOnce({ rows: [], rowsAffected: 0 })
+        .mockResolvedValueOnce({ rows: [], rowsAffected: 1 })
+        .mockResolvedValueOnce({ rows: [], rowsAffected: 1 })
+        .mockResolvedValueOnce({ rows: [{ id: 2 }], rowsAffected: 0 })
+        .mockResolvedValueOnce({ rows: [], rowsAffected: 0 });
+
+      await Promise.all([ensureSystemBuckets(7), ensureSystemBuckets(7)]);
+
+      expect(mockExecute).toHaveBeenCalledTimes(5);
+    });
+
+    it('ensureSystemBuckets resolves the Unsorted id deterministically', async () => {
+      mockExecute
+        .mockResolvedValueOnce({ rows: [{ kind: 'mission' }, { kind: 'unsorted' }], rowsAffected: 0 })
+        .mockResolvedValueOnce({ rows: [{ id: 2 }], rowsAffected: 0 })
+        .mockResolvedValueOnce({ rows: [], rowsAffected: 0 });
+
+      await ensureSystemBuckets(7);
+
+      expect(mockExecute).toHaveBeenNthCalledWith(2, {
+        sql: expect.stringContaining("kind = 'unsorted' ORDER BY id ASC LIMIT 1"),
+        args: [7],
+      });
+    });
+
+    it('deleteBucket appends moved objectives after the existing Unsorted ones', async () => {
+      mockExecute
+        .mockResolvedValueOnce({ rows: [{ user_id: 7, kind: 'custom' }], rowsAffected: 0 })
+        .mockResolvedValueOnce({ rows: [{ id: 2 }], rowsAffected: 0 })
+        .mockResolvedValueOnce({ rows: [{ maxOrder: 2, minOrder: 0 }], rowsAffected: 0 })
+        .mockResolvedValueOnce({ rows: [], rowsAffected: 4 })
+        .mockResolvedValueOnce({ rows: [], rowsAffected: 1 });
+
+      await deleteBucket(9);
+
+      // Unsorted max is 2 and the deleted bucket starts at 0, so its items shift by 3 (P=3, Q=4)
+      expect(mockExecute).toHaveBeenNthCalledWith(4, {
+        sql: expect.stringContaining('UPDATE objectives SET bucket_id = ?, bucket_sort_order = COALESCE(bucket_sort_order, 0) + ? WHERE bucket_id = ?'),
+        args: [2, 3, 9],
+      });
+      expect(mockExecute).toHaveBeenNthCalledWith(5, {
+        sql: expect.stringContaining('DELETE FROM buckets WHERE id = ?'),
+        args: [9],
+      });
+    });
+
+    it('deleteBucket handles an empty Unsorted and negative orders in the deleted bucket', async () => {
+      mockExecute
+        .mockResolvedValueOnce({ rows: [{ user_id: 7, kind: 'custom' }], rowsAffected: 0 })
+        .mockResolvedValueOnce({ rows: [{ id: 2 }], rowsAffected: 0 })
+        .mockResolvedValueOnce({ rows: [{ maxOrder: null, minOrder: -2 }], rowsAffected: 0 })
+        .mockResolvedValueOnce({ rows: [], rowsAffected: 2 })
+        .mockResolvedValueOnce({ rows: [], rowsAffected: 1 });
+
+      await deleteBucket(9);
+
+      expect(mockExecute).toHaveBeenNthCalledWith(4, expect.objectContaining({ args: [2, 2, 9] }));
+    });
+
+    it('deleteBucket refuses to delete a system bucket', async () => {
+      mockExecute.mockResolvedValueOnce({ rows: [{ user_id: 7, kind: 'unsorted' }], rowsAffected: 0 });
+      await expect(deleteBucket(2)).rejects.toThrow('Cannot delete system bucket');
+    });
+
+    it('moveObjectiveToBucket appends to the target bucket', async () => {
+      mockExecute
+        .mockResolvedValueOnce({ rows: [{ user_id: 7, kind: 'custom' }], rowsAffected: 0 })
+        .mockResolvedValueOnce({ rows: [{ maxOrder: 4 }], rowsAffected: 0 })
+        .mockResolvedValueOnce({ rows: [], rowsAffected: 1 });
+
+      await moveObjectiveToBucket(11, 9);
+
+      expect(mockExecute).toHaveBeenLastCalledWith({
+        sql: expect.stringContaining('UPDATE objectives SET bucket_id = ?, bucket_sort_order = ? WHERE id = ?'),
+        args: [9, 5, 11],
+      });
+    });
+
+    it('moveObjectiveToBucket refuses the mission bucket', async () => {
+      mockExecute.mockResolvedValueOnce({ rows: [{ user_id: 7, kind: 'mission' }], rowsAffected: 0 });
+      await expect(moveObjectiveToBucket(11, 1)).rejects.toThrow('Cannot move objective into mission bucket');
+    });
+
+    it('bringBucketToFront moves the bucket above all of the same user\'s buckets', async () => {
+      mockExecute.mockResolvedValueOnce({ rows: [], rowsAffected: 1 });
+      await bringBucketToFront(9);
+      expect(mockExecute).toHaveBeenCalledTimes(1);
+      expect(mockExecute).toHaveBeenCalledWith({
+        sql: expect.stringMatching(/UPDATE buckets SET sort_order = \(SELECT COALESCE\(MAX\(sort_order\), 0\) \+ 1 FROM buckets WHERE user_id = \(SELECT user_id FROM buckets WHERE id = \?\)\) WHERE id = \?/),
+        args: [9, 9],
+      });
+    });
+
+    it('reorderBucketObjectives writes bucket_sort_order, not sort_order', async () => {
+      mockExecute.mockResolvedValue({ rows: [], rowsAffected: 1 });
+      await reorderBucketObjectives([5, 3]);
+      expect(mockExecute).toHaveBeenNthCalledWith(1, { sql: 'UPDATE objectives SET bucket_sort_order = ? WHERE id = ?', args: [0, 5] });
+      expect(mockExecute).toHaveBeenNthCalledWith(2, { sql: 'UPDATE objectives SET bucket_sort_order = ? WHERE id = ?', args: [1, 3] });
+    });
+
+    it('addObjective without a bucket puts it in Unsorted', async () => {
+      mockExecute
+        .mockResolvedValueOnce({ rows: [{ maxOrder: 2 }], rowsAffected: 0 })   // MAX(sort_order)
+        .mockResolvedValueOnce({ rows: [{ id: 2 }], rowsAffected: 0 })         // unsorted id
+        .mockResolvedValueOnce({ rows: [{ maxOrder: 6 }], rowsAffected: 0 })   // MAX(bucket_sort_order)
+        .mockResolvedValueOnce({ rows: [], rowsAffected: 1, lastInsertRowid: 30n });
+
+      const id = await addObjective(7, 'Task', null, 1, false);
+
+      expect(id).toBe(30);
+      expect(mockExecute).toHaveBeenLastCalledWith({
+        sql: expect.stringContaining('INSERT INTO objectives (user_id, text, sort_order, category_id, is_mission, bucket_id, bucket_sort_order)'),
+        args: [7, 'Task', 3, null, 1, 2, 7],
+      });
+    });
+
+    it('getBuckets maps rows to Bucket objects', async () => {
+      mockExecute
+        .mockResolvedValueOnce({ rows: [{ kind: 'mission' }, { kind: 'unsorted' }], rowsAffected: 0 })
+        .mockResolvedValueOnce({ rows: [{ id: 2 }], rowsAffected: 0 })
+        .mockResolvedValueOnce({ rows: [], rowsAffected: 0 })
+        .mockResolvedValueOnce({ rows: [{ id: 2, name: 'Unsorted', color: '#888888', x: 360, y: 0, w: 300, h: 420, sort_order: 1, kind: 'unsorted' }], rowsAffected: 0 });
+
+      const buckets = await getBuckets(7);
+
+      expect(buckets).toEqual([{ id: 2, name: 'Unsorted', color: '#888888', x: 360, y: 0, w: 300, h: 420, sort_order: 1, kind: 'unsorted' }]);
     });
   });
 });

@@ -23,13 +23,14 @@ import { AlarmProvider } from './contexts/AlarmContext';
 import { NavigationGuard } from './components/NavigationGuard';
 import { SeasonTransitionModal } from './components/SeasonTransitionModal';
 import { VaultPage } from './components/VaultPage';
+import { BucketsPage } from './components/BucketsPage';
 import { FireBackground } from './components/FireBackground';
 import AlarmOverlay from './components/AlarmOverlay';
 
 function HudApp() {
-  const [view, setView] = useState<'hud' | 'analytics' | 'intel' | 'vault'>('hud');
+  const [view, setView] = useState<'hud' | 'analytics' | 'intel' | 'vault' | 'buckets'>('hud');
   const [analyticsDate, setAnalyticsDate] = useState<Date>(new Date());
-  const [pendingNavigation, setPendingNavigation] = useState<{ target: 'analytics' | 'intel' | 'vault'; dateStr?: string } | null>(null);
+  const [pendingNavigation, setPendingNavigation] = useState<{ target: 'analytics' | 'intel' | 'vault' | 'buckets'; dateStr?: string } | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [detailsPanelOpen, setDetailsPanelOpen] = useState(false);
   const [rightSidebarWidth, setRightSidebarWidth] = useState(350);
@@ -84,6 +85,14 @@ function HudApp() {
     setView('vault');
   };
 
+  const handleViewBuckets = () => {
+    if (timerStatus !== 'idle') {
+      setPendingNavigation({ target: 'buckets' });
+      return;
+    }
+    setView('buckets');
+  };
+
   const handleConfirmNavigation = () => {
     if (!pendingNavigation) return;
     resetTimer();
@@ -93,6 +102,8 @@ function HudApp() {
       setView('analytics');
     } else if (pendingNavigation.target === 'vault') {
       setView('vault');
+    } else if (pendingNavigation.target === 'buckets') {
+      setView('buckets');
     } else {
       setView('intel');
     }
@@ -133,11 +144,12 @@ function HudApp() {
         <Header onOpenSettings={() => setIsSettingsOpen(true)} onViewVault={handleViewVault} />
         {view === 'hud' ? (
           <>
-            <SidebarLeft onOpenSettings={() => setIsSettingsOpen(true)} onOpenDetails={() => setDetailsPanelOpen(true)} />
+            <SidebarLeft onOpenSettings={() => setIsSettingsOpen(true)} onOpenDetails={() => setDetailsPanelOpen(true)} onViewBuckets={handleViewBuckets} />
             <MainDisplay
               onViewAnalytics={() => handleViewAnalytics()}
               onViewIntel={handleViewIntel}
               onViewVault={handleViewVault}
+              onViewBuckets={handleViewBuckets}
               onOpenDetails={() => setDetailsPanelOpen(true)}
               detailsPanelOpen={detailsPanelOpen}
             />
@@ -147,6 +159,7 @@ function HudApp() {
                 onViewAnalytics={(date) => handleViewAnalytics(date)}
                 onViewIntel={handleViewIntel}
                 onViewVault={handleViewVault}
+                onViewBuckets={handleViewBuckets}
                 detailsPanelOpen={detailsPanelOpen}
                 onCloseDetails={() => setDetailsPanelOpen(false)}
               />
@@ -156,6 +169,8 @@ function HudApp() {
           <AnalyticsView initialDate={analyticsDate} onBack={() => setView('hud')} />
         ) : view === 'vault' ? (
           <VaultPage onBack={() => setView('hud')} />
+        ) : view === 'buckets' ? (
+          <BucketsPage onBack={() => setView('hud')} />
         ) : (
           <IntelligenceHub onBack={() => setView('hud')} />
         )}

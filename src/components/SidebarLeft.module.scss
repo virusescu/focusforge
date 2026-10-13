@@ -259,45 +259,20 @@
   }
 }
 
-.dragHandle {
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  cursor: grab !important;
-  padding: 2px 4px;
-  display: flex;
-  align-items: center;
-  opacity: 0;
-  transition: opacity 0.15s ease;
-  flex-shrink: 0;
-  margin-top: 2px;
-
-  &:active {
-    cursor: grabbing !important;
-  }
-
-  * {
-    cursor: grab !important;
-  }
-}
-
 .objectiveItem {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-
-  &:hover .dragHandle {
-    opacity: 0.5;
-  }
-
-  &.activeObjective .dragHandle {
-    color: var(--primary);
-  }
   padding: 0.5rem;
   font-size: 0.75rem;
   border: 1px solid var(--border);
   background: rgba(var(--primary-rgb), 0.05);
-  cursor: pointer;
+  cursor: grab;
+  touch-action: none;
+
+  &:active {
+    cursor: grabbing;
+  }
   transition: all 0.2s ease;
   font-family: var(--font-mono);
 
@@ -526,27 +501,23 @@
   }
 }
 
-.viewToggleArrow {
+.bucketsBtn {
   background: transparent;
   border: none;
   color: var(--text-secondary);
-  font-size: 1.2rem;
+  font-size: 0.65rem;
+  letter-spacing: 0.15em;
   cursor: pointer;
   // Big hit zone, vertically fills the title row
-  padding: 6px 10px;
+  padding: 6px 4px 6px 10px;
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 6px;
   align-self: stretch;
   transition: color 0.15s;
 
-  &:hover:not(:disabled) {
+  &:hover {
     color: var(--primary);
-  }
-
-  &:disabled {
-    opacity: 0.2;
-    cursor: default;
   }
 }
 
@@ -557,6 +528,8 @@
   cursor: pointer;
   padding: 2px 4px;
   font-size: 0.75rem;
+  display: flex;
+  align-items: center;
   flex-shrink: 0;
   transition: color 0.15s;
   opacity: 0;

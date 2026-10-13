@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
-import type { FocusSession, DailyStat, StrategicObjective, ObjectiveCategory } from '../types';
+import type { FocusSession, DailyStat, StrategicObjective, ObjectiveCategory, Bucket, BucketGeometry } from '../types';
 import { soundEngine, playObjectiveComplete } from '../utils/audio';
 import { useTimer } from '../hooks/useTimer';
 import { useUser } from './UserContext';
@@ -15,15 +15,28 @@ import {
   updateObjective as dbUpdateObjective,
   completeObjective as dbCompleteObjective,
   reorderObjectives as dbReorderObjectives,
-  moveObjectiveToOtherList as dbMoveObjectiveToOtherList,
+  setObjectiveMission as dbSetObjectiveMission,
   getCategories,
   addCategory as dbAddCategory,
   updateCategory as dbUpdateCategory,
   deleteCategory as dbDeleteCategory,
   updateObjectiveCategory as dbUpdateObjectiveCategory,
   updateObjectiveDetails as dbUpdateObjectiveDetails,
-  updateObjectiveInteractionTime as dbUpdateObjectiveInteractionTime
+  updateObjectiveInteractionTime as dbUpdateObjectiveInteractionTime,
+  getBuckets,
+  addBucket as dbAddBucket,
+  updateBucket as dbUpdateBucket,
+  updateBucketGeometry as dbUpdateBucketGeometry,
+  bringBucketToFront as dbBringBucketToFront,
+  deleteBucket as dbDeleteBucket,
+  moveObjectiveToBucket as dbMoveObjectiveToBucket,
+  reorderBucketObjectives as dbReorderBucketObjectives
 } from '../db';
+
+export interface AddObjectiveOptions {
+  bucketId?: number | null; // default: Unsorted (resolved by db)
+  inMission?: boolean;      // default: true
+}
 
 interface FocusContextType {
   recentSessions: FocusSession[];
@@ -42,7 +55,7 @@ interface FocusContextType {
   categories: ObjectiveCategory[];
   saveSession: (startTime: string, durationSeconds: number, pauseTimes?: string[]) => Promise<void>;
   refreshData: () => Promise<void>;
-  addObjective: (text: string, categoryId?: number | null, prepend?: boolean) => Promise<void>;
+  addObjective: (text: string, categoryId?: number | null, prepend?: boolean, options?: AddObjectiveOptions) => Promise<void>;
   deleteObjective: (id: number) => Promise<void>;
   updateObjective: (id: number, text: string) => Promise<void>;
   updateObjectiveCategory: (id: number, categoryId: number | null) => Promise<void>;
@@ -51,11 +64,17 @@ interface FocusContextType {
   setViewedObjective: (id: number | null) => void;
   neutralizeObjective: (id: number) => Promise<void>;
   reorderObjectives: (orderedIds: number[]) => Promise<void>;
-  moveObjectiveToOtherList: (id: number) => Promise<void>;
-  objectiveView: 'mission' | 'backlog';
-  switchObjectiveView: (view: 'mission' | 'backlog') => void;
   missionObjectives: StrategicObjective[];
-  backlogObjectives: StrategicObjective[];
+  buckets: Bucket[];
+  objectivesByBucket: Map<number, StrategicObjective[]>; // key bucket id; sorted by bucket_sort_order, then id
+  setObjectiveMission: (id: number, inMission: boolean) => Promise<void>;
+  moveObjectiveToBucket: (id: number, bucketId: number) => Promise<void>;
+  reorderBucketObjectives: (bucketId: number, orderedIds: number[]) => Promise<void>;
+  addBucket: (name: string, color: string, geometry: BucketGeometry) => Promise<void>;
+  updateBucket: (id: number, name: string, color: string) => Promise<void>;
+  updateBucketGeometry: (id: number, geometry: BucketGeometry) => Promise<void>;
+  bringBucketToFront: (id: number) => Promise<void>;
+  deleteBucket: (id: number) => Promise<void>;
   addCategory: (label: string, color: string, coinBounty?: number) => Promise<void>;
   updateCategory: (id: number, label: string, color: string, coinBounty?: number) => Promise<void>;
   deleteCategory: (id: number) => Promise<void>;
@@ -93,16 +112,32 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
   const [globalStats, setGlobalStats] = useState<FocusContextType['globalStats']>(null);
   const [objectivePool, setObjectivePool] = useState<StrategicObjective[]>([]);
   const [categories, setCategories] = useState<ObjectiveCategory[]>([]);
-  const [objectiveView, setObjectiveView] = useState<'mission' | 'backlog'>('mission');
+  const [buckets, setBuckets] = useState<Bucket[]>([]);
 
   const missionObjectives = useMemo(
     () => objectivePool.filter(o => o.is_mission === 1),
     [objectivePool]
   );
-  const backlogObjectives = useMemo(
-    () => objectivePool.filter(o => o.is_mission === 0),
-    [objectivePool]
-  );
+  const objectivesByBucket = useMemo(() => {
+    const map = new Map<number, StrategicObjective[]>();
+    for (const b of buckets) {
+      if (b.kind !== 'mission') map.set(b.id, []);
+    }
+    const unsortedId = buckets.find(b => b.kind === 'unsorted')?.id;
+    for (const o of objectivePool) {
+      const key = o.bucket_id ?? unsortedId;
+      if (key === undefined) continue;
+      const list = map.get(key);
+      if (list) list.push(o);
+      else map.set(key, [o]);
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) =>
+        ((a.bucket_sort_order ?? Infinity) - (b.bucket_sort_order ?? Infinity)) || (a.id - b.id)
+      );
+    }
+    return map;
+  }, [objectivePool, buckets]);
   const [activeObjectiveId, setActiveObjectiveId] = useState<number | null>(null);
   const [viewedObjectiveId, setViewedObjectiveId] = useState<number | null>(null);
   const [isGlitching, setIsGlitching] = useState(false);
@@ -142,6 +177,8 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
   const refreshData = useCallback(async () => {
     if (!authUser) return;
     try {
+      // Buckets first: getBuckets creates the system buckets and backfills objectives.bucket_id
+      const bkts = await getBuckets(authUser.id);
       const [sessions, stats, globals, objectives, cats] = await Promise.all([
         getRecentSessions(authUser.id, 3),
         getDailyFocusStats(authUser.id, 21),
@@ -154,6 +191,7 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
       setGlobalStats(globals);
       setObjectivePool(objectives);
       setCategories(cats);
+      setBuckets(bkts);
     } catch (e) {
       console.error("Failed to load focus data", e);
     } finally {
@@ -171,12 +209,12 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
     await refreshData();
   }, [authUser, refreshData]);
 
-  const addObjective = useCallback(async (text: string, categoryId?: number | null, prepend: boolean = false) => {
+  const addObjective = useCallback(async (text: string, categoryId?: number | null, prepend: boolean = false, options: AddObjectiveOptions = {}) => {
     if (!authUser) return;
-    const isMission = objectiveView === 'mission' ? 1 : 0;
-    await dbAddObjective(authUser.id, text, categoryId, isMission, prepend);
+    const isMission = options.inMission === false ? 0 : 1;
+    await dbAddObjective(authUser.id, text, categoryId, isMission, prepend, options.bucketId ?? null);
     await refreshData();
-  }, [authUser, objectiveView, refreshData]);
+  }, [authUser, refreshData]);
 
   const deleteObjective = useCallback(async (id: number) => {
     await dbDeleteObjective(id);
@@ -225,36 +263,116 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
     await dbReorderObjectives(orderedIds);
   }, []);
 
-  const switchObjectiveView = useCallback((view: 'mission' | 'backlog') => {
-    console.log('[FocusContext] Switching view to:', view);
-    setObjectiveView(view);
-  }, []);
+  const setObjectiveMission = useCallback(async (id: number, inMission: boolean) => {
+    // 1. Instantly update local state. The objective keeps its bucket; like the DB, it goes
+    //    to the end of its new list (sort_order = max + 1), so move it to the end of the pool too.
+    setObjectivePool(prev => {
+      const target = prev.find(o => o.id === id);
+      if (!target) return prev;
+      const isMission = inMission ? 1 : 0;
+      const rest = prev.filter(o => o.id !== id);
+      const maxOrder = rest
+        .filter(o => o.is_mission === isMission)
+        .reduce((max, o) => Math.max(max, o.sort_order ?? -1), -1);
+      return [...rest, { ...target, is_mission: isMission, sort_order: maxOrder + 1, last_interacted_at: new Date().toISOString() }];
+    });
 
-  const moveObjectiveToOtherList = useCallback(async (id: number) => {
-    const obj = objectivePool.find(o => o.id === id);
-    if (!obj) return;
-
-    const targetIsMission = obj.is_mission === 1 ? 0 : 1;
-    console.log('[FocusContext] Move:', id, 'to', targetIsMission === 1 ? 'mission' : 'backlog');
-
-    // 1. Instantly update local state
-    setObjectivePool(prev => prev.map(o => 
-      o.id === id ? { ...o, is_mission: targetIsMission, last_interacted_at: new Date().toISOString() } : o
-    ));
-
-    if (activeObjectiveId === id) {
+    if (!inMission && activeObjectiveId === id) {
       setActiveObjectiveId(null);
     }
 
     // 2. Sync DB in background WITHOUT refreshData (to avoid stale read race)
     try {
-      await dbMoveObjectiveToOtherList(id, targetIsMission);
+      await dbSetObjectiveMission(id, inMission ? 1 : 0);
       await dbUpdateObjectiveInteractionTime(id);
     } catch (error) {
       console.error('[FocusContext] DB sync failed, reverting UI:', error);
       await refreshData();
     }
-  }, [objectivePool, activeObjectiveId, refreshData]);
+  }, [activeObjectiveId, refreshData]);
+
+  const moveObjectiveToBucket = useCallback(async (id: number, bucketId: number) => {
+    // Optimistic: append to the end of the target bucket
+    setObjectivePool(prev => {
+      const maxOrder = prev
+        .filter(o => o.id !== id && o.bucket_id === bucketId)
+        .reduce((max, o) => Math.max(max, o.bucket_sort_order ?? -1), -1);
+      return prev.map(o => o.id === id ? { ...o, bucket_id: bucketId, bucket_sort_order: maxOrder + 1 } : o);
+    });
+
+    try {
+      await dbMoveObjectiveToBucket(id, bucketId);
+    } catch (error) {
+      console.error('[FocusContext] Bucket move failed, reverting UI:', error);
+      await refreshData();
+    }
+  }, [refreshData]);
+
+  // bucketId is unused by the DB (objective ids are unique); it keeps call sites explicit
+  const reorderBucketObjectives = useCallback(async (_bucketId: number, orderedIds: number[]) => {
+    const orderById = new Map(orderedIds.map((id, index) => [id, index]));
+    setObjectivePool(prev => prev.map(o => {
+      const order = orderById.get(o.id);
+      return order === undefined ? o : { ...o, bucket_sort_order: order };
+    }));
+
+    try {
+      await dbReorderBucketObjectives(orderedIds);
+    } catch (error) {
+      console.error('[FocusContext] Bucket reorder failed, reverting UI:', error);
+      await refreshData();
+    }
+  }, [refreshData]);
+
+  const addBucket = useCallback(async (name: string, color: string, geometry: BucketGeometry) => {
+    if (!authUser) return;
+    await dbAddBucket(authUser.id, name, color, geometry);
+    await refreshData();
+  }, [authUser, refreshData]);
+
+  const updateBucket = useCallback(async (id: number, name: string, color: string) => {
+    setBuckets(prev => prev.map(b => b.id === id ? { ...b, name, color } : b));
+    try {
+      await dbUpdateBucket(id, name, color);
+    } catch (error) {
+      console.error('[FocusContext] Bucket update failed, reverting UI:', error);
+      await refreshData();
+    }
+  }, [refreshData]);
+
+  const updateBucketGeometry = useCallback(async (id: number, geometry: BucketGeometry) => {
+    setBuckets(prev => prev.map(b => b.id === id ? { ...b, ...geometry } : b));
+    try {
+      await dbUpdateBucketGeometry(id, geometry);
+    } catch (error) {
+      console.error('[FocusContext] Bucket geometry update failed, reverting UI:', error);
+      await refreshData();
+    }
+  }, [refreshData]);
+
+  const bringBucketToFront = useCallback(async (id: number) => {
+    const others = buckets.filter(b => b.id !== id);
+    const target = buckets.find(b => b.id === id);
+    if (!target) return;
+    const maxOther = Math.max(0, ...others.map(b => b.sort_order));
+    if (target.sort_order > maxOther) return; // already in front
+    // Same value the DB computes: highest sort_order among the user's buckets + 1
+    const sortOrder = Math.max(target.sort_order, maxOther) + 1;
+    setBuckets(prev => prev
+      .map(b => b.id === id ? { ...b, sort_order: sortOrder } : b)
+      .sort((a, b) => a.sort_order - b.sort_order || a.id - b.id));
+    try {
+      await dbBringBucketToFront(id);
+    } catch (error) {
+      console.error('[FocusContext] Bring bucket to front failed, reverting UI:', error);
+      await refreshData();
+    }
+  }, [buckets, refreshData]);
+
+  const deleteBucket = useCallback(async (id: number) => {
+    await dbDeleteBucket(id);
+    await refreshData();
+  }, [refreshData]);
 
   const updateObjectiveCategory = useCallback(async (id: number, categoryId: number | null) => {
     // Optimistic
@@ -376,11 +494,17 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
       setViewedObjective,
       neutralizeObjective,
       reorderObjectives,
-      moveObjectiveToOtherList,
-      objectiveView,
-      switchObjectiveView,
       missionObjectives,
-      backlogObjectives,
+      buckets,
+      objectivesByBucket,
+      setObjectiveMission,
+      moveObjectiveToBucket,
+      reorderBucketObjectives,
+      addBucket,
+      updateBucket,
+      updateBucketGeometry,
+      bringBucketToFront,
+      deleteBucket,
       addCategory,
       updateCategory,
       deleteCategory,

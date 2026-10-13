@@ -70,7 +70,7 @@ only needs `useAuth()` but listens to events emitted from inside `FocusProvider`
 |---|---|---|---|
 | **Auth** | `contexts/AuthContext.tsx` | `authUser`, `needsSetup`, `login`, `logout`, `completeSetup` | Also initialises the DB client. |
 | **User** | `contexts/UserContext.tsx` | `user` (settings row), `name`/`email`/`avatar` from Google, `updateSettings` | Settings: `debug_speed`, `experience_lvl`, `day_start_hour`, `day_end_hour`. |
-| **Focus** | `contexts/FocusContext.tsx` | Timer state (via `useTimer`), recent sessions, 21-day stats, global stats, objective pool (mission + backlog), categories, active/viewed objective, glitch overlay state | Objective edits are optimistic; the DB write runs after and `refreshData()` reverts on failure. |
+| **Focus** | `contexts/FocusContext.tsx` | Timer state (via `useTimer`), recent sessions, 21-day stats, global stats, objective pool, `missionObjectives`, buckets and `objectivesByBucket`, bucket operations (add/rename/recolor/move/resize/delete, move or reorder objectives within buckets, `setObjectiveMission`), categories, active/viewed objective, glitch overlay state | Objective and bucket edits are optimistic; the DB write runs after and `refreshData()` reverts on failure. |
 | **Game** | `contexts/GameContext.tsx` | Season, coins, streak, daily challenge, prestige titles, archives, `coinGain` (header flash), `startNewSeason` | `useGame()` returns safe defaults instead of throwing outside its provider. |
 | **Alarm** | `contexts/AlarmContext.tsx` | Alarms CRUD, `activeAlarm`, snooze state | Polls every 5 s; snooze state is in memory only. |
 
@@ -103,7 +103,7 @@ In dev builds the timer runs at `debug_speed` × real time (set in Settings).
 
 ## Views and navigation
 
-`HudApp` (in `App.tsx`) holds a `view` state: `hud | analytics | intel | vault`.
+`HudApp` (in `App.tsx`) holds a `view` state: `hud | analytics | intel | vault | buckets`.
 Switching away from the HUD while the timer is not idle shows `NavigationGuard`.
 Confirming ends (and saves) the session first.
 
@@ -115,10 +115,14 @@ and shows `UpdatePrompt` if one is available.
 | Component | Purpose |
 |---|---|
 | `Header` | Title bar / drag region, coin counter + `+N` flash, streak bars, season timer, prestige rank, version, window controls. |
-| `SidebarLeft` | Objective lists (Mission / Backlog) with drag-and-drop (`@dnd-kit`), inline edit (F2), category dots, forge progress, streak/daily/multiplier readout. |
-| `MainDisplay` | The "Neural Forge" timer ring, active objective, hold-to-charge neutralize, global keyboard shortcuts. |
-| `SidebarRight` | Activity map (21-day heatmap → opens Analytics for a day), recent forges, system log. Hosts `ObjectiveDetails` when the details panel is open. Resizable (280–700 px). |
-| `ObjectiveDetails` | Markdown notes editor for an objective, with toolbar, shortcuts, auto-link on paste and line reordering. |
+| `SidebarLeft` | Mission list (each row has a left stripe in its bucket's color; hover shows the bucket name) with drag-and-drop reordering (`@dnd-kit`, drag from anywhere on the row; pointer only), inline edit (F2), category dots, remove-from-Mission button, a BUCKETS button that opens the Buckets page, forge progress, streak/daily/multiplier readout. |
+| `BucketsPage` | The Buckets view: an infinite pan/zoom canvas (CSS-transformed world, viewport saved in `localStorage` key `bucket_canvas_viewport`) with one `BucketPanel` per bucket plus the Mission panel. Handles card drag-and-drop between panels, NEW_BUCKET, the details drawer and the category manager. |
+| `BucketPanel` | One colored panel on the canvas. It can be moved by its header and resized from its corner (minimum 200×120; Shift snaps to a 20-unit grid). Every panel's color is editable, including Mission and Unsorted; the name of every panel except Mission is editable. Delete is available for custom buckets only. Panels stack by `sort_order` (`stackingOrder` in `utils/canvas.ts`); dropping a moved or resized panel calls `bringBucketToFront`, so the last one dragged stays on top, and the order is saved. Holds a sortable list of cards and an add box. |
+| `ObjectiveCard` | A sortable objective card used in bucket panels and the Mission panel, dragged from anywhere on the card (not while renaming): category dot, inline rename (double-click / F2), details, Mission toggle, delete. |
+| `BucketTag` | Colored dot + bucket name in the bucket's color. Used in the LOCKED_ON label and the details header. |
+| `MainDisplay` | The "Neural Forge" timer ring, active objective (its LOCKED_ON label shows the objective's bucket), hold-to-charge neutralize, global keyboard shortcuts. |
+| `SidebarRight` | Activity map (21-day heatmap → opens Analytics for a day), recent forges, system log, and the big nav buttons (Buckets, Analytics, Alarms, Intelligence Hub, Vault; they shrink to fit narrow widths). Hosts `ObjectiveDetails` when the details panel is open. Resizable (280–700 px). |
+| `ObjectiveDetails` | Markdown notes editor for an objective, with toolbar, shortcuts, auto-link on paste and line reordering. The header shows the title and the objective's bucket (`BucketTag`). |
 | `AnalyticsView` | Day view timeline, session edit/delete, completed objectives, kill rate, category management. Reads the DB directly. |
 | `IntelligenceHub` | Focus by hour, focus by day, session length distribution, fragmentation index, clean-forge ratio. Reads the DB directly. |
 | `VaultPage` | Season overview, daily challenge, streak status, prestige ranks, seasonal archive, economy help. |
@@ -137,6 +141,7 @@ and shows `UpdatePrompt` if one is available.
 | `hooks/useTimer.ts` | Pure timer state machine (seconds, pause countdown, pause timestamps) that emits the timer events. |
 | `hooks/useSystemLog.ts` | Flavour-text log fed by timer events, using messages from `logData.ts`. |
 | `utils/gameEconomy.ts` | Pure economy functions with no side effects (see [economy.md](economy.md)). |
+| `utils/canvas.ts` | Pure viewport/geometry math for the Buckets canvas (screen↔world, zoom at cursor with 0.25–2 clamp, recenter, panel move/resize) plus viewport persistence. |
 | `utils/audio.ts` | `soundEngine`: every UI sound is synthesised with the Web Audio API, with no audio assets. |
 | `utils/dateUtils.ts`, `utils/statusHint.ts`, `utils/logger.ts` | Date helpers, footer status hints, logging. |
 
@@ -150,15 +155,17 @@ and shows `UpdatePrompt` if one is available.
 | Escape | End session (saves it), unless the details panel is open |
 | Ctrl+Enter | Neutralize the active objective (timer must be running) |
 | Enter | Open details for the active objective |
-| A / I / V | Analytics / Intelligence Hub / Vault |
-| ← / → | Switch Mission / Backlog list |
+| A / I / V / B | Analytics / Intelligence Hub / Vault / Buckets |
 | ↑ / ↓ | Select previous / next objective |
-| Shift+← / Shift+→ | Move the selected objective to the other list |
 | Shift+↑ / Shift+↓ / Shift+Home / Shift+End | Reorder the selected objective |
 | F2 | Rename objective |
 | Shift+Enter (in add box) | Add objective to the top of the list |
 
 **Analytics:** ← / → previous/next day · Space jump to today · Escape back.
+
+**Buckets page:** drag background / middle mouse pan · wheel zoom (around the cursor) ·
+Space recenter origin (keeps zoom) · F2 rename card · Escape back (closes the details drawer first) ·
+hold Shift while moving/resizing a panel to snap to a 20-unit grid. Keys are ignored while typing in an input.
 
 **Details editor:** Ctrl+B / I / S bold / italic / strikethrough (toggle) ·
 Ctrl+1/2/3 headings · Ctrl+L bullet · Ctrl+T task · Ctrl+D duplicate line ·

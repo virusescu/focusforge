@@ -54,9 +54,28 @@ export interface StrategicObjective {
   completed_at?: string;
   sort_order?: number;
   category_id?: number | null;
-  is_mission: number; // 1 = Mission Objectives, 0 = Backlog
+  is_mission: number; // 1 = in Mission Objectives, 0 = only in its bucket
   details?: string | null;
   last_interacted_at?: string;
+  bucket_id?: number | null;
+  bucket_sort_order?: number | null;
+}
+
+export type BucketKind = 'custom' | 'unsorted' | 'mission';
+
+export interface BucketGeometry {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export interface Bucket extends BucketGeometry {
+  id: number;
+  name: string;
+  color: string;
+  sort_order: number;
+  kind: BucketKind;
 }
 
 // ─── Game Economy Types ─────────────────────────────────────────

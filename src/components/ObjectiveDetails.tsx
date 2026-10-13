@@ -3,10 +3,11 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import styles from './ObjectiveDetails.module.scss';
-import { Edit3, Check, X, ClipboardList, Heading1, Heading2, Heading3, List, ListChecks, Strikethrough, Table, Bold, Italic, Link2 } from 'lucide-react';
+import { Edit3, Check, X, Heading1, Heading2, Heading3, List, ListChecks, Strikethrough, Table, Bold, Italic, Link2 } from 'lucide-react';
 import { useFocus } from '../contexts/FocusContext';
 import { soundEngine, playCheckboxCheckWithFile } from '../utils/audio';
 import { open } from '@tauri-apps/plugin-shell';
+import { BucketTag } from './BucketTag';
 
 // ─── Remark plugin: embed 0-indexed source line on each task list item ──────────
 // This runs on the MDAST after remark-gfm has set node.checked,
@@ -78,8 +79,9 @@ interface Props {
 }
 
 export const ObjectiveDetails: FC<Props> = ({ onClose }) => {
-  const { viewedObjectiveId, objectivePool, updateObjectiveDetails } = useFocus();
+  const { viewedObjectiveId, objectivePool, buckets, updateObjectiveDetails } = useFocus();
   const activeObjective = objectivePool.find(o => o.id === viewedObjectiveId) ?? null;
+  const activeBucket = activeObjective ? buckets.find(b => b.id === activeObjective.bucket_id) : undefined;
 
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState('');
@@ -356,12 +358,12 @@ export const ObjectiveDetails: FC<Props> = ({ onClose }) => {
     <aside className={styles.sidebar} ref={asideRef as any}>
       <div className="card" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <div className={styles.header}>
-          <div className={styles.titleRow}>
-            <ClipboardList size={14} />
+          <div className={styles.titleBlock}>
             <h4>{activeObjective?.text ?? 'OBJECTIVE_DETAILS'}</h4>
+            {activeBucket && <BucketTag bucket={activeBucket} className={styles.bucketTag} />}
           </div>
           <button className={styles.closeBtn} onClick={onClose} title="Close (Esc)">
-            <X size={14} />
+            <X size={16} />
           </button>
         </div>
 

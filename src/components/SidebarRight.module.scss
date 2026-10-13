@@ -134,8 +134,10 @@
 }
 
 .navBtn {
-  width: 64px;
-  height: 64px;
+  // Shrinks (staying square) when five buttons don't fit the panel's minimum width
+  flex: 0 1 64px;
+  min-width: 0;
+  aspect-ratio: 1;
   display: flex;
   align-items: center;
   justify-content: center;

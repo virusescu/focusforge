@@ -1,6 +1,6 @@
 import { type FC, useCallback, useState, useRef, useEffect, useMemo } from 'react';
 import styles from './SidebarLeft.module.scss';
-import { User, Zap, Flame, Star, Plus, X, GripVertical, Edit3, Check } from 'lucide-react';
+import { User, Zap, Flame, Star, Plus, X, Edit3, Check, LayoutGrid, MinusCircle } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 import { useFocus } from '../contexts/FocusContext';
 import { useGame } from '../contexts/GameContext';
@@ -10,21 +10,19 @@ import {
   DndContext,
   closestCenter,
   PointerSensor,
-  KeyboardSensor,
   useSensor,
   useSensors,
   type DragEndEvent,
 } from '@dnd-kit/core';
 import {
   SortableContext,
-  sortableKeyboardCoordinates,
   verticalListSortingStrategy,
   useSortable,
   arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
-import type { StrategicObjective, ObjectiveCategory } from '../types';
+import type { StrategicObjective, ObjectiveCategory, Bucket } from '../types';
 import { CategoryDotPicker } from './CategoryDotPicker';
 import { CategoryManagerModal } from './CategoryManagerModal';
 import { AlarmsModal } from './AlarmsModal';
@@ -41,13 +39,14 @@ interface SortableItemProps {
   onCategoryChange: (id: number, categoryId: number | null) => void;
   onManageCategories: () => void;
   onHover: () => void;
-  onMove: (id: number) => void;
-  objectiveView: 'mission' | 'backlog';
+  onRemoveFromMission: (id: number) => void;
+  bucket?: Bucket; // the objective's bucket, shown as a colored left stripe
 }
 
-const SortableItem: FC<SortableItemProps> = ({ obj, isActive, isViewed, categories, onSelect, onActivate, onDelete, onUpdate, onCategoryChange, onManageCategories, onHover, onMove, objectiveView }) => {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: obj.id });
+const SortableItem: FC<SortableItemProps> = ({ obj, isActive, isViewed, categories, onSelect, onActivate, onDelete, onUpdate, onCategoryChange, onManageCategories, onHover, onRemoveFromMission, bucket }) => {
   const [isEditing, setIsEditing] = useState(false);
+  // The whole row is the drag source; disabled while renaming so the input's text can be selected
+  const { listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: obj.id, disabled: isEditing });
   const [editText, setEditText] = useState(obj.text);
   const [showPicker, setShowPicker] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -66,6 +65,7 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, isViewed, categori
     transition,
     opacity: isDragging ? 0.4 : 1,
     zIndex: isDragging ? 999 : undefined,
+    borderLeft: bucket ? `3px solid ${bucket.color}` : undefined,
   };
 
   const handleEdit = (e: React.MouseEvent) => {
@@ -92,14 +92,9 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, isViewed, categori
     }
   };
 
-  const handleClick = (e: React.MouseEvent) => {
+  const handleClick = () => {
     if (isEditing) return;
-    if (e.shiftKey) {
-      e.preventDefault();
-      onMove(obj.id);
-    } else {
-      onSelect(obj.id);
-    }
+    onSelect(obj.id);
   };
 
   const handleDoubleClick = (e: React.MouseEvent) => {
@@ -142,17 +137,10 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, isViewed, categori
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       onMouseEnter={onHover}
+      title={bucket ? `Bucket: ${bucket.name}` : undefined}
+      data-bucket-id={bucket?.id}
+      {...listeners}
     >
-      <button
-        className={styles.dragHandle}
-        {...attributes}
-        {...listeners}
-        tabIndex={-1}
-        onClick={e => e.stopPropagation()}
-      >
-        <GripVertical size={12} />
-      </button>
-
       <span
         className={styles.categoryBullet}
         style={{ backgroundColor: categoryColor || '#333333' }}
@@ -207,12 +195,12 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, isViewed, categori
 
       <button
         className={styles.moveBtn}
-        onClick={(e) => { e.stopPropagation(); onMove(obj.id); }}
-        onMouseEnter={() => { onHover(); setStatusHint(objectiveView === 'mission' ? 'MOVE_TO_BACKLOG' : 'MOVE_TO_MISSION'); }}
+        onClick={(e) => { e.stopPropagation(); onRemoveFromMission(obj.id); }}
+        onMouseEnter={() => { onHover(); setStatusHint('REMOVE_FROM_MISSION'); }}
         onMouseLeave={clearStatusHint}
-        title={objectiveView === 'mission' ? 'Move to Backlog' : 'Move to Mission'}
+        title="Remove from Mission"
       >
-        {objectiveView === 'mission' ? '→' : '←'}
+        <MinusCircle size={12} />
       </button>
 
       <button
@@ -230,16 +218,14 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, isViewed, categori
 interface SidebarLeftProps {
   onOpenSettings: () => void;
   onOpenDetails: () => void;
+  onViewBuckets: () => void;
 }
 
-export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenSettings, onOpenDetails }) => {
+export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenSettings, onOpenDetails, onViewBuckets }) => {
   const { name, avatar, loading } = useUser();
   const {
     objectivePool,
     missionObjectives,
-    backlogObjectives,
-    objectiveView,
-    switchObjectiveView,
     activeObjectiveId,
     viewedObjectiveId,
     addObjective,
@@ -249,12 +235,14 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenSettings, onOpenDetail
     setActiveObjective,
     setViewedObjective,
     reorderObjectives,
-    moveObjectiveToOtherList,
+    setObjectiveMission,
     categories,
     addCategory,
     updateCategory,
     deleteCategory,
+    buckets,
   } = useFocus();
+  const bucketById = useMemo(() => new Map(buckets.map(b => [b.id, b])), [buckets]);
   const { sessionsToday, dailyBonusActive, currentStreakDays, streakMultiplier, totalCoinsEarned, prestigeTitles, currentTitle } = useGame();
   const [newObjective, setNewObjective] = useState('');
   const [newCategoryId, setNewCategoryId] = useState<number | null>(null);
@@ -262,7 +250,7 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenSettings, onOpenDetail
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [showAlarms, setShowAlarms] = useState(false);
 
-  const displayedObjectives = objectiveView === 'mission' ? missionObjectives : backlogObjectives;
+  const displayedObjectives = missionObjectives;
 
   // Compute current prestige level progress (from current threshold to next threshold)
   const nextTitle = currentTitle
@@ -291,9 +279,10 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenSettings, onOpenDetail
     return map;
   }, [objectivePool]);
 
+  // Pointer only: the listeners sit on the whole row, so a keyboard sensor would start a drag on
+  // Space/Enter from any focused button in it (Space is also the timer key). Shift+↑/↓ reorders instead.
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   );
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
@@ -342,6 +331,11 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenSettings, onOpenDetail
     updateObjective(id, text);
   };
 
+  const handleRemoveFromMission = (id: number) => {
+    soundEngine.playClick();
+    setObjectiveMission(id, false);
+  };
+
   const handleSelectObjective = (id: number) => {
     soundEngine.playClick();
     setViewedObjective(id);
@@ -358,23 +352,14 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenSettings, onOpenDetail
     }
   };
 
-  // Arrow key shortcuts: Left/Right switch view; Shift+Left/Right move task; Up/Down select adjacent; Shift+Up/Down reorder
+  // Arrow key shortcuts: Up/Down select adjacent; Shift+Up/Down/Home/End reorder
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      
-      const isArrowLR = e.key === 'ArrowLeft' || e.key === 'ArrowRight';
+
       const isArrowUD = e.key === 'ArrowUp' || e.key === 'ArrowDown';
 
-      // 1. View Switching (Works always with Left/Right)
-      if (isArrowLR && !e.shiftKey) {
-        const target = e.key === 'ArrowLeft' ? 'mission' : 'backlog';
-        console.log('[SidebarLeft] Switching view to:', target);
-        switchObjectiveView(target);
-        return;
-      }
-
-      // 2. Task Selection (Works with Up/Down)
+      // 1. Task Selection (Works with Up/Down)
       if (isArrowUD && !e.shiftKey) {
         e.preventDefault();
         if (displayedObjectives.length === 0) return;
@@ -392,24 +377,9 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenSettings, onOpenDetail
         return;
       }
 
-      // 3. Shift Actions (Move or Reorder)
+      // 2. Shift Actions (Reorder)
       if (e.shiftKey && viewedObjectiveId !== null) {
         const idx = displayedObjectives.findIndex(o => o.id === viewedObjectiveId);
-
-        // Move Task between lists
-        if (isArrowLR) {
-          const isTaskInMission = missionObjectives.some(o => o.id === viewedObjectiveId);
-          const wantsToMoveToBacklog = e.key === 'ArrowRight' && isTaskInMission;
-          const wantsToMoveToMission = e.key === 'ArrowLeft' && !isTaskInMission;
-
-          if (wantsToMoveToBacklog || wantsToMoveToMission) {
-            console.log('[SidebarLeft] Shortcut: Moving task', viewedObjectiveId);
-            e.preventDefault();
-            moveObjectiveToOtherList(viewedObjectiveId);
-            soundEngine.playClick();
-          }
-          return;
-        }
 
         // Reorder Task
         if (idx !== -1) {
@@ -434,7 +404,7 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenSettings, onOpenDetail
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [switchObjectiveView, viewedObjectiveId, displayedObjectives, missionObjectives, reorderObjectives, setViewedObjective, moveObjectiveToOtherList]);
+  }, [viewedObjectiveId, displayedObjectives, reorderObjectives, setViewedObjective]);
 
   if (loading) return <aside className={styles.sidebar} data-details-barrier>LOADING...</aside>;
 
@@ -523,24 +493,16 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenSettings, onOpenDetail
 
       <div className="card">
         <div className={styles.viewToggle}>
+          <h4 className={styles.sectionTitle}>MISSION_OBJECTIVES</h4>
           <button
-            className={styles.viewToggleArrow}
-            onClick={() => switchObjectiveView('mission')}
-            disabled={objectiveView === 'mission'}
-            title="Mission Objectives"
+            className={styles.bucketsBtn}
+            onClick={() => { soundEngine.playClick(); onViewBuckets(); }}
+            onMouseEnter={() => setStatusHint('OPEN_BUCKETS')}
+            onMouseLeave={clearStatusHint}
+            title="Buckets (B)"
           >
-            ‹
-          </button>
-          <h4 className={styles.sectionTitle}>
-            {objectiveView === 'mission' ? 'MISSION_OBJECTIVES' : 'BACKLOG'}
-          </h4>
-          <button
-            className={styles.viewToggleArrow}
-            onClick={() => switchObjectiveView('backlog')}
-            disabled={objectiveView === 'backlog'}
-            title="Backlog"
-          >
-            ›
+            <LayoutGrid size={12} />
+            <span>BUCKETS</span>
           </button>
         </div>
         <form className={styles.objectiveInputContainer} onSubmit={handleAddObjective}>
@@ -596,14 +558,12 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenSettings, onOpenDetail
                     onCategoryChange={handleObjectiveCategoryChange}
                     onManageCategories={() => setShowCategoryManager(true)}
                     onHover={handleHover}
-                    onMove={moveObjectiveToOtherList}
-                    objectiveView={objectiveView}
+                    onRemoveFromMission={handleRemoveFromMission}
+                    bucket={bucketById.get(obj.bucket_id ?? -1)}
                   />
                 ))}
                 {displayedObjectives.length === 0 && (
-                  <div className={styles.emptyPool}>
-                    {objectiveView === 'mission' ? 'NO_ACTIVE_OBJECTIVES' : 'BACKLOG_EMPTY'}
-                  </div>
+                  <div className={styles.emptyPool}>NO_ACTIVE_OBJECTIVES</div>
                 )}
               </div>
             </SortableContext>

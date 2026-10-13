@@ -1,0 +1,22 @@
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  min-width: 0;
+  font-family: var(--font-mono);
+  vertical-align: middle;
+}
+
+.dot {
+  width: 0.6em;
+  height: 0.6em;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 6px currentColor;
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

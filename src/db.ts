@@ -1,5 +1,5 @@
 import { createClient, type Client, type InArgs } from '@libsql/client';
-import type { FocusSession, DailyStat, StrategicObjective, ObjectiveCategory, AuthUser, UserSettings, GameSeason, GameState, PrestigeTitleDefinition, SeasonArchive, StreakLogEntry, Alarm } from './types';
+import type { FocusSession, DailyStat, StrategicObjective, ObjectiveCategory, AuthUser, UserSettings, GameSeason, GameState, PrestigeTitleDefinition, SeasonArchive, StreakLogEntry, Alarm, Bucket, BucketKind, BucketGeometry } from './types';
 import { getQuarter, getSeasonDates, getSeasonLabel, getSeasonName, getSeasonBadgeColor } from './utils/gameEconomy';
 
 let db: Client | null = null;
@@ -64,6 +64,22 @@ export async function initDb() {
   `);
 
   await database.execute(`
+    CREATE TABLE IF NOT EXISTS buckets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      color TEXT NOT NULL,
+      x REAL NOT NULL DEFAULT 0,
+      y REAL NOT NULL DEFAULT 0,
+      w REAL NOT NULL DEFAULT 300,
+      h REAL NOT NULL DEFAULT 420,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      kind TEXT NOT NULL DEFAULT 'custom',
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+
+  await database.execute(`
     CREATE TABLE IF NOT EXISTS objectives (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
@@ -74,6 +90,8 @@ export async function initDb() {
       category_id INTEGER REFERENCES objective_categories(id),
       is_mission INTEGER DEFAULT 1,
       last_interacted_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      bucket_id INTEGER REFERENCES buckets(id),
+      bucket_sort_order INTEGER,
       FOREIGN KEY (user_id) REFERENCES users(id)
     )
   `);
@@ -225,6 +243,44 @@ export async function initDb() {
     await database.execute(`ALTER TABLE objectives ADD COLUMN details TEXT`);
   } catch {
     // Column already exists — no action needed
+  }
+
+  // Add bucket columns to objectives (backfilled per user in ensureSystemBuckets)
+  try {
+    await database.execute(`ALTER TABLE objectives ADD COLUMN bucket_id INTEGER`);
+  } catch {
+    // Column already exists — no action needed
+  }
+
+  try {
+    await database.execute(`ALTER TABLE objectives ADD COLUMN bucket_sort_order INTEGER`);
+  } catch {
+    // Column already exists — no action needed
+  }
+
+  // One Mission and one Unsorted bucket per user. Merge duplicates left by an earlier
+  // check-then-insert race (keep the lowest id), then enforce it with a unique index.
+  try {
+    await database.execute(`
+      UPDATE objectives SET bucket_id = (
+        SELECT MIN(keep.id) FROM buckets dup
+        JOIN buckets keep ON keep.user_id = dup.user_id AND keep.kind = dup.kind
+        WHERE dup.id = objectives.bucket_id
+      )
+      WHERE bucket_id IN (
+        SELECT b.id FROM buckets b
+        WHERE b.kind IN ('mission', 'unsorted')
+          AND b.id > (SELECT MIN(m.id) FROM buckets m WHERE m.user_id = b.user_id AND m.kind = b.kind)
+      )
+    `);
+    await database.execute(`
+      DELETE FROM buckets
+      WHERE kind IN ('mission', 'unsorted')
+        AND id > (SELECT MIN(m.id) FROM buckets m WHERE m.user_id = buckets.user_id AND m.kind = buckets.kind)
+    `);
+    await database.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_buckets_user_system ON buckets(user_id, kind) WHERE kind IN ('mission', 'unsorted')`);
+  } catch (e) {
+    console.error('Failed to enforce unique system buckets', e);
   }
 
   // Migrate prestige titles to 12 titles with even 5k spacing
@@ -559,6 +615,178 @@ export async function deleteCategory(id: number): Promise<void> {
   await database.execute({ sql: 'DELETE FROM objective_categories WHERE id = ?', args: [id] });
 }
 
+// ─── Buckets ─────────────────────────────────────────────────────
+
+export const SYSTEM_BUCKET_DEFAULTS = {
+  mission: { name: 'Mission', color: '#00ff88', x: 0, y: 0, w: 320, h: 480 },
+  unsorted: { name: 'Unsorted', color: '#888888', x: 360, y: 0, w: 300, h: 420 },
+} as const satisfies Record<'mission' | 'unsorted', { name: string; color: string } & BucketGeometry>;
+
+async function getUnsortedBucketId(userId: number): Promise<number> {
+  const database = getDb();
+  const result = await database.execute({
+    sql: "SELECT id FROM buckets WHERE user_id = ? AND kind = 'unsorted' ORDER BY id ASC LIMIT 1",
+    args: [userId],
+  });
+  if (result.rows.length === 0) throw new Error('Unsorted bucket missing');
+  return result.rows[0].id as number;
+}
+
+// Overlapping refreshes (e.g. StrictMode's double mount) share one run per user
+const ensureSystemBucketsInFlight = new Map<number, Promise<void>>();
+
+export function ensureSystemBuckets(userId: number): Promise<void> {
+  const pending = ensureSystemBucketsInFlight.get(userId);
+  if (pending) return pending;
+  const run = runEnsureSystemBuckets(userId).finally(() => ensureSystemBucketsInFlight.delete(userId));
+  ensureSystemBucketsInFlight.set(userId, run);
+  return run;
+}
+
+async function runEnsureSystemBuckets(userId: number): Promise<void> {
+  const database = getDb();
+  const existing = await database.execute({
+    sql: "SELECT kind FROM buckets WHERE user_id = ? AND kind IN ('mission', 'unsorted')",
+    args: [userId],
+  });
+  const kinds = new Set(existing.rows.map(r => r.kind as string));
+  for (const kind of ['mission', 'unsorted'] as const) {
+    if (kinds.has(kind)) continue;
+    const d = SYSTEM_BUCKET_DEFAULTS[kind];
+    await database.execute({
+      // OR IGNORE: the unique index on (user_id, kind) wins any race with another client
+      sql: 'INSERT OR IGNORE INTO buckets (user_id, name, color, x, y, w, h, sort_order, kind) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      args: [userId, d.name, d.color, d.x, d.y, d.w, d.h, kind === 'mission' ? 0 : 1, kind],
+    });
+  }
+  // Backfill: objectives without a bucket (pre-bucket data) land in Unsorted
+  const unsortedId = await getUnsortedBucketId(userId);
+  await database.execute({
+    sql: 'UPDATE objectives SET bucket_id = ?, bucket_sort_order = COALESCE(bucket_sort_order, sort_order) WHERE user_id = ? AND bucket_id IS NULL',
+    args: [unsortedId, userId],
+  });
+}
+
+export async function getBuckets(userId: number): Promise<Bucket[]> {
+  await ensureSystemBuckets(userId);
+  const database = getDb();
+  const result = await database.execute({
+    sql: 'SELECT * FROM buckets WHERE user_id = ? ORDER BY sort_order ASC, id ASC',
+    args: [userId],
+  });
+  return result.rows.map(row => ({
+    id: Number(row.id),
+    name: row.name as string,
+    color: row.color as string,
+    x: Number(row.x),
+    y: Number(row.y),
+    w: Number(row.w),
+    h: Number(row.h),
+    sort_order: Number(row.sort_order),
+    kind: row.kind as BucketKind,
+  }));
+}
+
+export async function addBucket(userId: number, name: string, color: string, geometry: BucketGeometry): Promise<number> {
+  const database = getDb();
+  const maxResult = await database.execute({
+    sql: 'SELECT MAX(sort_order) as maxOrder FROM buckets WHERE user_id = ?',
+    args: [userId],
+  });
+  const maxOrder = (maxResult.rows[0]?.maxOrder as number | null) ?? -1;
+  const result = await database.execute({
+    sql: "INSERT INTO buckets (user_id, name, color, x, y, w, h, sort_order, kind) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'custom')",
+    args: [userId, name, color, geometry.x, geometry.y, geometry.w, geometry.h, maxOrder + 1],
+  });
+  return Number(result.lastInsertRowid);
+}
+
+export async function updateBucket(id: number, name: string, color: string): Promise<void> {
+  const database = getDb();
+  await database.execute({
+    sql: 'UPDATE buckets SET name = ?, color = ? WHERE id = ?',
+    args: [name, color, id],
+  });
+}
+
+// Gives the bucket the highest sort_order among its user's buckets, which puts it on top on the canvas
+export async function bringBucketToFront(id: number): Promise<void> {
+  const database = getDb();
+  await database.execute({
+    sql: 'UPDATE buckets SET sort_order = (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM buckets WHERE user_id = (SELECT user_id FROM buckets WHERE id = ?)) WHERE id = ?',
+    args: [id, id],
+  });
+}
+
+export async function updateBucketGeometry(id: number, geometry: BucketGeometry): Promise<void> {
+  const database = getDb();
+  await database.execute({
+    sql: 'UPDATE buckets SET x = ?, y = ?, w = ?, h = ? WHERE id = ?',
+    args: [geometry.x, geometry.y, geometry.w, geometry.h, id],
+  });
+}
+
+export async function deleteBucket(id: number): Promise<void> {
+  const database = getDb();
+  const bucketResult = await database.execute({
+    sql: 'SELECT user_id, kind FROM buckets WHERE id = ?',
+    args: [id],
+  });
+  if (bucketResult.rows.length === 0) return;
+  const { user_id, kind } = bucketResult.rows[0];
+  if (kind !== 'custom') throw new Error('Cannot delete system bucket');
+
+  // Move every objective (open and completed) to Unsorted so none keep a dangling bucket_id,
+  // appended after Unsorted's open objectives in their existing order
+  const unsortedId = await getUnsortedBucketId(user_id as number);
+  const orderResult = await database.execute({
+    sql: `SELECT
+      (SELECT MAX(bucket_sort_order) FROM objectives WHERE bucket_id = ? AND completed_at IS NULL) as maxOrder,
+      (SELECT MIN(COALESCE(bucket_sort_order, 0)) FROM objectives WHERE bucket_id = ?) as minOrder`,
+    args: [unsortedId, id],
+  });
+  const maxOrder = (orderResult.rows[0]?.maxOrder as number | null) ?? -1;
+  const minOrder = (orderResult.rows[0]?.minOrder as number | null) ?? 0;
+  await database.execute({
+    sql: 'UPDATE objectives SET bucket_id = ?, bucket_sort_order = COALESCE(bucket_sort_order, 0) + ? WHERE bucket_id = ?',
+    args: [unsortedId, maxOrder + 1 - minOrder, id],
+  });
+  await database.execute({ sql: 'DELETE FROM buckets WHERE id = ?', args: [id] });
+}
+
+export async function moveObjectiveToBucket(id: number, bucketId: number): Promise<void> {
+  const database = getDb();
+  const bucketResult = await database.execute({
+    sql: 'SELECT user_id, kind FROM buckets WHERE id = ?',
+    args: [bucketId],
+  });
+  if (bucketResult.rows.length === 0) return;
+  const { user_id, kind } = bucketResult.rows[0];
+  // Mission membership is is_mission, never a bucket
+  if (kind === 'mission') throw new Error('Cannot move objective into mission bucket');
+
+  const maxResult = await database.execute({
+    sql: 'SELECT MAX(bucket_sort_order) as maxOrder FROM objectives WHERE user_id = ? AND bucket_id = ? AND completed_at IS NULL',
+    args: [user_id as number, bucketId],
+  });
+  const maxOrder = (maxResult.rows[0]?.maxOrder as number | null) ?? -1;
+
+  await database.execute({
+    sql: 'UPDATE objectives SET bucket_id = ?, bucket_sort_order = ? WHERE id = ?',
+    args: [bucketId, maxOrder + 1, id],
+  });
+}
+
+export async function reorderBucketObjectives(orderedIds: number[]): Promise<void> {
+  const database = getDb();
+  for (let i = 0; i < orderedIds.length; i++) {
+    await database.execute({
+      sql: 'UPDATE objectives SET bucket_sort_order = ? WHERE id = ?',
+      args: [i, orderedIds[i]],
+    });
+  }
+}
+
 // ─── Strategic Objectives ────────────────────────────────────────
 
 export async function getObjectives(userId: number): Promise<StrategicObjective[]> {
@@ -577,6 +805,8 @@ export async function getObjectives(userId: number): Promise<StrategicObjective[
     is_mission: (row.is_mission as number) ?? 1,
     details: row.details as string | null,
     last_interacted_at: (row.last_interacted_at as string) || (row.created_at as string),
+    bucket_id: (row.bucket_id as number | null) ?? null,
+    bucket_sort_order: (row.bucket_sort_order as number | null) ?? null,
   }));
 }
 
@@ -593,7 +823,8 @@ export async function addObjective(
   text: string,
   categoryId?: number | null,
   isMission: number = 1,
-  prepend: boolean = false
+  prepend: boolean = false,
+  bucketId: number | null = null
 ): Promise<number> {
   const database = getDb();
   let sortOrder: number;
@@ -612,9 +843,15 @@ export async function addObjective(
     const maxOrder = (maxResult.rows[0]?.maxOrder as number | null) ?? -1;
     sortOrder = maxOrder + 1;
   }
+  const targetBucketId = bucketId ?? await getUnsortedBucketId(userId);
+  const bucketMax = await database.execute({
+    sql: 'SELECT MAX(bucket_sort_order) as maxOrder FROM objectives WHERE user_id = ? AND bucket_id = ? AND completed_at IS NULL',
+    args: [userId, targetBucketId],
+  });
+  const bucketSortOrder = ((bucketMax.rows[0]?.maxOrder as number | null) ?? -1) + 1;
   const result = await database.execute({
-    sql: 'INSERT INTO objectives (user_id, text, sort_order, category_id, is_mission) VALUES (?, ?, ?, ?, ?)',
-    args: [userId, text, sortOrder, categoryId ?? null, isMission],
+    sql: 'INSERT INTO objectives (user_id, text, sort_order, category_id, is_mission, bucket_id, bucket_sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    args: [userId, text, sortOrder, categoryId ?? null, isMission, targetBucketId, bucketSortOrder],
   });
   return Number(result.lastInsertRowid) ?? 0;
 }
@@ -655,7 +892,7 @@ export async function updateObjectiveDetails(id: number, details: string | null)
   });
 }
 
-export async function moveObjectiveToOtherList(id: number, targetIsMission: number): Promise<void> {
+export async function setObjectiveMission(id: number, isMission: number): Promise<void> {
   const database = getDb();
   const objResult = await database.execute({
     sql: 'SELECT user_id FROM objectives WHERE id = ?',
@@ -666,13 +903,13 @@ export async function moveObjectiveToOtherList(id: number, targetIsMission: numb
 
   const maxResult = await database.execute({
     sql: 'SELECT MAX(sort_order) as maxOrder FROM objectives WHERE user_id = ? AND is_mission = ? AND completed_at IS NULL',
-    args: [userId, targetIsMission],
+    args: [userId, isMission],
   });
   const maxOrder = (maxResult.rows[0]?.maxOrder as number | null) ?? -1;
 
   await database.execute({
     sql: 'UPDATE objectives SET is_mission = ?, sort_order = ? WHERE id = ?',
-    args: [targetIsMission, maxOrder + 1, id],
+    args: [isMission, maxOrder + 1, id],
   });
 }
 

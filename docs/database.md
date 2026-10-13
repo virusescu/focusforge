@@ -27,7 +27,8 @@ Related docs: [architecture.md](architecture.md) · [economy.md](economy.md)
 | `focus_sessions` | `id`, `user_id`, `start_time` (ISO, UTC), `duration_seconds`, `date` (YYYY-MM-DD from `start_time`) | Only sessions ≥ 60 s are saved. |
 | `session_pauses` | `id`, `session_id` → `focus_sessions`, `pause_time` | One row per counted pause. Deleted together with the session. |
 | `objective_categories` | `id`, `user_id`, `label`, `color`, `sort_order`, `coin_bounty` (25) | Seeded per user: Hard (50), Normal (25), Easy (10). |
-| `objectives` | `id`, `user_id`, `text`, `created_at`, `sort_order`, `completed_at`, `category_id` → categories, `is_mission` (1 = Mission, 0 = Backlog), `details` (markdown), `last_interacted_at` | Open objectives have `completed_at IS NULL`. Completing one clears `details`. |
+| `buckets` | `id`, `user_id`, `name`, `color` (hex), `x`, `y`, `w` (300), `h` (420), `sort_order`, `kind` (`mission` / `unsorted` / `custom`) | Panels on the Buckets canvas; `x`/`y`/`w`/`h` are world units. `sort_order` is the stacking order (higher = in front); `bringBucketToFront` sets it to the user's max + 1 after a panel is moved or resized. Every user has exactly one `mission` and one `unsorted` system bucket, created by `ensureSystemBuckets` and enforced by the partial unique index `idx_buckets_user_system` on `(user_id, kind) WHERE kind IN ('mission','unsorted')`. The `mission` row only stores the Mission panel's name, color and geometry; no objective has its `bucket_id`. System buckets cannot be deleted. Deleting a custom bucket moves its objectives (open and completed) to Unsorted, appended after Unsorted's open objectives in their existing order. |
+| `objectives` | `id`, `user_id`, `text`, `created_at`, `sort_order` (Mission order), `completed_at`, `category_id` → categories, `is_mission` (1 = in Mission, 0 = only in its bucket), `details` (markdown), `last_interacted_at`, `bucket_id` → buckets, `bucket_sort_order` (order inside the bucket) | Open objectives have `completed_at IS NULL`. Completing one clears `details`. Every objective belongs to a non-mission bucket; being in Mission is a flag on top of that, so a Mission objective also appears in its bucket. |
 | `alarms` | `id`, `user_id`, `title`, `time` (HH:MM), `days_of_week` (JSON array 0–6, Sun–Sat), `is_active` | |
 
 ### Game economy
@@ -48,6 +49,7 @@ users ─┬─< user_settings
        ├─< focus_sessions ─< session_pauses
        ├─< objective_categories ─< objectives
        ├─< objectives
+       ├─< buckets ─< objectives
        ├─< alarms
        └─< game_seasons ─┬─ game_state            (1 per season)
                          ├─< game_coin_transactions
@@ -74,8 +76,10 @@ lower the balance but not the rank.
 
 There is no migration framework. `initDb()` runs idempotent steps every time:
 
-- `ALTER TABLE ... ADD COLUMN` wrapped in `try/catch` (it fails harmlessly if the column already exists): `objectives.is_mission`, `objectives.details`, `objectives.last_interacted_at`, `objective_categories.coin_bounty`.
+- `ALTER TABLE ... ADD COLUMN` wrapped in `try/catch` (it fails harmlessly if the column already exists): `objectives.is_mission`, `objectives.details`, `objectives.last_interacted_at`, `objective_categories.coin_bounty`, `objectives.bucket_id`, `objectives.bucket_sort_order`.
+- **Unique system buckets.** Duplicate `mission`/`unsorted` rows for a user (left by an old check-then-insert race) are merged into the lowest id, with objectives repointed to it, and then `idx_buckets_user_system` is created.
 - When `coin_bounty` is first added, the seeded `Hard` and `Easy` categories are set to 50 and 10.
+- **Buckets backfill (per user).** `ensureSystemBuckets(userId)` runs whenever buckets are loaded. It creates the `mission` and `unsorted` system buckets if missing (`INSERT OR IGNORE`; overlapping calls for the same user share one run), then moves every objective with `bucket_id IS NULL` into Unsorted, with `bucket_sort_order = COALESCE(bucket_sort_order, sort_order)`. Existing Mission and Backlog objectives therefore all land in Unsorted, and `is_mission` and `sort_order` are left alone, so Mission order does not change. The step is a no-op once every objective has a bucket.
 - The prestige thresholds are rewritten to the 5 000-step ladder, then all 12 titles are re-seeded.
 
 To add a column, append another guarded `ALTER TABLE` block to `initDb()` and

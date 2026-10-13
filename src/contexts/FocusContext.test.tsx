@@ -29,6 +29,15 @@ const mockAddObjective = vi.fn();
 const mockDeleteObjective = vi.fn();
 const mockCompleteObjective = vi.fn();
 const mockGetObjectives = vi.fn().mockResolvedValue([]);
+const mockGetBuckets = vi.fn();
+const mockUpdateBucketGeometry = vi.fn();
+const mockBringBucketToFront = vi.fn();
+const mockDeleteBucket = vi.fn();
+const mockMoveObjectiveToBucket = vi.fn();
+const mockSetObjectiveMission = vi.fn();
+
+const UNSORTED = { id: 2, name: 'Unsorted', color: '#888888', x: 360, y: 0, w: 300, h: 420, sort_order: 1, kind: 'unsorted' as const };
+const WORK = { id: 9, name: 'Work', color: '#3388ff', x: 700, y: 0, w: 300, h: 420, sort_order: 2, kind: 'custom' as const };
 
 vi.mock('../db', () => ({
   getRecentSessions: vi.fn().mockResolvedValue([]),
@@ -41,7 +50,7 @@ vi.mock('../db', () => ({
   }),
   saveFocusSession: (userId: number, start: string, dur: number, pauses: string[]) => mockSaveSession(userId, start, dur, pauses),
   getObjectives: () => mockGetObjectives(),
-  addObjective: (userId: number, text: string, categoryId?: number | null) => mockAddObjective(userId, text, categoryId),
+  addObjective: (...args: unknown[]) => mockAddObjective(...args),
   deleteObjective: (id: number) => mockDeleteObjective(id),
   updateObjective: vi.fn().mockResolvedValue(undefined),
   completeObjective: (id: number) => mockCompleteObjective(id),
@@ -52,7 +61,16 @@ vi.mock('../db', () => ({
   deleteCategory: vi.fn().mockResolvedValue(undefined),
   updateObjectiveCategory: vi.fn().mockResolvedValue(undefined),
   updateObjectiveInteractionTime: vi.fn().mockResolvedValue(undefined),
-  moveObjectiveToOtherList: vi.fn().mockResolvedValue(undefined),
+  getBuckets: () => mockGetBuckets(),
+  addBucket: vi.fn().mockResolvedValue(10),
+  updateBucket: vi.fn().mockResolvedValue(undefined),
+  updateBucketGeometry: (id: number, g: unknown) => mockUpdateBucketGeometry(id, g),
+  bringBucketToFront: (id: number) => mockBringBucketToFront(id),
+  deleteBucket: (id: number) => mockDeleteBucket(id),
+  moveObjectiveToBucket: (id: number, bucketId: number) => mockMoveObjectiveToBucket(id, bucketId),
+  reorderBucketObjectives: vi.fn().mockResolvedValue(undefined),
+  setObjectiveMission: (id: number, m: number) => mockSetObjectiveMission(id, m),
+  updateObjectiveDetails: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Mock UserContext
@@ -85,6 +103,12 @@ describe('FocusContext', () => {
     vi.clearAllMocks();
     mockGetObjectives.mockResolvedValue([]);
     mockCompleteObjective.mockResolvedValue(undefined);
+    mockGetBuckets.mockResolvedValue([UNSORTED, WORK]);
+    mockUpdateBucketGeometry.mockResolvedValue(undefined);
+    mockBringBucketToFront.mockResolvedValue(undefined);
+    mockDeleteBucket.mockResolvedValue(undefined);
+    mockMoveObjectiveToBucket.mockResolvedValue(undefined);
+    mockSetObjectiveMission.mockResolvedValue(undefined);
   });
 
   it('provides focus data and loading state', async () => {
@@ -123,7 +147,7 @@ describe('FocusContext', () => {
       await result.current.addObjective('New Objective');
     });
 
-    expect(mockAddObjective).toHaveBeenCalledWith(1, 'New Objective', undefined);
+    expect(mockAddObjective).toHaveBeenCalledWith(1, 'New Objective', undefined, 1, false, null);
     expect(result.current.objectivePool).toEqual([newObjective]);
   });
 
@@ -240,5 +264,96 @@ describe('FocusContext', () => {
     // Wait a bit to ensure it WASN'T called
     await new Promise(r => setTimeout(r, 100));
     expect(mockSaveSession).not.toHaveBeenCalled();
+  });
+
+  it('loads buckets and groups objectives by bucket', async () => {
+    mockGetObjectives.mockResolvedValue([
+      { id: 1, text: 'a', created_at: '', is_mission: 1, bucket_id: 9, bucket_sort_order: 1 },
+      { id: 2, text: 'b', created_at: '', is_mission: 0, bucket_id: 9, bucket_sort_order: 0 },
+      { id: 3, text: 'c', created_at: '', is_mission: 0, bucket_id: null, bucket_sort_order: null },
+    ]);
+    const { result } = renderHook(() => useFocus(), { wrapper });
+    await waitFor(() => expect(result.current.buckets).toHaveLength(2));
+    expect(result.current.objectivesByBucket.get(9)!.map(o => o.id)).toEqual([2, 1]);
+    expect(result.current.objectivesByBucket.get(2)!.map(o => o.id)).toEqual([3]);
+    expect(result.current.missionObjectives.map(o => o.id)).toEqual([1]);
+  });
+
+  it('addObjective with bucket options passes them to the DB', async () => {
+    const { result } = renderHook(() => useFocus(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => {
+      await result.current.addObjective('In work', 5, false, { bucketId: 9, inMission: false });
+    });
+    expect(mockAddObjective).toHaveBeenCalledWith(1, 'In work', 5, 0, false, 9);
+  });
+
+  it('setObjectiveMission updates optimistically and keeps the bucket', async () => {
+    mockGetObjectives.mockResolvedValue([{ id: 4, text: 'x', created_at: '', is_mission: 0, bucket_id: 9, bucket_sort_order: 0 }]);
+    const { result } = renderHook(() => useFocus(), { wrapper });
+    await waitFor(() => expect(result.current.objectivePool).toHaveLength(1));
+    await act(async () => { await result.current.setObjectiveMission(4, true); });
+    expect(mockSetObjectiveMission).toHaveBeenCalledWith(4, 1);
+    expect(result.current.objectivePool[0]).toMatchObject({ is_mission: 1, bucket_id: 9 });
+  });
+
+  it('setObjectiveMission moves the objective to the end of Mission, like the DB does', async () => {
+    mockGetObjectives.mockResolvedValue([
+      { id: 4, text: 'x', created_at: '', is_mission: 0, sort_order: 0, bucket_id: 9, bucket_sort_order: 0 },
+      { id: 5, text: 'm1', created_at: '', is_mission: 1, sort_order: 0, bucket_id: 9, bucket_sort_order: 1 },
+      { id: 6, text: 'm2', created_at: '', is_mission: 1, sort_order: 1, bucket_id: 9, bucket_sort_order: 2 },
+    ]);
+    const { result } = renderHook(() => useFocus(), { wrapper });
+    await waitFor(() => expect(result.current.objectivePool).toHaveLength(3));
+    await act(async () => { await result.current.setObjectiveMission(4, true); });
+    expect(result.current.missionObjectives.map(o => o.id)).toEqual([5, 6, 4]);
+    expect(result.current.objectivePool.find(o => o.id === 4)).toMatchObject({ sort_order: 2 });
+  });
+
+  it('moveObjectiveToBucket updates optimistically and reverts on failure', async () => {
+    mockGetObjectives.mockResolvedValue([{ id: 4, text: 'x', created_at: '', is_mission: 1, bucket_id: 2, bucket_sort_order: 0 }]);
+    const { result } = renderHook(() => useFocus(), { wrapper });
+    await waitFor(() => expect(result.current.objectivePool).toHaveLength(1));
+
+    await act(async () => { await result.current.moveObjectiveToBucket(4, 9); });
+    expect(mockMoveObjectiveToBucket).toHaveBeenCalledWith(4, 9);
+    expect(result.current.objectivePool[0]).toMatchObject({ bucket_id: 9, is_mission: 1 });
+
+    mockMoveObjectiveToBucket.mockRejectedValueOnce(new Error('boom'));
+    await act(async () => { await result.current.moveObjectiveToBucket(4, 2); });
+    await waitFor(() => expect(result.current.objectivePool[0].bucket_id).toBe(2)); // reverted via refreshData (DB still says 2)
+  });
+
+  it('updateBucketGeometry updates local bucket state immediately', async () => {
+    const { result } = renderHook(() => useFocus(), { wrapper });
+    await waitFor(() => expect(result.current.buckets).toHaveLength(2));
+    await act(async () => { await result.current.updateBucketGeometry(9, { x: 1, y: 2, w: 300, h: 200 }); });
+    expect(result.current.buckets.find(b => b.id === 9)).toMatchObject({ x: 1, y: 2, w: 300, h: 200 });
+    expect(mockUpdateBucketGeometry).toHaveBeenCalledWith(9, { x: 1, y: 2, w: 300, h: 200 });
+  });
+
+  it('bringBucketToFront gives the bucket the highest sort_order and saves it', async () => {
+    const { result } = renderHook(() => useFocus(), { wrapper });
+    await waitFor(() => expect(result.current.buckets).toHaveLength(2));
+    await act(async () => { await result.current.bringBucketToFront(2); });
+    expect(result.current.buckets.find(b => b.id === 2)!.sort_order).toBe(3);
+    expect(result.current.buckets.map(b => b.id)).toEqual([9, 2]);
+    expect(mockBringBucketToFront).toHaveBeenCalledWith(2);
+  });
+
+  it('bringBucketToFront skips the DB write when the bucket is already in front', async () => {
+    const { result } = renderHook(() => useFocus(), { wrapper });
+    await waitFor(() => expect(result.current.buckets).toHaveLength(2));
+    await act(async () => { await result.current.bringBucketToFront(9); });
+    expect(mockBringBucketToFront).not.toHaveBeenCalled();
+  });
+
+  it('deleteBucket calls DB and refreshes', async () => {
+    const { result } = renderHook(() => useFocus(), { wrapper });
+    await waitFor(() => expect(result.current.buckets).toHaveLength(2));
+    mockGetBuckets.mockResolvedValue([UNSORTED]);
+    await act(async () => { await result.current.deleteBucket(9); });
+    expect(mockDeleteBucket).toHaveBeenCalledWith(9);
+    expect(result.current.buckets).toEqual([UNSORTED]);
   });
 });
