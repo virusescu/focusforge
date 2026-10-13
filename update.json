@@ -1,11 +1,11 @@
 {
+  "pub_date": "2026-10-13T10:05:14Z",
+  "notes": "Release v0.1.47",
+  "version": "0.1.47",
   "platforms": {
     "windows-x86_64": {
-      "url": "https://github.com/virusescu/focusforge/releases/download/v0.1.46/focusforge_0.1.46_x64-setup.exe",
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUUHFJdThyd2NSa0xUWmEzbGU0NUt0aEppVGNKQUtZWVVGVWk2MkFjWVF5QWZxSlBzVzhocG9LUFcwTlBFVjNHUWVQVFN3VW0rWEpBSUptNWZkdlJvQ2FRc0xhUHJ6TXdjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4NDM2OTI5CWZpbGU6Zm9jdXNmb3JnZV8wLjEuNDZfeDY0LXNldHVwLmV4ZQpxNFNjRXFody9RaXhua0d3ZThVbUtrTGd1ZzREMENlN04rNU9IVEg0WVpHMEZUUklIdHhKLzV6M2R0M1dDUEJ0L0RYOENmYlV1UTZUb2NaeTR4RWlBUT09Cg=="
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUUHFJdThyd2NSa0EyV3kycEhKbWppYXNnSFFobjJJV1RYL0pvdjk3a3B1SkEwSWtOYlRIZDNQcUIrL3NTcnJ2S3VOanZvZG8xM1BCaHdLMWZkK2dQSjQvckN5ZHE4MFFJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkxODg1OTA1CWZpbGU6Zm9jdXNmb3JnZV8wLjEuNDdfeDY0LXNldHVwLmV4ZQpJYTd1K2dZbjRVaStPeHJ5Q042c3NqZzlwYVorUUR3Q25Rd1g3T0UwdUxnQTNoRDRic0RzMHNGME5MUHc4NWlaNjZyd3pwRkNGdHRkWksrY1FhNkdCUT09Cg==",
+      "url": "https://github.com/virusescu/focusforge/releases/download/v0.1.47/focusforge_0.1.47_x64-setup.exe"
     }
-  },
-  "pub_date": "2026-09-03T12:02:29Z",
-  "notes": "Release v0.1.46",
-  "version": "0.1.46"
+  }
 }
