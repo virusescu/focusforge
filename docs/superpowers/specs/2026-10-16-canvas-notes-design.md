@@ -38,7 +38,7 @@ New table `canvas_notes`:
 
 Created with `CREATE TABLE IF NOT EXISTS` in `initDb`; no migration of existing data. Type `CanvasNote` in `types`.
 
-DB functions in `db.ts`: `getCanvasNotes(userId)`, `addCanvasNote(userId, color, geometry) → id`, `updateCanvasNoteContent(id, content)`, `updateCanvasNoteColor(id, color)`, `updateCanvasNoteGeometry(id, geometry)`, `bringCanvasNoteToFront(userId, id)` (sort_order = user's max + 1), `deleteCanvasNote(id)`.
+DB functions in `db.ts`: `getCanvasNotes(userId)`, `addCanvasNote(userId, color, geometry) → id`, `updateCanvasNoteContent(id, content)`, `updateCanvasNoteColor(id, color)`, `updateCanvasNoteGeometry(id, geometry)`, `bringCanvasNoteToFront(id)` (sort_order = the user's max + 1, same subquery as `bringBucketToFront`), `deleteCanvasNote(id)`.
 
 ### State
 
@@ -53,9 +53,9 @@ The pointer move/resize logic in `BucketPanel` (threshold before capture, pointe
 - Background and border tinted with the note color, using the same tinting approach as `BucketPanel`.
 - **Move:** drag from anywhere on the note, except buttons, links, checkboxes and while editing. Uses the same 3 px threshold so double-click still works.
 - **Resize:** corner handle; minimum 160×100.
-- **Hover controls:** color swatch picker (bucket palette) and delete. Delete asks for confirmation only if the note has content.
+- **Hover controls (view mode only):** a native color input (the same control as bucket panels) and delete. Delete asks for confirmation only if the note has content.
 - **View mode:** content rendered with `MarkdownView`; scrolls inside the note (`data-canvas-scroll`, so the wheel scrolls the note instead of zooming). Task checkboxes toggle directly. An empty note shows a muted "Double-click to edit" hint.
-- **Edit mode:** double-click → compact `MarkdownToolbar` + textarea filling the note. Same keys as the details pane: Esc saves, Shift+Esc cancels, the Ctrl shortcuts (B/I/S/1/2/3/L/T/D, Ctrl+↑/↓) and auto-link on paste. Clicking outside the note saves.
+- **Edit mode:** `BucketsPage` owns `editingNoteId`, so at most one note is edited at a time. Double-click → a `NoteEditor` child mounts with the note's text (fresh state each time, no syncing effects), showing a compact `MarkdownToolbar` + textarea filling the note. Same keys as the details pane: Esc saves, Shift+Esc cancels, the Ctrl shortcuts (B/I/S/1/2/3/L/T/D, Ctrl+↑/↓) and auto-link on paste. Clicking outside the note saves.
 - **Layering:** notes render after the bucket panels with z-index `NOTE_Z_BASE + stackingOrder` (`NOTE_Z_BASE` above any bucket z-index), so every note is above every bucket. A note being dragged is lifted above the other notes; dropping it calls `bringToFront`. `stackingOrder` from `utils/canvas.ts` is reused.
 
 ### NEW_NOTE button
