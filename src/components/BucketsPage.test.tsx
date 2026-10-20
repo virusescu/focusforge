@@ -9,6 +9,8 @@ const mockAddBucket = vi.fn();
 const mockUpdateBucketGeometry = vi.fn();
 const mockBringBucketToFront = vi.fn();
 const mockSetObjectiveMission = vi.fn();
+const mockDuplicateObjective = vi.fn();
+const mockDuplicateNote = vi.fn();
 let mockViewedId: number | null = null;
 
 const BUCKETS: Bucket[] = [
@@ -37,6 +39,7 @@ vi.mock('../contexts/FocusContext', () => ({
     addObjective: mockAddObjective,
     updateObjective: vi.fn(),
     deleteObjective: vi.fn(),
+    duplicateObjective: mockDuplicateObjective,
     updateObjectiveCategory: vi.fn(),
     setObjectiveMission: mockSetObjectiveMission,
     moveObjectiveToBucket: vi.fn(),
@@ -51,6 +54,7 @@ vi.mock('../contexts/FocusContext', () => ({
     addCategory: vi.fn(),
     updateCategory: vi.fn(),
     deleteCategory: vi.fn(),
+    reorderCategories: vi.fn(),
   }),
 }));
 
@@ -78,6 +82,7 @@ vi.mock('../hooks/useCanvasNotes', () => ({
   useCanvasNotes: () => ({
     notes: mockNotes,
     addNote: mockAddNote,
+    duplicateNote: mockDuplicateNote,
     updateContent: vi.fn(),
     updateColor: vi.fn(),
     updateGeometry: vi.fn(),
@@ -96,6 +101,8 @@ describe('BucketsPage', () => {
     mockUpdateBucketGeometry.mockClear();
     mockBringBucketToFront.mockClear();
     mockSetObjectiveMission.mockClear();
+    mockDuplicateObjective.mockClear();
+    mockDuplicateNote.mockClear();
     mockViewedId = null;
     mockAddNote.mockReset();
     mockNotes = [];
@@ -272,8 +279,22 @@ describe('BucketsPage', () => {
   it('cards have no separate drag handle', () => {
     render(<BucketsPage onBack={vi.fn()} />);
     const card = document.querySelector('[data-objective-id="101"]') as HTMLElement;
-    // Only the action buttons: details, mission toggle, delete
-    expect(card.querySelectorAll('button')).toHaveLength(3);
+    // Only the action buttons: details, mission toggle, duplicate, delete
+    expect(card.querySelectorAll('button')).toHaveLength(4);
+  });
+
+  it('the duplicate button on a card duplicates that objective', () => {
+    render(<BucketsPage onBack={vi.fn()} />);
+    const card = document.querySelector('[data-objective-id="101"]') as HTMLElement;
+    fireEvent.click(within(card).getByTitle('Duplicate'));
+    expect(mockDuplicateObjective).toHaveBeenCalledWith(101);
+  });
+
+  it('the duplicate button on a note duplicates that note', () => {
+    mockNotes = [NOTE(1)];
+    render(<BucketsPage onBack={vi.fn()} />);
+    fireEvent.click(within(document.querySelector('[data-note-id="1"]') as HTMLElement).getByRole('button', { name: /duplicate note/i }));
+    expect(mockDuplicateNote).toHaveBeenCalledWith(1);
   });
 
   it('a header click without movement saves nothing', () => {

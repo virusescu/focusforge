@@ -18,48 +18,11 @@
   }
 }
 
-.logContainer {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  font-family: var(--font-mono);
-  height: 120px; /* Reduced height to save space */
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding-right: 1.25rem; // Breathing room for scrollbar
-  flex-shrink: 0;
-}
-
-.logItem {
-  display: flex;
-  gap: 0.75rem;
-  font-size: 0.6rem;
-  line-height: 1.4;
-  
-  .timestamp {
-    color: var(--text-muted);
-    white-space: nowrap;
-  }
-  
-  .message {
-    &.info { color: var(--text-secondary); }
-    &.success { color: #4ade80; text-shadow: 0 0 5px rgba(74, 222, 128, 0.3); }
-    &.warning { color: #facc15; }
-  }
-}
-
-.cursor {
-  width: 6px;
-  height: 10px;
-  background: var(--primary);
-  margin-top: 0.5rem;
-  animation: pulse 1s infinite;
-}
-
+// 21 work days in two rows (11 + 10)
 .activityGrid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 0.4rem;
+  grid-template-columns: repeat(11, 1fr);
+  gap: 0.3rem;
 }
 
 .cell {

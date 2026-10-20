@@ -1,5 +1,5 @@
 import { type FC, type RefObject, useRef, useEffect, useState } from 'react';
-import { Trash2, Copy, Check } from 'lucide-react';
+import { Trash2, Copy, CopyPlus, Check } from 'lucide-react';
 import styles from './CanvasNoteView.module.scss';
 import { soundEngine } from '../utils/audio';
 import { copyRich } from '../utils/clipboard';
@@ -31,6 +31,7 @@ export interface CanvasNoteViewProps {
   onColorChange: (id: number, color: string) => void;
   onGeometryChange: (id: number, geometry: BucketGeometry) => void;
   onBringToFront: (id: number) => void;
+  onDuplicate: (id: number) => void;
   onDelete: (id: number) => void;
 }
 
@@ -108,7 +109,7 @@ const CopyNoteButton: FC<CopyNoteButtonProps> = ({ bodyRef }) => {
 
 export const CanvasNoteView: FC<CanvasNoteViewProps> = ({
   note, zoom, zIndex, isEditing,
-  onStartEdit, onEndEdit, onContentChange, onColorChange, onGeometryChange, onBringToFront, onDelete,
+  onStartEdit, onEndEdit, onContentChange, onColorChange, onGeometryChange, onBringToFront, onDuplicate, onDelete,
 }) => {
   const rootRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -190,6 +191,14 @@ export const CanvasNoteView: FC<CanvasNoteViewProps> = ({
               title="Note color"
             />
             <CopyNoteButton bodyRef={bodyRef} />
+            <button
+              className={styles.copyNoteBtn}
+              onClick={() => { soundEngine.playClick(); onDuplicate(note.id); }}
+              aria-label="duplicate note"
+              title="Duplicate note"
+            >
+              <CopyPlus size={12} />
+            </button>
             <button className={styles.deleteBtn} onClick={handleDelete} title="Delete note">
               <Trash2 size={12} />
             </button>

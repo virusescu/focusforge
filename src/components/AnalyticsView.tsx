@@ -1,7 +1,7 @@
 import { type FC, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import styles from './AnalyticsView.module.scss';
 import { ChevronLeft, ChevronRight, ArrowLeft, BarChart2, X, HelpCircle, Edit3, Check } from 'lucide-react';
-import { getSessionsForDay, deleteFocusSession, updateFocusSession, getCompletedObjectivesForDay, getKillRate, deleteObjective as dbDeleteObjective, updateObjective as dbUpdateObjective, updateObjectiveCompletedAt as dbUpdateObjectiveCompletedAt, addCategory as dbAddCategory, updateCategory as dbUpdateCategory, deleteCategory as dbDeleteCategory } from '../db';
+import { getSessionsForDay, deleteFocusSession, updateFocusSession, getCompletedObjectivesForDay, getKillRate, deleteObjective as dbDeleteObjective, updateObjective as dbUpdateObjective, updateObjectiveCompletedAt as dbUpdateObjectiveCompletedAt, addCategory as dbAddCategory, updateCategory as dbUpdateCategory, deleteCategory as dbDeleteCategory, reorderCategories as dbReorderCategories } from '../db';
 import { useFocus } from '../contexts/FocusContext';
 import { formatDateObjWithWeekday } from '../utils/dateUtils';
 import { useUser } from '../contexts/UserContext';
@@ -842,6 +842,10 @@ export const AnalyticsView: FC<Props> = ({ onBack, initialDate }) => {
           }}
           onDelete={async (id: number) => {
             await dbDeleteCategory(id);
+            await refreshData();
+          }}
+          onReorder={async (orderedIds: number[]) => {
+            await dbReorderCategories(orderedIds);
             await refreshData();
           }}
           onClose={() => setShowCategoryManager(false)}

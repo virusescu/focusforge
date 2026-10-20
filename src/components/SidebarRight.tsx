@@ -1,7 +1,6 @@
-import { type FC, useEffect, useRef, useState, useCallback } from 'react';
+import { type FC, useEffect, useState, useCallback } from 'react';
 import styles from './SidebarRight.module.scss';
-import { Terminal, Activity, History, BarChart2, Gem, Clock, LayoutGrid } from 'lucide-react';
-import { useSystemLog } from '../hooks/useSystemLog';
+import { Activity, History, BarChart2, Gem, Clock, LayoutGrid } from 'lucide-react';
 import { useFocus } from '../contexts/FocusContext';
 import { soundEngine } from '../utils/audio';
 import { setStatusHint, clearStatusHint } from '../utils/statusHint';
@@ -9,6 +8,7 @@ import { isWorkDay } from '../utils/gameEconomy';
 import { formatDateWithWeekday } from '../utils/dateUtils';
 import { ObjectiveDetails } from './ObjectiveDetails';
 import { AlarmsModal } from './AlarmsModal';
+import { OperatorPanel } from './OperatorPanel';
 
 type RGB = [number, number, number];
 
@@ -58,12 +58,12 @@ interface Props {
   onViewIntel: () => void;
   onViewVault: () => void;
   onViewBuckets: () => void;
+  onOpenSettings: () => void;
   detailsPanelOpen: boolean;
   onCloseDetails: () => void;
 }
 
-export const SidebarRight: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVault, onViewBuckets, detailsPanelOpen, onCloseDetails }) => {
-  const { logs } = useSystemLog();
+export const SidebarRight: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVault, onViewBuckets, onOpenSettings, detailsPanelOpen, onCloseDetails }) => {
   const { dailyStats, recentSessions } = useFocus();
   const [showAlarms, setShowAlarms] = useState(false);
 
@@ -78,15 +78,8 @@ export const SidebarRight: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVa
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [detailsPanelOpen, onCloseDetails]);
-  const logContainerRef = useRef<HTMLDivElement>(null);
 
   const [hoveredCell, setHoveredCell] = useState<{ date: string; time: string } | null>(null);
-
-  useEffect(() => {
-    if (logContainerRef.current) {
-      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
-    }
-  }, [logs]);
 
   // Heatmap generation logic: show 21 work days (Mon-Fri only), going backwards from today
   const heatmapCells = (() => {
@@ -161,21 +154,8 @@ export const SidebarRight: FC<Props> = ({ onViewAnalytics, onViewIntel, onViewVa
 
   return (
     <aside className={styles.sidebar}>
-      <div className="card">
-        <div className={styles.titleContainer}>
-          <Terminal size={14} />
-          <h4>SYSTEM_LOG</h4>
-        </div>
-        <div ref={logContainerRef} className={styles.logContainer}>
-          {logs.map(log => (
-            <div key={log.id} className={styles.logItem}>
-              <span className={styles.timestamp}>{log.time}</span>
-              <span className={`${styles.message} ${styles[log.type]}`}>{log.msg}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-      
+      <OperatorPanel onOpenSettings={onOpenSettings} />
+
       <div className="card" style={{ position: 'relative' }}>
         <div className={styles.titleContainer}>
           <Activity size={14} />

@@ -69,7 +69,7 @@ Tauri updater plugin checks `update.json` on GitHub raw master on startup. Relea
 Vitest + React Testing Library + jsdom. Test files co-located with source (`*.test.ts(x)`). Key test files:
 - `src/utils/gameEconomy.test.ts` — comprehensive economy calculation tests
 - `src/contexts/FocusContext.test.tsx`, `UserContext.test.tsx`
-- `src/hooks/useTimer.test.ts`, `useSystemLog.test.ts`
+- `src/hooks/useTimer.test.ts`, `useCanvasNotes.test.ts`
 - `src/db.test.ts`
 
 ## Environment Variables (`.env`, git-ignored)

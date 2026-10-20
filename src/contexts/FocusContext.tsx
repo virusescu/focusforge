@@ -11,6 +11,8 @@ import {
   getGlobalStats,
   getObjectives,
   addObjective as dbAddObjective,
+  duplicateObjective as dbDuplicateObjective,
+  reorderCategories as dbReorderCategories,
   deleteObjective as dbDeleteObjective,
   updateObjective as dbUpdateObjective,
   completeObjective as dbCompleteObjective,
@@ -57,6 +59,7 @@ interface FocusContextType {
   refreshData: () => Promise<void>;
   addObjective: (text: string, categoryId?: number | null, prepend?: boolean, options?: AddObjectiveOptions) => Promise<void>;
   deleteObjective: (id: number) => Promise<void>;
+  duplicateObjective: (id: number) => Promise<void>;
   updateObjective: (id: number, text: string) => Promise<void>;
   updateObjectiveCategory: (id: number, categoryId: number | null) => Promise<void>;
   updateObjectiveDetails: (id: number, details: string | null) => Promise<void>;
@@ -78,6 +81,7 @@ interface FocusContextType {
   addCategory: (label: string, color: string, coinBounty?: number) => Promise<void>;
   updateCategory: (id: number, label: string, color: string, coinBounty?: number) => Promise<void>;
   deleteCategory: (id: number) => Promise<void>;
+  reorderCategories: (orderedIds: number[]) => Promise<void>;
   loading: boolean;
   timerStatus: 'idle' | 'active' | 'paused';
   // Timer state
@@ -215,6 +219,11 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
     await dbAddObjective(authUser.id, text, categoryId, isMission, prepend, options.bucketId ?? null);
     await refreshData();
   }, [authUser, refreshData]);
+
+  const duplicateObjective = useCallback(async (id: number) => {
+    await dbDuplicateObjective(id);
+    await refreshData();
+  }, [refreshData]);
 
   const deleteObjective = useCallback(async (id: number) => {
     await dbDeleteObjective(id);
@@ -416,6 +425,22 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
     await refreshData();
   }, [refreshData]);
 
+  // Optimistic like the objective reorder: the list jumps instantly, a failed write reloads from the DB
+  const reorderCategories = useCallback(async (orderedIds: number[]) => {
+    setCategories(prev => {
+      const byId = new Map(prev.map(c => [c.id, c]));
+      const reordered = orderedIds.map(id => byId.get(id)).filter((c): c is ObjectiveCategory => !!c);
+      const rest = prev.filter(c => !orderedIds.includes(c.id));
+      return [...reordered, ...rest].map((c, i) => ({ ...c, sort_order: i }));
+    });
+    try {
+      await dbReorderCategories(orderedIds);
+    } catch (e) {
+      console.error('Category reorder failed', e);
+      await refreshData();
+    }
+  }, [refreshData]);
+
   const neutralizeObjective = useCallback(async (id: number) => {
     const obj = objectivePool.find(o => o.id === id);
     setCompletedObjectiveText(obj?.text ?? null);
@@ -487,6 +512,7 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
       refreshData,
       addObjective,
       deleteObjective,
+      duplicateObjective,
       updateObjective,
       updateObjectiveCategory,
       updateObjectiveDetails,
@@ -508,6 +534,7 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
       addCategory,
       updateCategory,
       deleteCategory,
+      reorderCategories,
       loading,
       timerStatus,
       seconds,

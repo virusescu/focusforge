@@ -82,8 +82,9 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
     addCategory,
     updateCategory,
     deleteCategory,
+    reorderCategories,
   } = useFocus();
-  const { notes, addNote, updateContent, updateColor, updateGeometry, bringToFront, deleteNote } = useCanvasNotes();
+  const { notes, addNote, duplicateNote, updateContent, updateColor, updateGeometry, bringToFront, deleteNote } = useCanvasNotes();
   // At most one note is edited at a time
   const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
 
@@ -379,6 +380,7 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
                 onColorChange={updateColor}
                 onGeometryChange={updateGeometry}
                 onBringToFront={bringToFront}
+                onDuplicate={duplicateNote}
                 onDelete={deleteNote}
               />
             ))}
@@ -407,6 +409,7 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
           onAdd={addCategory}
           onUpdate={updateCategory}
           onDelete={deleteCategory}
+          onReorder={reorderCategories}
           onClose={() => setShowCategoryManager(false)}
           objectiveCountByCategory={objectiveCountByCategory}
         />

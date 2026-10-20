@@ -22,6 +22,7 @@ const handlers = {
   onColorChange: vi.fn(),
   onGeometryChange: vi.fn(),
   onBringToFront: vi.fn(),
+  onDuplicate: vi.fn(),
   onDelete: vi.fn(),
 };
 
@@ -173,6 +174,18 @@ describe('CanvasNoteView', () => {
   it('copy button is not visible when note is in edit mode', () => {
     render(<Harness startEditing />);
     expect(within(noteEl()).queryByRole('button', { name: /copy note/i })).toBeNull();
+  });
+
+  it('duplicate button reports the note and does not enter edit mode', () => {
+    render(<Harness />);
+    fireEvent.click(within(noteEl()).getByRole('button', { name: /duplicate note/i }));
+    expect(handlers.onDuplicate).toHaveBeenCalledWith(5);
+    expect(within(noteEl()).queryByRole('textbox')).toBeNull();
+  });
+
+  it('duplicate button is hidden while editing', () => {
+    render(<Harness startEditing />);
+    expect(within(noteEl()).queryByRole('button', { name: /duplicate note/i })).toBeNull();
   });
 
   it('clicking copy button calls copyRich', () => {

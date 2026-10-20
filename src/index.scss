@@ -22,6 +22,8 @@ body {
   height: 100vh;
   overflow: hidden;
   position: relative;
+  // The window is frameless and transparent, so this outline is what shows its edges and corners
+  border: 1px solid var(--border-window);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   
@@ -76,15 +78,21 @@ body {
   position: relative;
 }
 
-.right-sidebar-wrapper {
+.right-sidebar-wrapper,
+.left-sidebar-wrapper {
   position: relative;
   display: flex;
   min-height: 0;
+}
 
-  > :last-child {
-    flex: 1;
-    min-width: 0;
-  }
+.right-sidebar-wrapper > :last-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.left-sidebar-wrapper > :first-child {
+  flex: 1;
+  min-width: 0;
 }
 
 .resize-handle {
@@ -114,6 +122,12 @@ body {
   &:hover::after {
     background: var(--primary);
     height: 60px;
+  }
+
+  // Handle on the right edge of a left-hand panel
+  &.resize-handle-right {
+    left: auto;
+    right: -6px;
   }
 }
 
