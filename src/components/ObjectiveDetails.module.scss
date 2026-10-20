@@ -1,3 +1,27 @@
+// Thin, neutral scrollbar that only shows while the pane is hovered
+@mixin quietScrollbar {
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: transparent;
+    box-shadow: none;
+  }
+
+  &:hover::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.25);
+  }
+
+  &:hover::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.4);
+  }
+}
+
 @keyframes slideInRight {
   from {
     transform: translateX(110%);
@@ -97,6 +121,7 @@
   outline: none;
   transition: border-color 0.15s;
   white-space: pre-wrap;
+  @include quietScrollbar;
 
   &:focus {
     border-color: var(--primary);
@@ -192,4 +217,5 @@
 .markdownScroll {
   flex: 1;
   overflow-y: auto;
+  @include quietScrollbar;
 }
