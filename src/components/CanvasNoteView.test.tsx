@@ -3,11 +3,16 @@ import { useState } from 'react';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import type { CanvasNote } from '../types';
 import { CanvasNoteView, type CanvasNoteViewProps } from './CanvasNoteView';
+import { copyRich } from '../utils/clipboard';
 
 vi.mock('@tauri-apps/plugin-shell', () => ({ open: vi.fn() }));
 vi.mock('../utils/audio', () => ({
   soundEngine: { playClick: vi.fn(), playEditStart: vi.fn(), playCheckboxUncheck: vi.fn() },
   playCheckboxCheckWithFile: vi.fn(),
+}));
+vi.mock('../utils/clipboard', () => ({
+  copyRich: vi.fn().mockResolvedValue(undefined),
+  copyPlain: vi.fn().mockResolvedValue(undefined),
 }));
 
 const NOTE: CanvasNote = { id: 5, content: '# Title\n\n- [ ] task', color: '#ffcc33', x: 100, y: 40, w: 260, h: 200, sort_order: 0 };
@@ -158,5 +163,21 @@ describe('CanvasNoteView', () => {
     }
     expect(capture).not.toHaveBeenCalled();
     expect(within(noteEl()).queryByRole('textbox')).toBeNull();
+  });
+
+  it('note card in view mode shows a copy button', () => {
+    render(<Harness />);
+    expect(within(noteEl()).getByRole('button', { name: /copy note/i })).toBeInTheDocument();
+  });
+
+  it('copy button is not visible when note is in edit mode', () => {
+    render(<Harness startEditing />);
+    expect(within(noteEl()).queryByRole('button', { name: /copy note/i })).toBeNull();
+  });
+
+  it('clicking copy button calls copyRich', () => {
+    render(<Harness />);
+    fireEvent.click(within(noteEl()).getByRole('button', { name: /copy note/i }));
+    expect(copyRich).toHaveBeenCalledOnce();
   });
 });

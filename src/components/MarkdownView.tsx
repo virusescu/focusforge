@@ -194,6 +194,7 @@ const ScrollTable: FC<MdProps<'table'>> = (allProps) => {
 type CopyBlockProps = MdProps<'p'> & { 'data-copy-line'?: string; 'data-copy-source'?: string };
 
 const makeCopyBlock = (Tag: keyof React.JSX.IntrinsicElements): FC<CopyBlockProps> => {
+  const El = Tag as React.ElementType;
   const CopyBlock: FC<CopyBlockProps> = (allProps) => {
     const { node, 'data-copy-line': copyLine, 'data-copy-source': copySource, children, ...props } = allProps;
     void node;
@@ -201,13 +202,13 @@ const makeCopyBlock = (Tag: keyof React.JSX.IntrinsicElements): FC<CopyBlockProp
 
     if (copyLine === 'true' && copySource !== undefined) {
       return (
-        <Tag {...props} className={`${(props as { className?: string }).className ?? ''} ${styles.copyRow}`}>
+        <El {...props} className={`${(props as { className?: string }).className ?? ''} ${styles.copyRow}`}>
           <span ref={contentRef}>{children}</span>
           <CopyRowButton copySource={copySource} contentRef={contentRef} />
-        </Tag>
+        </El>
       );
     }
-    return <Tag {...props}>{children}</Tag>;
+    return <El {...props}>{children}</El>;
   };
   CopyBlock.displayName = `CopyBlock(${String(Tag)})`;
   return CopyBlock;
