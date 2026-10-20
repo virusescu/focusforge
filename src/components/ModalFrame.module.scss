@@ -7,6 +7,7 @@
   align-items: center;
   justify-content: center;
   z-index: 10500; // above Settings (9999); below the right-click menu (20000)
+  outline: none; // focusable only to hold keyboard focus, never as a visible target
 }
 
 .modal {

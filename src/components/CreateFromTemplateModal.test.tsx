@@ -90,6 +90,12 @@ describe('CreateFromTemplateModal', () => {
     expect(mockAddObjective).toHaveBeenCalledWith('Weekly review', null, false, { bucketId: 2, inMission: true, details: null });
   });
 
+  it('Enter creates a template without fields even though no input has focus', () => {
+    renderModal({ ...BUG, title: 'Weekly review', details: '' });
+    fireEvent.keyDown(document.activeElement as Element, { key: 'Enter' });
+    expect(mockAddObjective).toHaveBeenCalledWith('Weekly review', null, false, { bucketId: 2, inMission: true, details: null });
+  });
+
   it('prints $$ as one $ and never asks for an escaped name', () => {
     renderModal({ ...BUG, title: 'Cost $$5 of $$item for $who', details: '' });
     expect(screen.getAllByRole('textbox').map(i => i.getAttribute('aria-label'))).toEqual(['who']);
