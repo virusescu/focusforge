@@ -151,9 +151,9 @@ describe('BucketsPage', () => {
     expect(mockAddObjective).toHaveBeenCalledWith('Ship it', null, false, { bucketId: 9, inMission: false });
   });
 
-  it('NEW_BUCKET calls addBucket with a default geometry', () => {
+  it('NEW_PANEL button calls addBucket with a default geometry', () => {
     render(<BucketsPage onBack={vi.fn()} />);
-    fireEvent.click(screen.getByText('NEW_BUCKET'));
+    fireEvent.click(screen.getByText('NEW_PANEL'));
     expect(mockAddBucket).toHaveBeenCalledWith('NEW_BUCKET', expect.stringMatching(/^#/), expect.objectContaining({ w: 300, h: 420 }));
   });
 

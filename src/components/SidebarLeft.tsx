@@ -497,12 +497,12 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenSettings, onOpenDetail
           <button
             className={styles.bucketsBtn}
             onClick={() => { soundEngine.playClick(); onViewBuckets(); }}
-            onMouseEnter={() => setStatusHint('OPEN_BUCKETS')}
+            onMouseEnter={() => setStatusHint('OPEN_CANVAS')}
             onMouseLeave={clearStatusHint}
-            title="Buckets (B)"
+            title="Canvas (B)"
           >
             <LayoutGrid size={12} />
-            <span>BUCKETS</span>
+            <span>CANVAS</span>
           </button>
         </div>
         <form className={styles.objectiveInputContainer} onSubmit={handleAddObjective}>

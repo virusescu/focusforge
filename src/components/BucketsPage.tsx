@@ -313,11 +313,11 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
           <ArrowLeft size={14} />
           <span>BACK_TO_HUD</span>
         </button>
-        <h2 className={styles.title}>BUCKETS</h2>
+        <h2 className={styles.title}>CANVAS</h2>
         <div className={styles.toolbarRight}>
           <button className={styles.toolBtn} onClick={handleNewBucket}>
             <Plus size={14} />
-            <span>NEW_BUCKET</span>
+            <span>NEW_PANEL</span>
           </button>
           <button className={styles.toolBtn} onClick={handleNewNote}>
             <StickyNote size={14} />
