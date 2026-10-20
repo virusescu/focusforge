@@ -71,6 +71,26 @@
   position: relative;
 }
 
+.dragHandle {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: grab;
+  padding: 2px 0;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  touch-action: none;
+
+  &:hover {
+    color: var(--primary);
+  }
+
+  &:active {
+    cursor: grabbing;
+  }
+}
+
 .colorInput {
   width: 24px;
   height: 24px;

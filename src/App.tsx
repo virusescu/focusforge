@@ -20,22 +20,33 @@ import { UserProvider } from './contexts/UserContext';
 import { FocusProvider } from './contexts/FocusContext';
 import { GameProvider } from './contexts/GameContext';
 import { AlarmProvider } from './contexts/AlarmContext';
-import { NavigationGuard } from './components/NavigationGuard';
+
 import { SeasonTransitionModal } from './components/SeasonTransitionModal';
 import { VaultPage } from './components/VaultPage';
 import { BucketsPage } from './components/BucketsPage';
 import { FireBackground } from './components/FireBackground';
 import AlarmOverlay from './components/AlarmOverlay';
 
+const LEFT_SIDEBAR_WIDTH_KEY = 'left_sidebar_width';
+const LEFT_SIDEBAR_MIN = 280;
+const LEFT_SIDEBAR_MAX = 600;
+const LEFT_SIDEBAR_DEFAULT = 350;
+
+function loadLeftSidebarWidth(): number {
+  const stored = Number(localStorage.getItem(LEFT_SIDEBAR_WIDTH_KEY));
+  if (!Number.isFinite(stored) || stored === 0) return LEFT_SIDEBAR_DEFAULT;
+  return Math.max(LEFT_SIDEBAR_MIN, Math.min(LEFT_SIDEBAR_MAX, stored));
+}
+
 function HudApp() {
   const [view, setView] = useState<'hud' | 'analytics' | 'intel' | 'vault' | 'buckets'>('hud');
   const [analyticsDate, setAnalyticsDate] = useState<Date>(new Date());
-  const [pendingNavigation, setPendingNavigation] = useState<{ target: 'analytics' | 'intel' | 'vault' | 'buckets'; dateStr?: string } | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [detailsPanelOpen, setDetailsPanelOpen] = useState(false);
   const [rightSidebarWidth, setRightSidebarWidth] = useState(350);
+  const [leftSidebarWidth, setLeftSidebarWidth] = useState(loadLeftSidebarWidth);
   const resizingRef = useRef(false);
-  const { timerStatus, resetTimer, activeObjectiveId } = useFocus();
+  const { activeObjectiveId } = useFocus();
   const { activeAlarm, dismissAlarm } = useAlarms();
   const [availableUpdate, setAvailableUpdate] = useState<Update | null>(null);
 
@@ -60,59 +71,14 @@ function HudApp() {
   }, [activeObjectiveId]);
 
   const handleViewAnalytics = (dateStr?: string) => {
-    if (timerStatus !== 'idle') {
-      setPendingNavigation({ target: 'analytics', dateStr });
-      return;
-    }
     if (dateStr) setAnalyticsDate(new Date(dateStr));
     else setAnalyticsDate(new Date());
     setView('analytics');
   };
 
-  const handleViewIntel = () => {
-    if (timerStatus !== 'idle') {
-      setPendingNavigation({ target: 'intel' });
-      return;
-    }
-    setView('intel');
-  };
-
-  const handleViewVault = () => {
-    if (timerStatus !== 'idle') {
-      setPendingNavigation({ target: 'vault' });
-      return;
-    }
-    setView('vault');
-  };
-
-  const handleViewBuckets = () => {
-    if (timerStatus !== 'idle') {
-      setPendingNavigation({ target: 'buckets' });
-      return;
-    }
-    setView('buckets');
-  };
-
-  const handleConfirmNavigation = () => {
-    if (!pendingNavigation) return;
-    resetTimer();
-    if (pendingNavigation.target === 'analytics') {
-      if (pendingNavigation.dateStr) setAnalyticsDate(new Date(pendingNavigation.dateStr));
-      else setAnalyticsDate(new Date());
-      setView('analytics');
-    } else if (pendingNavigation.target === 'vault') {
-      setView('vault');
-    } else if (pendingNavigation.target === 'buckets') {
-      setView('buckets');
-    } else {
-      setView('intel');
-    }
-    setPendingNavigation(null);
-  };
-
-  const handleCancelNavigation = () => {
-    setPendingNavigation(null);
-  };
+  const handleViewIntel = () => setView('intel');
+  const handleViewVault = () => setView('vault');
+  const handleViewBuckets = () => setView('buckets');
 
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -136,15 +102,40 @@ function HudApp() {
     document.body.style.userSelect = 'none';
   }, [rightSidebarWidth]);
 
+  const handleLeftResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = leftSidebarWidth;
+    let latest = startWidth;
+    const onMouseMove = (ev: MouseEvent) => {
+      latest = Math.max(LEFT_SIDEBAR_MIN, Math.min(LEFT_SIDEBAR_MAX, startWidth + ev.clientX - startX));
+      setLeftSidebarWidth(latest);
+    };
+    const onMouseUp = () => {
+      localStorage.setItem(LEFT_SIDEBAR_WIDTH_KEY, String(latest));
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, [leftSidebarWidth]);
+
   return (
     <>
       <FireBackground />
-      <div className="hud-container" style={{ gridTemplateColumns: `350px 1fr ${rightSidebarWidth}px` }}>
+      <div className="hud-container" style={{ gridTemplateColumns: `${leftSidebarWidth}px 1fr ${rightSidebarWidth}px` }}>
         <GlitchOverlay />
         <Header onOpenSettings={() => setIsSettingsOpen(true)} onViewVault={handleViewVault} />
         {view === 'hud' ? (
           <>
-            <SidebarLeft onOpenSettings={() => setIsSettingsOpen(true)} onOpenDetails={() => setDetailsPanelOpen(true)} onViewBuckets={handleViewBuckets} />
+            <div className="left-sidebar-wrapper">
+              <SidebarLeft onOpenDetails={() => setDetailsPanelOpen(true)} onViewBuckets={handleViewBuckets} />
+              <div className="resize-handle resize-handle-right" data-details-barrier onMouseDown={handleLeftResizeStart} />
+            </div>
             <MainDisplay
               onViewAnalytics={() => handleViewAnalytics()}
               onViewIntel={handleViewIntel}
@@ -160,6 +151,7 @@ function HudApp() {
                 onViewIntel={handleViewIntel}
                 onViewVault={handleViewVault}
                 onViewBuckets={handleViewBuckets}
+                onOpenSettings={() => setIsSettingsOpen(true)}
                 detailsPanelOpen={detailsPanelOpen}
                 onCloseDetails={() => setDetailsPanelOpen(false)}
               />
@@ -176,12 +168,7 @@ function HudApp() {
         )}
         <Footer />
 
-        {pendingNavigation && (
-          <NavigationGuard
-            onConfirm={handleConfirmNavigation}
-            onCancel={handleCancelNavigation}
-          />
-        )}
+
       </div>
       <SeasonTransitionModal />
       {isSettingsOpen && (

@@ -13,6 +13,9 @@ import type { BucketGeometry, CanvasNote } from '../types';
 
 const maxSortOrder = (notes: CanvasNote[]) => notes.reduce((max, n) => Math.max(max, n.sort_order), -1);
 
+// World units between a note and its duplicate
+const DUPLICATE_OFFSET = 24;
+
 // Sticky notes on the Buckets canvas. Only BucketsPage needs them, so they live here
 // rather than in FocusContext. Edits are optimistic; a failed write reloads from the DB.
 export function useCanvasNotes() {
@@ -48,17 +51,25 @@ export function useCanvasNotes() {
   }, [reload]);
 
   // Not optimistic: the caller needs the new id (to open the note for editing)
-  const addNote = useCallback(async (color: string, geometry: BucketGeometry): Promise<number | null> => {
+  const addNote = useCallback(async (color: string, geometry: BucketGeometry, content: string = ''): Promise<number | null> => {
     if (userId === null) return null;
     try {
-      const id = await addCanvasNote(userId, color, geometry);
-      setNotes(prev => [...prev, { id, content: '', color, ...geometry, sort_order: maxSortOrder(prev) + 1 }]);
+      const id = await addCanvasNote(userId, color, geometry, content);
+      setNotes(prev => [...prev, { id, content, color, ...geometry, sort_order: maxSortOrder(prev) + 1 }]);
       return id;
     } catch (error) {
       console.error('[useCanvasNotes] Add failed:', error);
       return null;
     }
   }, [userId]);
+
+  // The copy lands offset down-right of the original, in front of every other note
+  const duplicateNote = useCallback(async (id: number): Promise<number | null> => {
+    const source = notes.find(n => n.id === id);
+    if (!source) return null;
+    const { color, x, y, w, h, content } = source;
+    return addNote(color, { x: x + DUPLICATE_OFFSET, y: y + DUPLICATE_OFFSET, w, h }, content);
+  }, [notes, addNote]);
 
   const updateContent = useCallback((id: number, content: string) => apply(
     prev => prev.map(n => n.id === id ? { ...n, content } : n),
@@ -88,7 +99,7 @@ export function useCanvasNotes() {
     () => deleteCanvasNote(id),
   ), [apply]);
 
-  return { notes, addNote, updateContent, updateColor, updateGeometry, bringToFront, deleteNote };
+  return { notes, addNote, duplicateNote, updateContent, updateColor, updateGeometry, bringToFront, deleteNote };
 }
 
 export type CanvasNotesApi = ReturnType<typeof useCanvasNotes>;

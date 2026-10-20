@@ -67,6 +67,21 @@
   }
 }
 
+.copyNoteBtn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  transition: color 0.15s;
+
+  &:hover {
+    color: var(--primary);
+  }
+}
+
 .body {
   flex: 1;
   min-height: 0;

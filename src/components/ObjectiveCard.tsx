@@ -1,7 +1,7 @@
 import { type FC, useState, useRef, useEffect } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { FileText, Target, MinusCircle, X } from 'lucide-react';
+import { FileText, Target, MinusCircle, CopyPlus, X } from 'lucide-react';
 import styles from './ObjectiveCard.module.scss';
 import { useFocus } from '../contexts/FocusContext';
 import { soundEngine } from '../utils/audio';
@@ -22,7 +22,7 @@ interface ObjectiveCardProps {
 }
 
 export const ObjectiveCard: FC<ObjectiveCardProps> = ({ obj, containerId, categories, isViewed, inMissionPanel, onOpenDetails, onManageCategories, zoom = 1 }) => {
-  const { buckets, updateObjective, deleteObjective, updateObjectiveCategory, setObjectiveMission, setViewedObjective } = useFocus();
+  const { buckets, updateObjective, deleteObjective, duplicateObjective, updateObjectiveCategory, setObjectiveMission, setViewedObjective } = useFocus();
   // The same objective can appear in the Mission panel and in its bucket, so the id includes the container
   const [isEditing, setIsEditing] = useState(false);
   // The whole card is the drag source (the sensor's 5px threshold keeps clicks and double-clicks
@@ -191,6 +191,15 @@ export const ObjectiveCard: FC<ObjectiveCardProps> = ({ obj, containerId, catego
             <Target size={12} />
           </button>
         )}
+        <button
+          className={styles.actionBtn}
+          onClick={(e) => { e.stopPropagation(); soundEngine.playClick(); void duplicateObjective(obj.id); }}
+          onMouseEnter={() => setStatusHint('DUPLICATE_OBJECTIVE')}
+          onMouseLeave={clearStatusHint}
+          title="Duplicate"
+        >
+          <CopyPlus size={12} />
+        </button>
         <button
           className={`${styles.actionBtn} ${styles.deleteBtn}`}
           onClick={handleDelete}

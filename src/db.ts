@@ -625,6 +625,16 @@ export async function updateCategory(id: number, label: string, color: string, c
   });
 }
 
+export async function reorderCategories(orderedIds: number[]): Promise<void> {
+  const database = getDb();
+  for (let i = 0; i < orderedIds.length; i++) {
+    await database.execute({
+      sql: 'UPDATE objective_categories SET sort_order = ? WHERE id = ?',
+      args: [i, orderedIds[i]],
+    });
+  }
+}
+
 export async function deleteCategory(id: number): Promise<void> {
   const database = getDb();
   await database.execute({ sql: 'UPDATE objectives SET category_id = NULL WHERE category_id = ?', args: [id] });
@@ -790,8 +800,8 @@ export async function getCanvasNotes(userId: number): Promise<CanvasNote[]> {
   }));
 }
 
-// New notes start empty, on top of the user's other notes
-export async function addCanvasNote(userId: number, color: string, geometry: BucketGeometry): Promise<number> {
+// New notes start empty (or with `content`, for duplicates), on top of the user's other notes
+export async function addCanvasNote(userId: number, color: string, geometry: BucketGeometry, content: string = ''): Promise<number> {
   const database = getDb();
   const maxResult = await database.execute({
     sql: 'SELECT MAX(sort_order) as maxOrder FROM canvas_notes WHERE user_id = ?',
@@ -800,7 +810,7 @@ export async function addCanvasNote(userId: number, color: string, geometry: Buc
   const maxOrder = (maxResult.rows[0]?.maxOrder as number | null) ?? -1;
   const result = await database.execute({
     sql: 'INSERT INTO canvas_notes (user_id, content, color, x, y, w, h, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    args: [userId, '', color, geometry.x, geometry.y, geometry.w, geometry.h, maxOrder + 1],
+    args: [userId, content, color, geometry.x, geometry.y, geometry.w, geometry.h, maxOrder + 1],
   });
   return Number(result.lastInsertRowid);
 }
@@ -937,6 +947,49 @@ export async function addObjective(
     args: [userId, text, sortOrder, categoryId ?? null, isMission, targetBucketId, bucketSortOrder],
   });
   return Number(result.lastInsertRowid) ?? 0;
+}
+
+// Copies text, category, details, mission flag and bucket; the copy sits directly after the
+// original in both the Mission list and its bucket. Returns the new id, or null if `id` is gone.
+export async function duplicateObjective(id: number): Promise<number | null> {
+  const database = getDb();
+  const found = await database.execute({
+    sql: 'SELECT user_id, text, sort_order, category_id, is_mission, details, bucket_id, bucket_sort_order FROM objectives WHERE id = ?',
+    args: [id],
+  });
+  const row = found.rows[0];
+  if (!row) return null;
+  const userId = row.user_id as number;
+  const isMission = (row.is_mission as number) ?? 1;
+  const sortOrder = ((row.sort_order as number | null) ?? 0) + 1;
+  const bucketId = (row.bucket_id as number | null) ?? await getUnsortedBucketId(userId);
+
+  await database.execute({
+    sql: 'UPDATE objectives SET sort_order = sort_order + 1 WHERE user_id = ? AND is_mission = ? AND completed_at IS NULL AND sort_order >= ?',
+    args: [userId, isMission, sortOrder],
+  });
+
+  let bucketSortOrder: number;
+  const originalBucketOrder = row.bucket_sort_order as number | null;
+  if (originalBucketOrder === null) {
+    const bucketMax = await database.execute({
+      sql: 'SELECT MAX(bucket_sort_order) as maxOrder FROM objectives WHERE user_id = ? AND bucket_id = ? AND completed_at IS NULL',
+      args: [userId, bucketId],
+    });
+    bucketSortOrder = ((bucketMax.rows[0]?.maxOrder as number | null) ?? -1) + 1;
+  } else {
+    bucketSortOrder = originalBucketOrder + 1;
+    await database.execute({
+      sql: 'UPDATE objectives SET bucket_sort_order = bucket_sort_order + 1 WHERE user_id = ? AND bucket_id = ? AND completed_at IS NULL AND bucket_sort_order >= ?',
+      args: [userId, bucketId, bucketSortOrder],
+    });
+  }
+
+  const result = await database.execute({
+    sql: 'INSERT INTO objectives (user_id, text, sort_order, category_id, is_mission, details, bucket_id, bucket_sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    args: [userId, row.text as string, sortOrder, (row.category_id as number | null) ?? null, isMission, (row.details as string | null) ?? null, bucketId, bucketSortOrder],
+  });
+  return Number(result.lastInsertRowid);
 }
 
 export async function deleteObjective(id: number) {

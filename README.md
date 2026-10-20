@@ -89,8 +89,8 @@ Precision focus timer with keyboard-first controls (Space, Escape, Ctrl+Enter). 
 ### Objectives & Categories
 Drag-and-drop prioritized objectives with custom color-coded categories. Inline editing, completion tracking, and kill-rate analytics.
 
-### Buckets Canvas
-An infinite pan/zoom canvas of colored bucket panels, with moves and resizes snapping to a grid (hold Shift to move/resize freely in whole units). Add sticky markdown notes: colored, movable, resizable, with table support. Markdown tables also work in objective details.
+### Canvas
+An infinite pan/zoom canvas of colored bucket panels, with moves and resizes snapping to a grid (hold Shift to move/resize freely in whole units). Add sticky markdown notes: colored, movable, resizable, with table support. Markdown tables also work in objective details. Put `[c]` on a line to give it a hover copy button (Shift+click copies its markdown); code blocks get one automatically; notes and objectives can be duplicated.
 
 ### Analytics View
 21-day focus heatmap with an interactive day-view timeline (00:00–24:00). Sessions rendered as horizontal bars with objective completion overlays. Zoomable and draggable for detailed inspection.
@@ -114,7 +114,7 @@ Full details in [docs/architecture.md](docs/architecture.md).
 
 - **`src/contexts/`** — State providers: Auth, User (settings), Focus (timer/objectives), Game (score/streaks/seasons), Alarm
 - **`src/components/`** — UI components: MainDisplay, AnalyticsView, IntelligenceHub, VaultPage, SidebarLeft, Header, etc.
-- **`src/hooks/`** — Reusable logic: `useTimer`, `useSystemLog`
+- **`src/hooks/`** — Reusable logic: `useTimer`, `useCanvasNotes`, `useMarkdownEditor`
 - **`src/utils/`** — Audio synthesis engine, game economy calculations, logging
 - **`src/db.ts`** — Turso database layer ([schema](docs/database.md))
 - **`src/auth.ts`** — Google OAuth flow

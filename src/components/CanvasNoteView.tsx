@@ -1,7 +1,8 @@
-import { type FC, type RefObject, useRef, useEffect } from 'react';
-import { Trash2 } from 'lucide-react';
+import { type FC, type RefObject, useRef, useEffect, useState } from 'react';
+import { Trash2, Copy, CopyPlus, Check } from 'lucide-react';
 import styles from './CanvasNoteView.module.scss';
 import { soundEngine } from '../utils/audio';
+import { copyRich } from '../utils/clipboard';
 import { usePanelDrag } from '../hooks/usePanelDrag';
 import { useMarkdownEditor, type MarkdownEditor } from '../hooks/useMarkdownEditor';
 import type { MinSize } from '../utils/canvas';
@@ -30,6 +31,7 @@ export interface CanvasNoteViewProps {
   onColorChange: (id: number, color: string) => void;
   onGeometryChange: (id: number, geometry: BucketGeometry) => void;
   onBringToFront: (id: number) => void;
+  onDuplicate: (id: number) => void;
   onDelete: (id: number) => void;
 }
 
@@ -75,11 +77,42 @@ const NoteEditor: FC<NoteEditorProps> = ({ initialText, containerRef, onSave, on
   );
 };
 
+// ─── CopyNoteButton ──────────────────────────────────────────────────────────────
+interface CopyNoteButtonProps {
+  bodyRef: React.RefObject<HTMLDivElement | null>;
+}
+
+const CopyNoteButton: FC<CopyNoteButtonProps> = ({ bodyRef }) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const el = bodyRef.current;
+    const html = el?.innerHTML ?? '';
+    const plain = el?.innerText ?? '';
+    copyRich(html, plain);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  return (
+    <button
+      className={styles.copyNoteBtn}
+      onClick={handleClick}
+      aria-label="copy note"
+      title="Copy note"
+    >
+      {copied ? <Check size={12} /> : <Copy size={12} />}
+    </button>
+  );
+};
+
 export const CanvasNoteView: FC<CanvasNoteViewProps> = ({
   note, zoom, zIndex, isEditing,
-  onStartEdit, onEndEdit, onContentChange, onColorChange, onGeometryChange, onBringToFront, onDelete,
+  onStartEdit, onEndEdit, onContentChange, onColorChange, onGeometryChange, onBringToFront, onDuplicate, onDelete,
 }) => {
   const rootRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
 
   const { geom, isDragging, beginPointerDrag, handlePointerMove, handlePointerUp } = usePanelDrag({
     geometry: { x: note.x, y: note.y, w: note.w, h: note.h },
@@ -157,11 +190,20 @@ export const CanvasNoteView: FC<CanvasNoteViewProps> = ({
               onChange={e => onColorChange(note.id, e.target.value)}
               title="Note color"
             />
+            <CopyNoteButton bodyRef={bodyRef} />
+            <button
+              className={styles.copyNoteBtn}
+              onClick={() => { soundEngine.playClick(); onDuplicate(note.id); }}
+              aria-label="duplicate note"
+              title="Duplicate note"
+            >
+              <CopyPlus size={12} />
+            </button>
             <button className={styles.deleteBtn} onClick={handleDelete} title="Delete note">
               <Trash2 size={12} />
             </button>
           </div>
-          <div className={styles.body} data-canvas-scroll>
+          <div ref={bodyRef} className={styles.body} data-canvas-scroll>
             {note.content ? (
               <MarkdownView source={note.content} onChange={next => onContentChange(note.id, next)} className={styles.markdown} />
             ) : (

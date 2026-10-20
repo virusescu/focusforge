@@ -12,7 +12,7 @@ vi.mock('@libsql/client', () => ({
   }),
 }));
 
-import { initDbClient, saveFocusSession, getRecentSessions, deleteFocusSession, getObjectives, addObjective, deleteObjective, completeObjective, getKillRate, getAllSessions, getFragmentationStats, getAlarms, addAlarm, toggleAlarm, deleteAlarm, ensureSystemBuckets, getBuckets, deleteBucket, moveObjectiveToBucket, reorderBucketObjectives, bringBucketToFront, getCanvasNotes, addCanvasNote, updateCanvasNoteContent, updateCanvasNoteGeometry, bringCanvasNoteToFront, deleteCanvasNote } from './db';
+import { initDbClient, saveFocusSession, getRecentSessions, deleteFocusSession, getObjectives, addObjective, duplicateObjective, reorderCategories, deleteObjective, completeObjective, getKillRate, getAllSessions, getFragmentationStats, getAlarms, addAlarm, toggleAlarm, deleteAlarm, ensureSystemBuckets, getBuckets, deleteBucket, moveObjectiveToBucket, reorderBucketObjectives, bringBucketToFront, getCanvasNotes, addCanvasNote, updateCanvasNoteContent, updateCanvasNoteGeometry, bringCanvasNoteToFront, deleteCanvasNote } from './db';
 
 describe('db utility functions', () => {
   beforeEach(() => {
@@ -102,6 +102,61 @@ describe('db utility functions', () => {
         args: [1, 'Test Objective', 1, null, 1, 2, 0],
       });
       expect(id).toBe(123);
+    });
+
+    it('duplicateObjective copies the row right after the original and shifts the rows behind it', async () => {
+      mockExecute
+        .mockResolvedValueOnce({ rows: [{ user_id: 1, text: 'Task', sort_order: 5, category_id: 4, is_mission: 1, details: '# notes', bucket_id: 9, bucket_sort_order: 3 }], rowsAffected: 0 })
+        .mockResolvedValueOnce({ rows: [], rowsAffected: 2 })
+        .mockResolvedValueOnce({ rows: [], rowsAffected: 1 })
+        .mockResolvedValueOnce({ lastInsertRowid: BigInt(77), rows: [], rowsAffected: 1 });
+
+      const id = await duplicateObjective(12);
+
+      expect(id).toBe(77);
+      expect(mockExecute).toHaveBeenNthCalledWith(2, {
+        sql: expect.stringContaining('SET sort_order = sort_order + 1'),
+        args: [1, 1, 6],
+      });
+      expect(mockExecute).toHaveBeenNthCalledWith(3, {
+        sql: expect.stringContaining('SET bucket_sort_order = bucket_sort_order + 1'),
+        args: [1, 9, 4],
+      });
+      expect(mockExecute).toHaveBeenNthCalledWith(4, {
+        sql: expect.stringContaining('INSERT INTO objectives'),
+        args: [1, 'Task', 6, 4, 1, '# notes', 9, 4],
+      });
+    });
+
+    it('duplicateObjective appends to the bucket when the original has no bucket order', async () => {
+      mockExecute
+        .mockResolvedValueOnce({ rows: [{ user_id: 1, text: 'Task', sort_order: 0, category_id: null, is_mission: 0, details: null, bucket_id: 9, bucket_sort_order: null }], rowsAffected: 0 })
+        .mockResolvedValueOnce({ rows: [], rowsAffected: 0 })
+        .mockResolvedValueOnce({ rows: [{ maxOrder: 6 }], rowsAffected: 0 })
+        .mockResolvedValueOnce({ lastInsertRowid: BigInt(78), rows: [], rowsAffected: 1 });
+
+      await duplicateObjective(12);
+
+      expect(mockExecute).toHaveBeenLastCalledWith({
+        sql: expect.stringContaining('INSERT INTO objectives'),
+        args: [1, 'Task', 1, null, 0, null, 9, 7],
+      });
+    });
+
+    it('duplicateObjective returns null for an objective that no longer exists', async () => {
+      mockExecute.mockResolvedValueOnce({ rows: [], rowsAffected: 0 });
+      expect(await duplicateObjective(404)).toBeNull();
+      expect(mockExecute).toHaveBeenCalledTimes(1);
+    });
+
+    it('reorderCategories writes the new position of every category', async () => {
+      mockExecute.mockResolvedValue({ rows: [], rowsAffected: 1 });
+
+      await reorderCategories([30, 10, 20]);
+
+      expect(mockExecute).toHaveBeenCalledTimes(3);
+      expect(mockExecute).toHaveBeenNthCalledWith(1, { sql: expect.stringContaining('UPDATE objective_categories SET sort_order = ?'), args: [0, 30] });
+      expect(mockExecute).toHaveBeenNthCalledWith(3, { sql: expect.stringContaining('UPDATE objective_categories SET sort_order = ?'), args: [2, 20] });
     });
 
     it('deleteObjective should call execute with delete query and id', async () => {

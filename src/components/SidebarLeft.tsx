@@ -1,9 +1,7 @@
 import { type FC, useCallback, useState, useRef, useEffect, useMemo } from 'react';
 import styles from './SidebarLeft.module.scss';
-import { User, Zap, Flame, Star, Plus, X, Edit3, Check, LayoutGrid, MinusCircle } from 'lucide-react';
-import { useUser } from '../contexts/UserContext';
+import { Plus, X, Edit3, Check, LayoutGrid, MinusCircle, CopyPlus } from 'lucide-react';
 import { useFocus } from '../contexts/FocusContext';
-import { useGame } from '../contexts/GameContext';
 import { soundEngine, playStartSound } from '../utils/audio';
 import { setStatusHint, clearStatusHint } from '../utils/statusHint';
 import {
@@ -40,10 +38,11 @@ interface SortableItemProps {
   onManageCategories: () => void;
   onHover: () => void;
   onRemoveFromMission: (id: number) => void;
+  onDuplicate: (id: number) => void;
   bucket?: Bucket; // the objective's bucket, shown as a colored left stripe
 }
 
-const SortableItem: FC<SortableItemProps> = ({ obj, isActive, isViewed, categories, onSelect, onActivate, onDelete, onUpdate, onCategoryChange, onManageCategories, onHover, onRemoveFromMission, bucket }) => {
+const SortableItem: FC<SortableItemProps> = ({ obj, isActive, isViewed, categories, onSelect, onActivate, onDelete, onUpdate, onCategoryChange, onManageCategories, onHover, onRemoveFromMission, onDuplicate, bucket }) => {
   const [isEditing, setIsEditing] = useState(false);
   // The whole row is the drag source; disabled while renaming so the input's text can be selected
   const { listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: obj.id, disabled: isEditing });
@@ -195,6 +194,16 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, isViewed, categori
 
       <button
         className={styles.moveBtn}
+        onClick={(e) => { e.stopPropagation(); onDuplicate(obj.id); }}
+        onMouseEnter={() => { onHover(); setStatusHint('DUPLICATE_OBJECTIVE'); }}
+        onMouseLeave={clearStatusHint}
+        title="Duplicate"
+      >
+        <CopyPlus size={12} />
+      </button>
+
+      <button
+        className={styles.moveBtn}
         onClick={(e) => { e.stopPropagation(); onRemoveFromMission(obj.id); }}
         onMouseEnter={() => { onHover(); setStatusHint('REMOVE_FROM_MISSION'); }}
         onMouseLeave={clearStatusHint}
@@ -216,13 +225,11 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, isViewed, categori
 };
 
 interface SidebarLeftProps {
-  onOpenSettings: () => void;
   onOpenDetails: () => void;
   onViewBuckets: () => void;
 }
 
-export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenSettings, onOpenDetails, onViewBuckets }) => {
-  const { name, avatar, loading } = useUser();
+export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenDetails, onViewBuckets }) => {
   const {
     objectivePool,
     missionObjectives,
@@ -230,6 +237,7 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenSettings, onOpenDetail
     viewedObjectiveId,
     addObjective,
     deleteObjective,
+    duplicateObjective,
     updateObjective,
     updateObjectiveCategory,
     setActiveObjective,
@@ -240,10 +248,10 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenSettings, onOpenDetail
     addCategory,
     updateCategory,
     deleteCategory,
+    reorderCategories,
     buckets,
   } = useFocus();
   const bucketById = useMemo(() => new Map(buckets.map(b => [b.id, b])), [buckets]);
-  const { sessionsToday, dailyBonusActive, currentStreakDays, streakMultiplier, totalCoinsEarned, prestigeTitles, currentTitle } = useGame();
   const [newObjective, setNewObjective] = useState('');
   const [newCategoryId, setNewCategoryId] = useState<number | null>(null);
   const [showNewCategoryPicker, setShowNewCategoryPicker] = useState(false);
@@ -251,14 +259,6 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenSettings, onOpenDetail
   const [showAlarms, setShowAlarms] = useState(false);
 
   const displayedObjectives = missionObjectives;
-
-  // Compute current prestige level progress (from current threshold to next threshold)
-  const nextTitle = currentTitle
-    ? prestigeTitles.find(t => t.unlock_threshold > currentTitle.unlock_threshold)
-    : prestigeTitles[0];
-  const levelFrom = currentTitle?.unlock_threshold ?? 0;
-  const levelTo = nextTitle?.unlock_threshold ?? 60000;
-  const levelProgress = Math.min(Math.max((totalCoinsEarned - levelFrom) / (levelTo - levelFrom), 0), 1);
 
   // Default newCategoryId to the first available category
   useEffect(() => {
@@ -336,6 +336,11 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenSettings, onOpenDetail
     setObjectiveMission(id, false);
   };
 
+  const handleDuplicate = (id: number) => {
+    soundEngine.playClick();
+    void duplicateObjective(id);
+  };
+
   const handleSelectObjective = (id: number) => {
     soundEngine.playClick();
     setViewedObjective(id);
@@ -406,104 +411,11 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenSettings, onOpenDetail
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [viewedObjectiveId, displayedObjectives, reorderObjectives, setViewedObjective]);
 
-  if (loading) return <aside className={styles.sidebar} data-details-barrier>LOADING...</aside>;
-
   return (
     <aside className={styles.sidebar} data-details-barrier>
       <div className="card">
-        <div
-          className={styles.operatorCard}
-          onClick={onOpenSettings}
-          style={{ cursor: 'pointer' }}
-          onMouseEnter={() => setStatusHint('OPEN_SETTINGS')}
-          onMouseLeave={clearStatusHint}
-        >
-          <div className={styles.avatar}>
-            {avatar ? (
-              <img src={avatar} alt="User Avatar" style={{ width: '100%', height: '100%', borderRadius: '4px' }} />
-            ) : (
-              <User size={32} />
-            )}
-          </div>
-          <div className={styles.details}>
-            <h3>{name || 'LOADING...'}</h3>
-            <p>SYNC_STABLE</p>
-          </div>
-        </div>
-
-        <div className={styles.stats}>
-          <div className={styles.multiplierRow}>
-            {(() => {
-              const dailyMult = dailyBonusActive ? 2.0 : 1.0;
-              const combined = streakMultiplier * dailyMult;
-              const isBase = combined <= 1;
-              return (
-                <div className={`${styles.multiplierDisplay} ${isBase ? styles.multiplierInactive : ''}`}>
-                  <span className={styles.multiplierValue}>{isBase ? '—' : `${combined.toFixed(2)}x`}</span>
-                  <span className={styles.multiplierLabel}>MULTIPLIER</span>
-                </div>
-              );
-            })()}
-            <div className={styles.compactStats}>
-              <div className={styles.compactItem}>
-                <div className={styles.compactInfo}>
-                  <Zap size={10} />
-                  <span>DAILY</span>
-                  <span className={styles.compactValue}>{dailyBonusActive ? '2x' : `${Math.min(sessionsToday, 3)}/3`}</span>
-                </div>
-                <div className={styles.progressBar}>
-                  <div className={`${styles.progressFill} ${dailyBonusActive ? styles.progressActive : ''}`} style={{ width: `${Math.min(sessionsToday / 3, 1) * 100}%` }} />
-                </div>
-              </div>
-              <div className={styles.compactItem}>
-                <div className={styles.compactInfo}>
-                  <Flame size={10} />
-                  <span>STREAK</span>
-                  <span className={styles.compactValue}>{currentStreakDays}/4</span>
-                </div>
-                <div className={styles.progressBar}>
-                  <div className={styles.progressFill} style={{ width: `${(currentStreakDays / 4) * 100}%` }} />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div
-            className={styles.statItem}
-            title={`Total: ${Math.floor(totalCoinsEarned).toLocaleString()} / 60,000 ⟐`}
-          >
-            <div className={styles.statInfo}>
-              <div className={styles.statLabel}>
-                <Star size={12} />
-                <span>FORGE_PROGRESS</span>
-              </div>
-              <span className={styles.statValue}>
-                {nextTitle
-                  ? `${Math.floor(totalCoinsEarned - levelFrom).toLocaleString()} / ${(levelTo - levelFrom).toLocaleString()}`
-                  : 'MAX'}
-              </span>
-            </div>
-            <div className={styles.progressBar}>
-              <div className={styles.progressFill} style={{ width: `${levelProgress * 100}%` }} />
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-      <div className="card">
         <div className={styles.viewToggle}>
           <h4 className={styles.sectionTitle}>MISSION_OBJECTIVES</h4>
-          <button
-            className={styles.bucketsBtn}
-            onClick={() => { soundEngine.playClick(); onViewBuckets(); }}
-            onMouseEnter={() => setStatusHint('OPEN_BUCKETS')}
-            onMouseLeave={clearStatusHint}
-            title="Buckets (B)"
-          >
-            <LayoutGrid size={12} />
-            <span>BUCKETS</span>
-          </button>
         </div>
         <form className={styles.objectiveInputContainer} onSubmit={handleAddObjective}>
           <div className={styles.inputRow}>
@@ -559,6 +471,7 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenSettings, onOpenDetail
                     onManageCategories={() => setShowCategoryManager(true)}
                     onHover={handleHover}
                     onRemoveFromMission={handleRemoveFromMission}
+                    onDuplicate={handleDuplicate}
                     bucket={bucketById.get(obj.bucket_id ?? -1)}
                   />
                 ))}
@@ -569,6 +482,17 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenSettings, onOpenDetail
             </SortableContext>
           </div>
         </DndContext>
+
+        <button
+          className={styles.canvasBtn}
+          onClick={() => { soundEngine.playClick(); onViewBuckets(); }}
+          onMouseEnter={() => { handleHover(); setStatusHint('OPEN_CANVAS'); }}
+          onMouseLeave={clearStatusHint}
+          title="Canvas (B)"
+        >
+          <LayoutGrid size={20} />
+          <span>CANVAS</span>
+        </button>
       </div>
 
       {showAlarms && (
@@ -582,6 +506,7 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenSettings, onOpenDetail
           onAdd={addCategory}
           onUpdate={updateCategory}
           onDelete={deleteCategory}
+          onReorder={reorderCategories}
           onClose={() => setShowCategoryManager(false)}
           objectiveCountByCategory={objectiveCountByCategory}
         />

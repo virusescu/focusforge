@@ -84,9 +84,9 @@ context, so the timer hook and the game economy stay decoupled.
 
 | Event | Emitted by | Payload | Listeners |
 |---|---|---|---|
-| `timer-active` | `useTimer.toggleTimer` (start/resume) | — | `FocusContext` (status), `useSystemLog` |
-| `timer-paused` | `useTimer.toggleTimer` (pause) | — | `FocusContext`, `useSystemLog` |
-| `timer-reset` | `useTimer.resetTimer`, pause-limit auto reset | — | `FocusContext`, `useSystemLog` |
+| `timer-active` | `useTimer.toggleTimer` (start/resume) | — | `FocusContext` (status) |
+| `timer-paused` | `useTimer.toggleTimer` (pause) | — | `FocusContext` |
+| `timer-reset` | `useTimer.resetTimer`, pause-limit auto reset | — | `FocusContext` |
 | `timer-saved` | `useTimer.resetTimer` when `seconds > 0` | `{ durationSeconds, startTime, pauseTimes[] }` | `FocusContext` (persist session), `GameContext` (award coins) |
 | `objective-neutralized` | `FocusContext.neutralizeObjective` | `{ baseBounty }` | `GameContext` (award bounty) |
 
@@ -104,8 +104,7 @@ In dev builds the timer runs at `debug_speed` × real time (set in Settings).
 ## Views and navigation
 
 `HudApp` (in `App.tsx`) holds a `view` state: `hud | analytics | intel | vault | buckets`.
-Switching away from the HUD while the timer is not idle shows `NavigationGuard`.
-Confirming ends (and saves) the session first.
+Navigation never touches the timer: it keeps running while you visit another view, and the HUD shows it again when you return.
 
 The app also checks for updates on startup (`@tauri-apps/plugin-updater` `check()`)
 and shows `UpdatePrompt` if one is available.
@@ -115,16 +114,16 @@ and shows `UpdatePrompt` if one is available.
 | Component | Purpose |
 |---|---|
 | `Header` | Title bar / drag region, coin counter + `+N` flash, streak bars, season timer, prestige rank, version, window controls. |
-| `SidebarLeft` | Mission list (each row has a left stripe in its bucket's color; hover shows the bucket name) with drag-and-drop reordering (`@dnd-kit`, drag from anywhere on the row; pointer only), inline edit (F2), category dots, remove-from-Mission button, a BUCKETS button that opens the Buckets page, forge progress, streak/daily/multiplier readout. |
-| `BucketsPage` | The Buckets view: an infinite pan/zoom canvas (CSS-transformed world, viewport saved in `localStorage` key `bucket_canvas_viewport`) with one `BucketPanel` per bucket plus the Mission panel. Handles card drag-and-drop between panels, NEW_BUCKET, the details drawer and the category manager. Also renders the `CanvasNoteView` sticky notes (loaded via `useCanvasNotes`) in a layer above all panels (`NOTE_Z_BASE`), owns `editingNoteId` (one note is edited at a time), and has a NEW_NOTE button that adds a `#ffcc33` 260×200 note near the top-right of the view, opened for editing. |
+| `SidebarLeft` | Mission list (each row has a left stripe in its bucket's color; hover shows the bucket name) with drag-and-drop reordering (`@dnd-kit`, drag from anywhere on the row; pointer only), inline edit (F2), category dots, remove-from-Mission button, a duplicate button (copies text, category, details and bucket; the copy lands right below the original), and a large CANVAS button under the list that opens the Canvas page. The sidebar is resizable (280–600 px, saved in `localStorage` key `left_sidebar_width`). |
+| `BucketsPage` | The Canvas view (user-facing name; the code, the `buckets` view id and the `bucket_canvas_viewport` key keep the old name): an infinite pan/zoom canvas (CSS-transformed world, viewport saved in `localStorage` key `bucket_canvas_viewport`) with one `BucketPanel` per bucket plus the Mission panel. Handles card drag-and-drop between panels, NEW_PANEL (adds a bucket), the details drawer and the category manager. Also renders the `CanvasNoteView` sticky notes (loaded via `useCanvasNotes`) in a layer above all panels (`NOTE_Z_BASE`), owns `editingNoteId` (one note is edited at a time), and has a NEW_NOTE button that adds a `#ffcc33` 260×200 note near the top-right of the view, opened for editing. |
 | `BucketPanel` | One colored panel on the canvas. It can be moved by its header and resized from its corner (minimum 200×120; moves/resizes snap to a 20-unit grid, hold Shift to move/resize freely in whole units, via `usePanelDrag`). Every panel's color is editable, including Mission and Unsorted; the name of every panel except Mission is editable. Delete is available for custom buckets only. Panels stack by `sort_order` (`stackingOrder` in `utils/canvas.ts`); dropping a moved or resized panel calls `bringBucketToFront`, so the last one dragged stays on top, and the order is saved. Holds a sortable list of cards and an add box. |
-| `CanvasNoteView` | A sticky note on the Buckets canvas, tinted with its color. Drag it from anywhere except controls and resize it from the corner (minimum 160×100). On hover it shows a color input and delete (delete asks for confirmation if the note has text). Double-click edits it in place with a compact `MarkdownToolbar`: Esc or clicking outside saves, Shift+Esc cancels. Task checkboxes toggle without entering edit mode. The last note moved comes to the front among notes. |
-| `MarkdownView` | Shared GFM renderer (used by objective details and notes): task toggles, external links, scrollable styled tables, blank-line preservation. |
+| `CanvasNoteView` | A sticky note on the Buckets canvas, tinted with its color. Drag it from anywhere except controls and resize it from the corner (minimum 160×100). On hover it shows a color input, copy (rich HTML + plain text), duplicate (an offset copy with the same text, color and size, in front) and delete (delete asks for confirmation if the note has text). Double-click edits it in place with a compact `MarkdownToolbar`: Esc or clicking outside saves, Shift+Esc cancels. Task checkboxes toggle without entering edit mode. The last note moved comes to the front among notes. |
+| `MarkdownView` | Shared GFM renderer (used by objective details and notes): task toggles, external links, scrollable styled tables, blank-line preservation. Fenced code blocks get a copy button (plain text). A `[c]` anywhere on a line makes just that line copyable: the marker is hidden, and hovering the line shows a copy button (click: rendered rich text + plain text; Shift+click: that line's markdown). `[c]` inside inline code or a code block is left alone. |
 | `MarkdownToolbar` | Shared formatting toolbar, in normal and compact variants. |
 | `ObjectiveCard` | A sortable objective card used in bucket panels and the Mission panel, dragged from anywhere on the card (not while renaming): category dot, inline rename (double-click / F2), details, Mission toggle, delete. |
 | `BucketTag` | Colored dot + bucket name in the bucket's color. Used in the LOCKED_ON label and the details header. |
 | `MainDisplay` | The "Neural Forge" timer ring, active objective (its LOCKED_ON label shows the objective's bucket), hold-to-charge neutralize, global keyboard shortcuts. |
-| `SidebarRight` | Activity map (21-day heatmap → opens Analytics for a day), recent forges, system log, and the big nav buttons (Buckets, Analytics, Alarms, Intelligence Hub, Vault; they shrink to fit narrow widths). Hosts `ObjectiveDetails` when the details panel is open. Resizable (280–700 px). |
+| `SidebarRight` | `OperatorPanel` on top, then the activity map (21-day heatmap in two rows → opens Analytics for a day), recent forges, and the big nav buttons (Buckets, Analytics, Alarms, Intelligence Hub, Vault; they shrink to fit narrow widths). Hosts `ObjectiveDetails` when the details panel is open. Resizable (280–700 px). |
 | `ObjectiveDetails` | Markdown notes editor for an objective, built on `MarkdownView` / `MarkdownToolbar` / `useMarkdownEditor`, with toolbar, shortcuts, auto-link on paste and line reordering. The header shows the title and the objective's bucket (`BucketTag`). |
 | `AnalyticsView` | Day view timeline, session edit/delete, completed objectives, kill rate, category management. Reads the DB directly. |
 | `IntelligenceHub` | Focus by hour, focus by day, session length distribution, fragmentation index, clean-forge ratio. Reads the DB directly. |
@@ -132,17 +131,17 @@ and shows `UpdatePrompt` if one is available.
 | `SettingsModal` | Debug speed, experience level, day start/end hours, logout. |
 | `AlarmsModal` / `AlarmOverlay` | Manage recurring alarms; full-screen overlay when one fires (snooze/dismiss). |
 | `SeasonTransitionModal` | Shown when the active season has ended; archives it and starts the next. |
-| `CategoryManagerModal`, `CategoryDotPicker`, `CompletedObjectivesModal` | Category CRUD and pickers, completed-objective browser. |
+| `CategoryManagerModal`, `CategoryDotPicker`, `CompletedObjectivesModal` | Category CRUD (rows are drag-sortable by a grip handle; the order is `sort_order` and drives every picker) and pickers, completed-objective browser. |
 | `GlitchOverlay` | Full-screen glitch effect when an objective is neutralized. |
 | `FireBackground` | Animated background that reacts to timer state. |
-| `LoginScreen`, `SetupScreen`, `UpdatePrompt`, `NavigationGuard`, `WindowControls`, `Footer` | Auth gate, Turso setup, update prompt, leave-session guard, custom window buttons, footer. |
+| `OperatorPanel` | Operator name/avatar (opens Settings), multiplier, daily and streak progress, forge (prestige) progress. Lives at the top of `SidebarRight`. |
+| `LoginScreen`, `SetupScreen`, `UpdatePrompt`, `WindowControls`, `Footer` | Auth gate, Turso setup, update prompt, custom window buttons, footer. |
 
 ## Hooks and utilities
 
 | Module | Purpose |
 |---|---|
 | `hooks/useTimer.ts` | Pure timer state machine (seconds, pause countdown, pause timestamps) that emits the timer events. |
-| `hooks/useSystemLog.ts` | Flavour-text log fed by timer events, using messages from `logData.ts`. |
 | `hooks/usePanelDrag.ts` | Pointer move/resize drag for canvas panels and notes; snaps to the 20-unit grid by default, Shift moves/resizes freely in whole units. |
 | `hooks/useMarkdownEditor.ts` | Shared markdown editing logic (shortcuts, formatting, auto-link on paste, line reordering) used by objective details and notes. |
 | `hooks/useCanvasNotes.ts` | Loads and mutates the user's canvas notes (add, update, delete, bring to front) against the DB. |
@@ -162,7 +161,7 @@ and shows `UpdatePrompt` if one is available.
 | Escape | End session (saves it), unless the details panel is open |
 | Ctrl+Enter | Neutralize the active objective (timer must be running) |
 | Enter | Open details for the active objective |
-| A / I / V / B | Analytics / Intelligence Hub / Vault / Buckets |
+| A / I / V / B | Analytics / Intelligence Hub / Vault / Canvas |
 | ↑ / ↓ | Select previous / next objective |
 | Shift+↑ / Shift+↓ / Shift+Home / Shift+End | Reorder the selected objective |
 | F2 | Rename objective |
@@ -170,7 +169,7 @@ and shows `UpdatePrompt` if one is available.
 
 **Analytics:** ← / → previous/next day · Space jump to today · Escape back.
 
-**Buckets page:** drag background / middle mouse pan · wheel zoom (around the cursor) ·
+**Canvas page:** drag background / middle mouse pan · wheel zoom (around the cursor) ·
 Space recenter origin (keeps zoom) · F2 rename card · Escape back (closes the details drawer first) ·
 moves and resizes snap to a 20-unit grid by default, Shift moves/resizes freely in whole units · double-click a note to edit it · Esc saves and Shift+Esc cancels in a note. Keys are ignored while typing in an input.
 

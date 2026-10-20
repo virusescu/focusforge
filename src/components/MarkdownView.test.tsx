@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MarkdownView } from './MarkdownView';
 
@@ -7,8 +7,14 @@ vi.mock('../utils/audio', () => ({
   soundEngine: { playCheckboxUncheck: vi.fn() },
   playCheckboxCheckWithFile: vi.fn(),
 }));
+vi.mock('../utils/clipboard', () => ({
+  copyRich: vi.fn().mockResolvedValue(undefined),
+  copyPlain: vi.fn().mockResolvedValue(undefined),
+}));
 
 const TABLE = '| Name | Qty |\n| :--- | ---: |\n| Apple | 3 |\n| Pear | 10 |';
+
+import { copyRich, copyPlain } from '../utils/clipboard';
 
 describe('MarkdownView', () => {
   it('renders a GFM table with header and body cells', () => {
@@ -37,5 +43,135 @@ describe('MarkdownView', () => {
   it('is read-only without onChange', () => {
     render(<MarkdownView source={'- [ ] task'} />);
     expect(() => fireEvent.click(screen.getByRole('checkbox'))).not.toThrow();
+  });
+});
+
+describe('[c] row copy marker', () => {
+  beforeEach(() => {
+    vi.mocked(copyRich).mockClear();
+    vi.mocked(copyPlain).mockClear();
+  });
+
+  it('[c] marker is stripped from rendered output', () => {
+    render(<MarkdownView source="hello world [c]" />);
+    expect(screen.queryByText(/\[c\]/)).toBeNull();
+    expect(screen.getByText(/hello world/)).toBeInTheDocument();
+  });
+
+  it('[c] on a line renders a copy button', () => {
+    render(<MarkdownView source="copy this line [c]" />);
+    expect(screen.getByRole('button', { name: /copy row/i })).toBeInTheDocument();
+  });
+
+  it('[c] inside a code span is not treated as a marker', () => {
+    render(<MarkdownView source={'use `foo [c]` here'} />);
+    expect(screen.getByText(/\[c\]/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /copy row/i })).toBeNull();
+  });
+
+  it('multiple [c] tokens on a line render only one copy button', () => {
+    render(<MarkdownView source="text [c] more [c]" />);
+    const buttons = screen.getAllByRole('button', { name: /copy row/i });
+    expect(buttons).toHaveLength(1);
+    expect(screen.queryByText(/\[c\]/)).toBeNull();
+  });
+
+  it('clicking copy button calls copyRich with html and plain', () => {
+    render(<MarkdownView source="**bold text** [c]" />);
+    fireEvent.click(screen.getByRole('button', { name: /copy row/i }));
+    expect(copyRich).toHaveBeenCalledOnce();
+  });
+
+  it('shift+click copy button calls copyPlain with raw markdown (no [c])', () => {
+    render(<MarkdownView source="**bold text** [c]" />);
+    const btn = screen.getByRole('button', { name: /copy row/i });
+    fireEvent.click(btn, { shiftKey: true });
+    expect(copyPlain).toHaveBeenCalledOnce();
+    const arg = vi.mocked(copyPlain).mock.calls[0][0] as string;
+    expect(arg).toContain('**bold text**');
+    expect(arg).not.toContain('[c]');
+  });
+});
+
+describe('[c] on one line of a multi-line paragraph', () => {
+  beforeEach(() => {
+    vi.mocked(copyRich).mockClear();
+    vi.mocked(copyPlain).mockClear();
+  });
+
+  const PARA = 'first line\n**bold** second [c]\nthird line';
+
+  it('only the marked line gets a copy button', () => {
+    render(<MarkdownView source={PARA} />);
+    expect(screen.getAllByRole('button', { name: /copy row/i })).toHaveLength(1);
+    expect(screen.getByText('first line', { exact: false })).toBeInTheDocument();
+    expect(screen.getByText('third line', { exact: false })).toBeInTheDocument();
+  });
+
+  it('click copies just that line, not the whole paragraph', () => {
+    render(<MarkdownView source={PARA} />);
+    fireEvent.click(screen.getByRole('button', { name: /copy row/i }));
+    const [html, plain] = vi.mocked(copyRich).mock.calls[0];
+    expect(plain).toContain('second');
+    expect(plain).not.toContain('first line');
+    expect(plain).not.toContain('third line');
+    expect(html).toContain('<strong>bold</strong>');
+  });
+
+  it('shift+click copies that line as markdown', () => {
+    render(<MarkdownView source={PARA} />);
+    fireEvent.click(screen.getByRole('button', { name: /copy row/i }), { shiftKey: true });
+    expect(copyPlain).toHaveBeenCalledWith('**bold** second');
+    expect(copyRich).not.toHaveBeenCalled();
+  });
+
+  it('each marked line gets its own button and source', () => {
+    render(<MarkdownView source={'a [c]\nb\nc [c]'} />);
+    const buttons = screen.getAllByRole('button', { name: /copy row/i });
+    expect(buttons).toHaveLength(2);
+    fireEvent.click(buttons[1], { shiftKey: true });
+    expect(copyPlain).toHaveBeenCalledWith('c');
+  });
+
+  it('works inside a list item', () => {
+    render(<MarkdownView source={'- keep\n- npm run build [c]'} />);
+    expect(screen.getAllByRole('button', { name: /copy row/i })).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: /copy row/i }), { shiftKey: true });
+    expect(copyPlain).toHaveBeenCalledWith('npm run build');
+  });
+
+  it('works on a heading', () => {
+    render(<MarkdownView source={'## Title [c]'} />);
+    fireEvent.click(screen.getByRole('button', { name: /copy row/i }), { shiftKey: true });
+    expect(copyPlain).toHaveBeenCalledWith('## Title');
+  });
+});
+
+describe('code block copy button', () => {
+  beforeEach(() => {
+    vi.mocked(copyPlain).mockClear();
+    vi.mocked(copyRich).mockClear();
+  });
+
+  it('fenced code block renders a copy button', () => {
+    render(<MarkdownView source={"```\nnpm run clean\n```"} />);
+    expect(screen.getByRole('button', { name: /copy code/i })).toBeInTheDocument();
+  });
+
+  it('clicking code block copy button copies raw code via copyPlain', () => {
+    render(<MarkdownView source={"```\nnpm run clean\n```"} />);
+    fireEvent.click(screen.getByRole('button', { name: /copy code/i }));
+    expect(copyPlain).toHaveBeenCalledOnce();
+    expect(vi.mocked(copyPlain).mock.calls[0][0]).toContain('npm run clean');
+  });
+
+  it('[c] inside a fenced code block is not treated as a row marker', () => {
+    render(<MarkdownView source={"```\nsome [c] code\n```"} />);
+    // The [c] is visible inside the code block
+    expect(screen.getByText(/\[c\]/)).toBeInTheDocument();
+    // Only one button: the code copy button, no row copy button
+    const buttons = screen.getAllByRole('button');
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0]).toHaveAccessibleName(/copy code/i);
   });
 });

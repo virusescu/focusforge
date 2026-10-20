@@ -5,43 +5,11 @@
   height: 100%;
   overflow: hidden;
 
-  > :last-child {
+  > :global(.card) {
     flex: 1;
     min-height: 0;
     display: flex;
     flex-direction: column;
-  }
-}
-
-.operatorCard {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-bottom: 2rem;
-  
-  .avatar {
-    width: 48px;
-    height: 48px;
-    border: 1px solid var(--primary);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--primary);
-    box-shadow: 0 0 10px var(--primary-glow);
-  }
-  
-  .details {
-    h3 {
-      font-size: 1rem;
-      margin: 0;
-      letter-spacing: 0.1em;
-    }
-    
-    p {
-      font-size: 0.65rem;
-      color: #4ade80;
-      margin: 0;
-    }
   }
 }
 
@@ -71,120 +39,6 @@
 
   &:active {
     transform: translateY(0);
-  }
-}
-
-.stats {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.multiplierRow {
-  display: flex;
-  gap: 0.75rem;
-  align-items: center;
-}
-
-.multiplierDisplay {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  min-width: 60px;
-
-  .multiplierValue {
-    font-size: 1.4rem;
-    font-weight: 700;
-    color: #f0c040;
-    letter-spacing: 0.02em;
-    line-height: 1;
-    text-shadow: 0 0 10px rgba(240, 192, 64, 0.4);
-  }
-
-  .multiplierLabel {
-    font-size: 0.45rem;
-    color: var(--text-muted);
-    letter-spacing: 0.15em;
-    margin-top: 0.2rem;
-  }
-
-  &.multiplierInactive {
-    .multiplierValue {
-      color: var(--text-muted);
-      opacity: 0.4;
-      text-shadow: none;
-    }
-  }
-}
-
-.compactStats {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  min-width: 0;
-}
-
-.compactItem {
-  .compactInfo {
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
-    font-size: 0.55rem;
-    letter-spacing: 0.05em;
-    color: var(--text-secondary);
-    margin-bottom: 0.2rem;
-
-    .compactValue {
-      margin-left: auto;
-      color: var(--text-primary);
-      font-weight: 600;
-    }
-  }
-}
-
-.progressBar {
-  width: 100%;
-  height: 6px;
-  background: var(--bg-dark);
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  overflow: hidden;
-
-  .progressFill {
-    height: 100%;
-    background: var(--primary);
-    box-shadow: 0 0 5px var(--primary-glow);
-
-    &.progressActive {
-      background: #4ade80;
-      box-shadow: 0 0 8px rgba(74, 222, 128, 0.5);
-    }
-  }
-}
-
-.statItem {
-  .statInfo {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.4rem;
-    font-size: 0.65rem;
-    letter-spacing: 0.05em;
-
-    .statLabel {
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-      color: var(--text-secondary);
-    }
-
-    .statValue {
-      color: var(--text-primary);
-      font-weight: 600;
-    }
   }
 }
 
@@ -501,23 +355,30 @@
   }
 }
 
-.bucketsBtn {
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  font-size: 0.65rem;
-  letter-spacing: 0.15em;
-  cursor: pointer;
-  // Big hit zone, vertically fills the title row
-  padding: 6px 4px 6px 10px;
+.canvasBtn {
+  --btn-color: #b388ff;
+  flex-shrink: 0;
+  margin-top: 1rem;
+  width: 100%;
+  min-height: 52px;
   display: flex;
   align-items: center;
-  gap: 6px;
-  align-self: stretch;
-  transition: color 0.15s;
+  justify-content: center;
+  gap: 0.75rem;
+  background: transparent;
+  border: 1px solid var(--btn-color);
+  color: var(--btn-color);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.25em;
+  cursor: pointer;
+  transition: all 0.15s ease;
 
   &:hover {
-    color: var(--primary);
+    background: var(--btn-color);
+    color: #000000;
+    box-shadow: 0 0 20px var(--btn-color);
   }
 }
 

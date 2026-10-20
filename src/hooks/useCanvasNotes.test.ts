@@ -55,6 +55,26 @@ describe('useCanvasNotes', () => {
     expect(result.current.notes.at(-1)).toEqual({ id: 9, content: '', color: '#ffcc33', x: 5, y: 6, w: 260, h: 200, sort_order: 4 });
   });
 
+  it('duplicateNote adds an offset copy with the same text, color and size, in front', async () => {
+    db.addCanvasNote.mockResolvedValue(11);
+    const { result } = renderHook(() => useCanvasNotes());
+    await waitFor(() => expect(result.current.notes).toHaveLength(2));
+    let id: number | null = null;
+    await act(async () => { id = await result.current.duplicateNote(1); });
+    expect(id).toBe(11);
+    expect(db.addCanvasNote).toHaveBeenCalledWith(7, '#ffcc33', { x: 24, y: 24, w: 260, h: 200 }, 'hi');
+    expect(result.current.notes.at(-1)).toEqual({ id: 11, content: 'hi', color: '#ffcc33', x: 24, y: 24, w: 260, h: 200, sort_order: 4 });
+  });
+
+  it('duplicateNote does nothing for an unknown note', async () => {
+    const { result } = renderHook(() => useCanvasNotes());
+    await waitFor(() => expect(result.current.notes).toHaveLength(2));
+    let id: number | null = 0;
+    await act(async () => { id = await result.current.duplicateNote(999); });
+    expect(id).toBeNull();
+    expect(db.addCanvasNote).not.toHaveBeenCalled();
+  });
+
   it('updateContent is optimistic', async () => {
     const { result } = renderHook(() => useCanvasNotes());
     await waitFor(() => expect(result.current.notes).toHaveLength(2));

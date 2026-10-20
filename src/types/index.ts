@@ -1,5 +1,3 @@
-import { LOG_MESSAGES } from '../logData';
-
 export interface AuthUser {
   id: number;
   google_sub: string;
@@ -16,15 +14,6 @@ export interface UserSettings {
   day_start_hour: number;
   day_end_hour: number;
 }
-
-export interface LogEntry {
-  id: string;
-  time: string;
-  msg: string;
-  type: string;
-}
-
-export type LogCategory = keyof typeof LOG_MESSAGES;
 
 export interface FocusSession {
   id: number;

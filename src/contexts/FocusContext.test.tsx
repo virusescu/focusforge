@@ -35,6 +35,9 @@ const mockBringBucketToFront = vi.fn();
 const mockDeleteBucket = vi.fn();
 const mockMoveObjectiveToBucket = vi.fn();
 const mockSetObjectiveMission = vi.fn();
+const mockDuplicateObjective = vi.fn();
+const mockReorderCategories = vi.fn();
+const mockGetCategories = vi.fn();
 
 const UNSORTED = { id: 2, name: 'Unsorted', color: '#888888', x: 360, y: 0, w: 300, h: 420, sort_order: 1, kind: 'unsorted' as const };
 const WORK = { id: 9, name: 'Work', color: '#3388ff', x: 700, y: 0, w: 300, h: 420, sort_order: 2, kind: 'custom' as const };
@@ -55,7 +58,9 @@ vi.mock('../db', () => ({
   updateObjective: vi.fn().mockResolvedValue(undefined),
   completeObjective: (id: number) => mockCompleteObjective(id),
   reorderObjectives: vi.fn().mockResolvedValue(undefined),
-  getCategories: vi.fn().mockResolvedValue([]),
+  duplicateObjective: (id: number) => mockDuplicateObjective(id),
+  reorderCategories: (ids: number[]) => mockReorderCategories(ids),
+  getCategories: () => mockGetCategories(),
   addCategory: vi.fn().mockResolvedValue(0),
   updateCategory: vi.fn().mockResolvedValue(undefined),
   deleteCategory: vi.fn().mockResolvedValue(undefined),
@@ -109,6 +114,47 @@ describe('FocusContext', () => {
     mockDeleteBucket.mockResolvedValue(undefined);
     mockMoveObjectiveToBucket.mockResolvedValue(undefined);
     mockSetObjectiveMission.mockResolvedValue(undefined);
+    mockDuplicateObjective.mockResolvedValue(5);
+    mockReorderCategories.mockResolvedValue(undefined);
+    mockGetCategories.mockResolvedValue([]);
+  });
+
+  it('duplicateObjective calls the DB and reloads the pool', async () => {
+    const { result } = renderHook(() => useFocus(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    const copy = { id: 5, text: 'Copy', created_at: '2023-01-02' };
+    mockGetObjectives.mockResolvedValue([copy]);
+    await act(async () => { await result.current.duplicateObjective(1); });
+
+    expect(mockDuplicateObjective).toHaveBeenCalledWith(1);
+    expect(result.current.objectivePool).toEqual([copy]);
+  });
+
+  it('reorderCategories reorders optimistically and saves the order', async () => {
+    const cat = (id: number, sort_order: number) => ({ id, label: `C${id}`, color: '#fff', sort_order, coin_bounty: 25 });
+    mockGetCategories.mockResolvedValue([cat(1, 0), cat(2, 1), cat(3, 2)]);
+    const { result } = renderHook(() => useFocus(), { wrapper });
+    await waitFor(() => expect(result.current.categories).toHaveLength(3));
+
+    await act(async () => { await result.current.reorderCategories([3, 1, 2]); });
+
+    expect(result.current.categories.map(c => c.id)).toEqual([3, 1, 2]);
+    expect(result.current.categories.map(c => c.sort_order)).toEqual([0, 1, 2]);
+    expect(mockReorderCategories).toHaveBeenCalledWith([3, 1, 2]);
+  });
+
+  it('a failed category reorder reloads the saved order', async () => {
+    const cat = (id: number, sort_order: number) => ({ id, label: `C${id}`, color: '#fff', sort_order, coin_bounty: 25 });
+    mockGetCategories.mockResolvedValue([cat(1, 0), cat(2, 1)]);
+    mockReorderCategories.mockRejectedValue(new Error('offline'));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { result } = renderHook(() => useFocus(), { wrapper });
+    await waitFor(() => expect(result.current.categories).toHaveLength(2));
+
+    await act(async () => { await result.current.reorderCategories([2, 1]); });
+
+    expect(result.current.categories.map(c => c.id)).toEqual([1, 2]);
   });
 
   it('provides focus data and loading state', async () => {

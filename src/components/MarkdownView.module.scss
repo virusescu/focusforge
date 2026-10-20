@@ -163,3 +163,54 @@
   flex-shrink: 0;
   margin: 0;
 }
+
+.codeBlock {
+  position: relative;
+
+  &:not(:hover) .codeBlockCopyBtn {
+    opacity: 0;
+  }
+}
+
+.codeBlockCopyBtn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  border-radius: 3px;
+  padding: 3px 5px;
+  color: var(--text-dim, rgba(255, 255, 255, 0.5));
+  line-height: 1;
+  transition: color 0.15s, opacity 0.15s, background 0.15s;
+
+  &:hover {
+    color: var(--primary);
+    background: rgba(255, 255, 255, 0.14);
+  }
+}
+
+// One [c] line; hovering it (not the whole paragraph) reveals its button
+.copyLine {
+  &:not(:hover) .copyRowBtn {
+    opacity: 0;
+  }
+}
+
+.copyRowBtn {
+  cursor: pointer;
+  background: none;
+  border: none;
+  margin-left: 4px;
+  padding: 0 2px;
+  vertical-align: middle;
+  color: var(--text-dim, rgba(255, 255, 255, 0.4));
+  flex-shrink: 0;
+  line-height: 1;
+  transition: color 0.15s, opacity 0.15s;
+
+  &:hover {
+    color: var(--primary);
+  }
+}
