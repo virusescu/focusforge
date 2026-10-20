@@ -221,6 +221,35 @@ const CopyH4 = makeCopyBlock('h4');
 const CopyH5 = makeCopyBlock('h5');
 const CopyH6 = makeCopyBlock('h6');
 
+// ─── CodeBlock: wraps <pre> with a copy button ──────────────────────────────────
+const CodeBlock: FC<MdProps<'pre'>> = (allProps) => {
+  const { node, children, ...props } = allProps;
+  void node;
+  const preRef = useRef<HTMLPreElement>(null);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    const code = preRef.current?.querySelector('code')?.textContent ?? '';
+    copyPlain(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  return (
+    <pre {...props} ref={preRef} className={`${props.className ?? ''} ${styles.codeBlock}`}>
+      <button
+        className={styles.codeBlockCopyBtn}
+        onClick={handleCopy}
+        aria-label="copy code"
+        title="Copy code"
+      >
+        {copied ? <Check size={12} /> : <Copy size={12} />}
+      </button>
+      {children}
+    </pre>
+  );
+};
+
 const MARKDOWN_COMPONENTS = {
   li: TaskListItem,
   input: TaskCheckbox,
@@ -233,6 +262,7 @@ const MARKDOWN_COMPONENTS = {
   h4: CopyH4,
   h5: CopyH5,
   h6: CopyH6,
+  pre: CodeBlock,
 };
 
 const REMARK_PLUGINS_BASE = [remarkGfm, remarkBreaks, remarkTaskLineIndex];

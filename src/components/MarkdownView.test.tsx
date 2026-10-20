@@ -92,3 +92,32 @@ describe('[c] row copy marker', () => {
     expect(arg).not.toContain('[c]');
   });
 });
+
+describe('code block copy button', () => {
+  beforeEach(() => {
+    vi.mocked(copyPlain).mockClear();
+    vi.mocked(copyRich).mockClear();
+  });
+
+  it('fenced code block renders a copy button', () => {
+    render(<MarkdownView source={"```\nnpm run clean\n```"} />);
+    expect(screen.getByRole('button', { name: /copy code/i })).toBeInTheDocument();
+  });
+
+  it('clicking code block copy button copies raw code via copyPlain', () => {
+    render(<MarkdownView source={"```\nnpm run clean\n```"} />);
+    fireEvent.click(screen.getByRole('button', { name: /copy code/i }));
+    expect(copyPlain).toHaveBeenCalledOnce();
+    expect(vi.mocked(copyPlain).mock.calls[0][0]).toContain('npm run clean');
+  });
+
+  it('[c] inside a fenced code block is not treated as a row marker', () => {
+    render(<MarkdownView source={"```\nsome [c] code\n```"} />);
+    // The [c] is visible inside the code block
+    expect(screen.getByText(/\[c\]/)).toBeInTheDocument();
+    // Only one button: the code copy button, no row copy button
+    const buttons = screen.getAllByRole('button');
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0]).toHaveAccessibleName(/copy code/i);
+  });
+});
