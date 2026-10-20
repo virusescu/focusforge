@@ -25,6 +25,61 @@ function Harness({ initialText = '', onSave = vi.fn(), onCancel = vi.fn() }: { i
 }
 
 const ta = () => screen.getByTestId('ta') as HTMLTextAreaElement;
+const flush = () => new Promise<void>(resolve => setTimeout(resolve, 0));
+const codeBlockButton = () => screen.getByTitle('Code block');
+
+describe('code block button', () => {
+  it('inserts an empty fenced block and leaves the cursor on the empty line inside it', async () => {
+    render(<Harness />);
+    fireEvent.click(codeBlockButton());
+    await flush();
+    expect(ta().value).toBe('```\n\n```');
+    expect(ta().selectionStart).toBe(4);
+    expect(ta().selectionEnd).toBe(4);
+  });
+
+  it('wraps the selected text in a fenced block and keeps it selected', async () => {
+    render(<Harness initialText="npm run build" />);
+    ta().setSelectionRange(0, 13);
+    fireEvent.click(codeBlockButton());
+    await flush();
+    expect(ta().value).toBe('```\nnpm run build\n```');
+    expect([ta().selectionStart, ta().selectionEnd]).toEqual([4, 17]);
+  });
+
+  it('starts the fence on its own line when the cursor is at the end of a line of text', async () => {
+    render(<Harness initialText="intro text" />);
+    ta().setSelectionRange(10, 10);
+    fireEvent.click(codeBlockButton());
+    await flush();
+    expect(ta().value).toBe('intro text\n```\n\n```');
+    expect(ta().selectionStart).toBe(15);
+  });
+
+  it('puts text that follows a mid-line selection on its own line after the block', async () => {
+    render(<Harness initialText="a b c" />);
+    ta().setSelectionRange(2, 3);
+    fireEvent.click(codeBlockButton());
+    await flush();
+    expect(ta().value).toBe('a \n```\nb\n```\n c');
+  });
+
+  it('adds no extra blank lines when the selection is already whole lines', async () => {
+    render(<Harness initialText={'one\ntwo\nthree'} />);
+    ta().setSelectionRange(4, 7);
+    fireEvent.click(codeBlockButton());
+    await flush();
+    expect(ta().value).toBe('one\n```\ntwo\n```\nthree');
+  });
+
+  it('preserves multi-line selections as they are', async () => {
+    render(<Harness initialText={'$ cd app\n$ npm test'} />);
+    ta().setSelectionRange(0, 19);
+    fireEvent.click(codeBlockButton());
+    await flush();
+    expect(ta().value).toBe('```\n$ cd app\n$ npm test\n```');
+  });
+});
 
 describe('useMarkdownEditor', () => {
   it('starts with initialText', () => {

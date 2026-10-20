@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { Heading1, Heading2, Heading3, Bold, Italic, Strikethrough, List, ListChecks, Link2, Table } from 'lucide-react';
+import { Heading1, Heading2, Heading3, Bold, Italic, Strikethrough, List, ListChecks, Link2, Table, Code } from 'lucide-react';
 import styles from './MarkdownToolbar.module.scss';
 import type { MarkdownEditor } from '../hooks/useMarkdownEditor';
 
@@ -10,12 +10,12 @@ export const TABLE_TEMPLATE =
   '| Cell        | Cell        | Cell        |';
 
 interface MarkdownToolbarProps {
-  editor: Pick<MarkdownEditor, 'wrapSelection' | 'insertTemplate' | 'insertLink'>;
+  editor: Pick<MarkdownEditor, 'wrapSelection' | 'insertTemplate' | 'insertLink' | 'insertCodeBlock'>;
   compact?: boolean; // smaller icons and padding (canvas notes)
 }
 
 export const MarkdownToolbar: FC<MarkdownToolbarProps> = ({ editor, compact = false }) => {
-  const { wrapSelection, insertTemplate, insertLink } = editor;
+  const { wrapSelection, insertTemplate, insertLink, insertCodeBlock } = editor;
   const size = compact ? 11 : 13;
   return (
     <div className={`${styles.toolbar} ${compact ? styles.compact : ''}`}>
@@ -36,6 +36,7 @@ export const MarkdownToolbar: FC<MarkdownToolbarProps> = ({ editor, compact = fa
         <button className={styles.toolBtn} onClick={() => insertTemplate('- [ ] Task 1\n- [ ] Task 2\n- [ ] Task 3')} title="Task list"><ListChecks size={size} /></button>
         <button className={styles.toolBtn} onClick={insertLink} title="Insert link"><Link2 size={size} /></button>
         <button className={styles.toolBtn} onClick={() => insertTemplate(TABLE_TEMPLATE)} title="Table"><Table size={size} /></button>
+        <button className={styles.toolBtn} onClick={insertCodeBlock} title="Code block"><Code size={size} /></button>
       </div>
     </div>
   );

@@ -60,6 +60,25 @@ export function useMarkdownEditor({ initialText = '', onSave, onCancel }: Markdo
     }, 0);
   }, [text]);
 
+  // Fenced code block around the selection (or an empty one with the cursor inside). The fences always get
+  // their own lines, so a block started mid-line or ended mid-line does not glue onto the surrounding text.
+  const insertCodeBlock = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    soundEngine.playClick();
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selected = text.slice(start, end);
+    const prefix = start > 0 && text[start - 1] !== '\n' ? '\n' : '';
+    const suffix = end < text.length && text[end] !== '\n' ? '\n' : '';
+    setText(text.slice(0, start) + prefix + '```\n' + selected + '\n```' + suffix + text.slice(end));
+    const codeStart = start + prefix.length + 4;
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(codeStart, codeStart + selected.length);
+    }, 0);
+  }, [text]);
+
   const insertTemplate = useCallback((template: string) => {
     const textarea = textareaRef.current;
     if (!textarea) return;
@@ -160,7 +179,7 @@ export function useMarkdownEditor({ initialText = '', onSave, onCancel }: Markdo
     setTimeout(() => { textarea.focus(); textarea.setSelectionRange(newEnd, newEnd); }, 0);
   }, [text]);
 
-  return { text, setText, textareaRef, wrapSelection, insertTemplate, insertLink, handleKeyDown, handlePaste };
+  return { text, setText, textareaRef, wrapSelection, insertTemplate, insertLink, insertCodeBlock, handleKeyDown, handlePaste };
 }
 
 export type MarkdownEditor = ReturnType<typeof useMarkdownEditor>;
