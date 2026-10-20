@@ -12,7 +12,7 @@ vi.mock('@libsql/client', () => ({
   }),
 }));
 
-import { initDbClient, saveFocusSession, getRecentSessions, deleteFocusSession, getObjectives, addObjective, duplicateObjective, reorderCategories, deleteObjective, completeObjective, getKillRate, getAllSessions, getFragmentationStats, getAlarms, addAlarm, toggleAlarm, deleteAlarm, ensureSystemBuckets, getBuckets, deleteBucket, moveObjectiveToBucket, reorderBucketObjectives, bringBucketToFront, getCanvasNotes, addCanvasNote, updateCanvasNoteContent, updateCanvasNoteGeometry, bringCanvasNoteToFront, deleteCanvasNote } from './db';
+import { initDbClient, saveFocusSession, getRecentSessions, deleteFocusSession, getObjectives, addObjective, duplicateObjective, reorderCategories, deleteCategory, getTemplates, addTemplate, updateTemplate, deleteTemplate, reorderTemplates, deleteObjective, completeObjective, getKillRate, getAllSessions, getFragmentationStats, getAlarms, addAlarm, toggleAlarm, deleteAlarm, ensureSystemBuckets, getBuckets, deleteBucket, moveObjectiveToBucket, reorderBucketObjectives, bringBucketToFront, getCanvasNotes, addCanvasNote, updateCanvasNoteContent, updateCanvasNoteGeometry, bringCanvasNoteToFront, deleteCanvasNote } from './db';
 
 describe('db utility functions', () => {
   beforeEach(() => {
@@ -98,8 +98,8 @@ describe('db utility functions', () => {
       const id = await addObjective(1, 'Test Objective');
 
       expect(mockExecute).toHaveBeenCalledWith({
-        sql: expect.stringContaining('INSERT INTO objectives (user_id, text, sort_order, category_id, is_mission, bucket_id, bucket_sort_order)'),
-        args: [1, 'Test Objective', 1, null, 1, 2, 0],
+        sql: expect.stringContaining('INSERT INTO objectives (user_id, text, sort_order, category_id, is_mission, details, bucket_id, bucket_sort_order)'),
+        args: [1, 'Test Objective', 1, null, 1, null, 2, 0],
       });
       expect(id).toBe(123);
     });
@@ -159,6 +159,20 @@ describe('db utility functions', () => {
       expect(mockExecute).toHaveBeenNthCalledWith(3, { sql: expect.stringContaining('UPDATE objective_categories SET sort_order = ?'), args: [2, 20] });
     });
 
+    it('addObjective stores details when given', async () => {
+      mockExecute
+        .mockResolvedValueOnce({ rows: [{ maxOrder: 0 }], rowsAffected: 0 })
+        .mockResolvedValueOnce({ rows: [{ maxOrder: null }], rowsAffected: 0 })
+        .mockResolvedValueOnce({ lastInsertRowid: BigInt(5), rows: [], rowsAffected: 1 });
+
+      await addObjective(1, 'Fix', 3, 0, false, 9, '# Details');
+
+      expect(mockExecute).toHaveBeenLastCalledWith({
+        sql: expect.stringContaining('details'),
+        args: [1, 'Fix', 1, 3, 0, '# Details', 9, 0],
+      });
+    });
+
     it('deleteObjective should call execute with delete query and id', async () => {
       mockExecute.mockResolvedValueOnce({ rows: [], rowsAffected: 1 });
 
@@ -168,6 +182,86 @@ describe('db utility functions', () => {
         sql: expect.stringContaining('DELETE FROM objectives WHERE id = ?'),
         args: [42],
       });
+    });
+  });
+
+  describe('Template Methods', () => {
+    const INPUT = { name: 'Bug', title: '$title', details: 'Issue $issueId', color: '#ff4444', category_id: 4 };
+
+    it('getTemplates returns the user\'s templates in order', async () => {
+      mockExecute.mockResolvedValueOnce({
+        rows: [{ id: 3, name: 'Bug', title: '$t', details: null, color: '#fff', category_id: null, sort_order: 0 }],
+        rowsAffected: 0,
+      });
+
+      const templates = await getTemplates(7);
+
+      expect(mockExecute).toHaveBeenCalledWith({
+        sql: expect.stringContaining('FROM templates WHERE user_id = ? ORDER BY sort_order ASC, id ASC'),
+        args: [7],
+      });
+      expect(templates).toEqual([{ id: 3, name: 'Bug', title: '$t', details: '', color: '#fff', category_id: null, sort_order: 0 }]);
+    });
+
+    it('addTemplate appends after the last template', async () => {
+      mockExecute
+        .mockResolvedValueOnce({ rows: [{ maxOrder: 4 }], rowsAffected: 0 })
+        .mockResolvedValueOnce({ lastInsertRowid: BigInt(12), rows: [], rowsAffected: 1 });
+
+      const id = await addTemplate(7, INPUT);
+
+      expect(id).toBe(12);
+      expect(mockExecute).toHaveBeenLastCalledWith({
+        sql: expect.stringContaining('INSERT INTO templates (user_id, name, title, details, color, category_id, sort_order)'),
+        args: [7, 'Bug', '$title', 'Issue $issueId', '#ff4444', 4, 5],
+      });
+    });
+
+    it('addTemplate starts the order at 0 for a user\'s first template', async () => {
+      mockExecute
+        .mockResolvedValueOnce({ rows: [{ maxOrder: null }], rowsAffected: 0 })
+        .mockResolvedValueOnce({ lastInsertRowid: BigInt(1), rows: [], rowsAffected: 1 });
+
+      await addTemplate(7, INPUT);
+
+      expect(mockExecute).toHaveBeenLastCalledWith(expect.objectContaining({ args: [7, 'Bug', '$title', 'Issue $issueId', '#ff4444', 4, 0] }));
+    });
+
+    it('updateTemplate rewrites every editable column', async () => {
+      mockExecute.mockResolvedValueOnce({ rows: [], rowsAffected: 1 });
+
+      await updateTemplate(12, { ...INPUT, category_id: null });
+
+      expect(mockExecute).toHaveBeenCalledWith({
+        sql: expect.stringContaining('UPDATE templates SET name = ?, title = ?, details = ?, color = ?, category_id = ? WHERE id = ?'),
+        args: ['Bug', '$title', 'Issue $issueId', '#ff4444', null, 12],
+      });
+    });
+
+    it('deleteTemplate deletes by id', async () => {
+      mockExecute.mockResolvedValueOnce({ rows: [], rowsAffected: 1 });
+      await deleteTemplate(12);
+      expect(mockExecute).toHaveBeenCalledWith({ sql: expect.stringContaining('DELETE FROM templates WHERE id = ?'), args: [12] });
+    });
+
+    it('reorderTemplates writes each template\'s new position', async () => {
+      mockExecute.mockResolvedValue({ rows: [], rowsAffected: 1 });
+
+      await reorderTemplates([30, 10, 20]);
+
+      expect(mockExecute).toHaveBeenCalledTimes(3);
+      expect(mockExecute).toHaveBeenNthCalledWith(1, { sql: expect.stringContaining('UPDATE templates SET sort_order = ?'), args: [0, 30] });
+      expect(mockExecute).toHaveBeenNthCalledWith(3, { sql: expect.stringContaining('UPDATE templates SET sort_order = ?'), args: [2, 20] });
+    });
+
+    it('deleteCategory clears the category from templates as well as objectives', async () => {
+      mockExecute.mockResolvedValue({ rows: [], rowsAffected: 1 });
+
+      await deleteCategory(4);
+
+      const sqls = mockExecute.mock.calls.map(c => (c[0] as { sql: string }).sql);
+      expect(sqls.some(s => s.includes('UPDATE templates SET category_id = NULL WHERE category_id = ?'))).toBe(true);
+      expect(sqls.some(s => s.includes('DELETE FROM objective_categories'))).toBe(true);
     });
   });
 
@@ -438,8 +532,8 @@ describe('db utility functions', () => {
 
       expect(id).toBe(30);
       expect(mockExecute).toHaveBeenLastCalledWith({
-        sql: expect.stringContaining('INSERT INTO objectives (user_id, text, sort_order, category_id, is_mission, bucket_id, bucket_sort_order)'),
-        args: [7, 'Task', 3, null, 1, 2, 7],
+        sql: expect.stringContaining('INSERT INTO objectives (user_id, text, sort_order, category_id, is_mission, details, bucket_id, bucket_sort_order)'),
+        args: [7, 'Task', 3, null, 1, null, 2, 7],
       });
     });
 

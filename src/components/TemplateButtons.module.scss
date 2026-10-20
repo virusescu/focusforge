@@ -1,0 +1,44 @@
+// About three rows, then scroll
+$row-height: 26px;
+$row-gap: 0.35rem;
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $row-gap;
+  max-height: calc(#{$row-height} * 3 + #{$row-gap} * 2);
+  overflow-y: auto;
+  padding-right: 2px;
+
+  &::-webkit-scrollbar {
+    width: 3px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: var(--border);
+    box-shadow: none;
+  }
+}
+
+.button {
+  height: $row-height;
+  max-width: 100%;
+  padding: 0 0.7rem;
+  background: transparent;
+  border: 1px solid var(--btn-color);
+  color: var(--btn-color);
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: var(--btn-color);
+    color: #000000;
+    box-shadow: 0 0 10px var(--btn-color);
+  }
+}
+

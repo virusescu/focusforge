@@ -10,6 +10,7 @@ const mockUpdateBucketGeometry = vi.fn();
 const mockBringBucketToFront = vi.fn();
 const mockSetObjectiveMission = vi.fn();
 const mockDuplicateObjective = vi.fn();
+const mockAddTemplate = vi.fn();
 const mockDuplicateNote = vi.fn();
 let mockViewedId: number | null = null;
 
@@ -55,6 +56,8 @@ vi.mock('../contexts/FocusContext', () => ({
     updateCategory: vi.fn(),
     deleteCategory: vi.fn(),
     reorderCategories: vi.fn(),
+    templates: [],
+    addTemplate: mockAddTemplate,
   }),
 }));
 
@@ -108,6 +111,7 @@ describe('BucketsPage', () => {
     mockBringBucketToFront.mockClear();
     mockSetObjectiveMission.mockClear();
     mockDuplicateObjective.mockClear();
+    mockAddTemplate.mockClear();
     mockDuplicateNote.mockClear();
     mockViewedId = null;
     mockAddNote.mockReset();
@@ -296,6 +300,17 @@ describe('BucketsPage', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Duplicate' }));
     expect(mockDuplicateObjective).toHaveBeenCalledWith(101);
     expect(screen.queryByRole('menu')).toBeNull();
+  });
+
+  it('right-clicking a card offers Create template from task, which saves a template and leaves the task', () => {
+    render(<BucketsPage onBack={vi.fn()} />);
+    fireEvent.contextMenu(document.querySelector('[data-objective-id="101"]') as HTMLElement);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Create template from task' }));
+    expect(screen.getByRole('dialog', { name: 'CREATE_TEMPLATE' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'SAVE_TEMPLATE' }));
+    expect(mockAddTemplate).toHaveBeenCalledWith({ name: 'Beta', title: 'Beta', details: '', color: '#ee682b', category_id: null });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.querySelector('[data-objective-id="101"]')).not.toBeNull();
   });
 
   it('right-clicking a card offers Copy text, which copies the objective text', () => {

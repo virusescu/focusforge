@@ -1,0 +1,144 @@
+// Form pieces shared by the template dialogs
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+
+  label {
+    font-size: 0.6rem;
+    letter-spacing: 0.15em;
+    color: var(--text-secondary);
+  }
+}
+
+.row {
+  display: flex;
+  gap: 0.75rem;
+
+  > * {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+.input,
+.select,
+.textarea {
+  width: 100%;
+  background: var(--bg-dark);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  padding: 0.45rem 0.6rem;
+  outline: none;
+  transition: border-color 0.15s ease;
+
+  &:focus {
+    border-color: var(--primary);
+  }
+}
+
+.textarea {
+  min-height: 110px;
+  resize: vertical;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.colorInput {
+  width: 34px;
+  height: 30px;
+  flex: 0 0 34px;
+  border: 1px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+
+  &::-webkit-color-swatch-wrapper {
+    padding: 2px;
+  }
+
+  &::-webkit-color-swatch {
+    border: none;
+    border-radius: 2px;
+  }
+}
+
+.nameRow {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+  cursor: pointer;
+
+  input {
+    accent-color: var(--primary);
+    cursor: pointer;
+  }
+}
+
+.fieldChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.chip {
+  font-size: 0.65rem;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid var(--border);
+  color: var(--primary);
+  background: var(--primary-muted);
+  overflow-wrap: anywhere;
+}
+
+.hint {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+.primaryBtn,
+.secondaryBtn {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  background: transparent;
+  transition: all 0.15s ease;
+}
+
+.primaryBtn {
+  border: 1px solid var(--primary);
+  color: var(--primary);
+
+  &:hover:not(:disabled) {
+    background: var(--primary-muted);
+    box-shadow: 0 0 10px var(--primary-glow);
+  }
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+}
+
+.secondaryBtn {
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.05);
+  }
+}

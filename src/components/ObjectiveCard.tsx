@@ -1,7 +1,7 @@
 import { type FC, useState, useRef, useEffect, useCallback } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { FileText, Target, MinusCircle, CopyPlus, Copy, X } from 'lucide-react';
+import { FileText, Target, MinusCircle, CopyPlus, Copy, BookmarkPlus, X } from 'lucide-react';
 import styles from './ObjectiveCard.module.scss';
 import { useFocus } from '../contexts/FocusContext';
 import { soundEngine } from '../utils/audio';
@@ -9,6 +9,7 @@ import { setStatusHint, clearStatusHint } from '../utils/statusHint';
 import { isTypingTarget } from '../utils/canvas';
 import { copyPlain } from '../utils/clipboard';
 import { ContextMenu } from './ContextMenu';
+import { SaveTemplateModal } from './SaveTemplateModal';
 import { CategoryDotPicker } from './CategoryDotPicker';
 import type { StrategicObjective, ObjectiveCategory } from '../types';
 
@@ -38,6 +39,8 @@ export const ObjectiveCard: FC<ObjectiveCardProps> = ({ obj, containerId, catego
   const [showPicker, setShowPicker] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const closeSaveTemplate = useCallback(() => setSavingTemplate(false), []);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const categoryColor = categories.find(c => c.id === obj.category_id)?.color;
@@ -222,9 +225,11 @@ export const ObjectiveCard: FC<ObjectiveCardProps> = ({ obj, containerId, catego
           items={[
             { label: 'Duplicate', icon: <CopyPlus size={12} />, onSelect: () => { void duplicateObjective(obj.id); } },
             { label: 'Copy text', icon: <Copy size={12} />, onSelect: () => { void copyPlain(obj.text); } },
+            { label: 'Create template from task', icon: <BookmarkPlus size={12} />, onSelect: () => setSavingTemplate(true) },
           ]}
         />
       )}
+      {savingTemplate && <SaveTemplateModal task={obj} onClose={closeSaveTemplate} />}
     </div>
   );
 };

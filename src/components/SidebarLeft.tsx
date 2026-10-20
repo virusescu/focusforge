@@ -1,6 +1,6 @@
 import { type FC, useCallback, useState, useRef, useEffect, useMemo } from 'react';
 import styles from './SidebarLeft.module.scss';
-import { Plus, X, Edit3, Check, LayoutGrid, MinusCircle, CopyPlus, Copy } from 'lucide-react';
+import { Plus, X, Edit3, Check, LayoutGrid, MinusCircle, CopyPlus, Copy, BookmarkPlus } from 'lucide-react';
 import { useFocus } from '../contexts/FocusContext';
 import { soundEngine, playStartSound } from '../utils/audio';
 import { setStatusHint, clearStatusHint } from '../utils/statusHint';
@@ -22,7 +22,10 @@ import { CSS } from '@dnd-kit/utilities';
 import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
 import type { StrategicObjective, ObjectiveCategory, Bucket } from '../types';
 import { copyPlain } from '../utils/clipboard';
+import { firstValidBucketId, firstValidCategoryId, loadLastPicks, saveLastPicks } from '../utils/lastPicks';
 import { ContextMenu } from './ContextMenu';
+import { SaveTemplateModal } from './SaveTemplateModal';
+import { TemplateButtons } from './TemplateButtons';
 import { CategoryDotPicker } from './CategoryDotPicker';
 import { CategoryManagerModal } from './CategoryManagerModal';
 import { AlarmsModal } from './AlarmsModal';
@@ -52,6 +55,8 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, isViewed, categori
   const [showPicker, setShowPicker] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const closeSaveTemplate = useCallback(() => setSavingTemplate(false), []);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const category = categories.find(c => c.id === obj.category_id);
@@ -231,9 +236,11 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, isViewed, categori
           items={[
             { label: 'Duplicate', icon: <CopyPlus size={12} />, onSelect: () => onDuplicate(obj.id) },
             { label: 'Copy text', icon: <Copy size={12} />, onSelect: () => { void copyPlain(obj.text); } },
+            { label: 'Create template from task', icon: <BookmarkPlus size={12} />, onSelect: () => setSavingTemplate(true) },
           ]}
         />
       )}
+      {savingTemplate && <SaveTemplateModal task={obj} onClose={closeSaveTemplate} />}
     </div>
   );
 };
@@ -267,19 +274,21 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenDetails, onViewBuckets
   } = useFocus();
   const bucketById = useMemo(() => new Map(buckets.map(b => [b.id, b])), [buckets]);
   const [newObjective, setNewObjective] = useState('');
-  const [newCategoryId, setNewCategoryId] = useState<number | null>(null);
+  // undefined = not picked this session: fall back to the last pick remembered on this machine
+  const [categoryChoice, setCategoryChoice] = useState<number | null | undefined>(undefined);
+  const [bucketChoice, setBucketChoice] = useState<number | undefined>(undefined);
   const [showNewCategoryPicker, setShowNewCategoryPicker] = useState(false);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [showAlarms, setShowAlarms] = useState(false);
 
   const displayedObjectives = missionObjectives;
 
-  // Default newCategoryId to the first available category
-  useEffect(() => {
-    if (newCategoryId === null && categories.length > 0) {
-      setNewCategoryId(categories[0].id);
-    }
-  }, [categories, newCategoryId]);
+  // A remembered pick that was deleted since falls back (first category / Unsorted)
+  const newCategoryId = categoryChoice !== undefined
+    ? firstValidCategoryId([categoryChoice], categories)
+    : firstValidCategoryId([loadLastPicks().categoryId, categories[0]?.id], categories);
+  const holdingBuckets = useMemo(() => buckets.filter(b => b.kind !== 'mission'), [buckets]);
+  const newBucketId = firstValidBucketId([bucketChoice, loadLastPicks().bucketId], buckets);
 
   const newCategoryColor = categories.find(c => c.id === newCategoryId)?.color;
 
@@ -316,9 +325,11 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenDetails, onViewBuckets
     e.preventDefault();
     if (newObjective.trim()) {
       soundEngine.playClick();
-      await addObjective(newObjective.trim(), newCategoryId, prepend);
+      await addObjective(newObjective.trim(), newCategoryId, prepend, { bucketId: newBucketId });
+      saveLastPicks({ bucketId: newBucketId, categoryId: newCategoryId });
+      setCategoryChoice(newCategoryId);
+      if (newBucketId !== null) setBucketChoice(newBucketId);
       setNewObjective('');
-      setNewCategoryId(null);
       setShowNewCategoryPicker(false);
     }
   };
@@ -445,7 +456,7 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenDetails, onViewBuckets
                 categories={categories}
                 selectedCategoryId={newCategoryId}
                 onSelect={(catId) => {
-                  setNewCategoryId(catId);
+                  setCategoryChoice(catId);
                   setShowNewCategoryPicker(false);
                 }}
                 onManage={() => setShowCategoryManager(true)}
@@ -460,11 +471,24 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenDetails, onViewBuckets
               onMouseEnter={handleHover}
               onKeyDown={handleInputKeyDown}
             />
+            <select
+              className={styles.bucketSelect}
+              value={newBucketId ?? ''}
+              onChange={e => setBucketChoice(Number(e.target.value))}
+              onMouseEnter={() => setStatusHint('SET_BUCKET')}
+              onMouseLeave={clearStatusHint}
+              aria-label="Bucket for new objective"
+              title="Bucket for the new objective"
+            >
+              {holdingBuckets.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
             <button type="submit" className={styles.addBtn} onMouseEnter={handleHover}>
               <Plus size={14} />
             </button>
           </div>
         </form>
+
+        <TemplateButtons className={styles.templates} defaultInMission />
 
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd} modifiers={[restrictToVerticalAxis, restrictToParentElement]}>
           <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>

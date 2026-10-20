@@ -50,6 +50,20 @@ export interface StrategicObjective {
   bucket_sort_order?: number | null;
 }
 
+// A saved task shape: `title` and `details` may contain $placeholders (see utils/templates.ts)
+export interface TemplateInput {
+  name: string;
+  title: string;
+  details: string; // markdown
+  color: string;
+  category_id: number | null;
+}
+
+export interface Template extends TemplateInput {
+  id: number;
+  sort_order: number;
+}
+
 export type BucketKind = 'custom' | 'unsorted' | 'mission';
 
 export interface BucketGeometry {

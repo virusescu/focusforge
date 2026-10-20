@@ -1,10 +1,15 @@
-import { type FC, useState, useEffect, useCallback } from 'react';
+import { type FC, useState, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import styles from './SettingsModal.module.scss';
-import { X, Check, LogOut, Volume2 } from 'lucide-react';
+import { X, Check, LogOut, Volume2, BookmarkPlus, Tags } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useFocus } from '../contexts/FocusContext';
 import { soundEngine, playObjectiveComplete } from '../utils/audio';
+import { CategoryManagerModal } from './CategoryManagerModal';
+import { TemplateManagerModal } from './TemplateManagerModal';
+
+type Manager = 'templates' | 'categories' | null;
 
 interface Props {
   onClose: () => void;
@@ -13,6 +18,8 @@ interface Props {
 export const SettingsModal: FC<Props> = ({ onClose }) => {
   const { user, name, email, updateSettings, loading } = useUser();
   const { logout } = useAuth();
+  const { objectivePool, categories, addCategory, updateCategory, deleteCategory, reorderCategories } = useFocus();
+  const [manager, setManager] = useState<Manager>(null);
   const [debugSpeed, setDebugSpeed] = useState(1);
   const [experienceLvl, setExperienceLvl] = useState(42);
   const [dayStartHour, setDayStartHour] = useState(8);
@@ -45,7 +52,32 @@ export const SettingsModal: FC<Props> = ({ onClose }) => {
     await logout();
   }, [logout]);
 
+  // Settings' own Enter (apply) and Escape (cancel) stand down while a manager is open on top of it
   useEffect(() => {
+    if (manager !== 'categories') return;
+    // The category manager has no key handling of its own; Escape closes just it
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopPropagation();
+      setManager(null);
+    };
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [manager]);
+
+  const objectiveCountByCategory = useMemo(() => {
+    const counts = new Map<number, number>();
+    for (const obj of objectivePool) {
+      if (obj.category_id != null) counts.set(obj.category_id, (counts.get(obj.category_id) ?? 0) + 1);
+    }
+    return counts;
+  }, [objectivePool]);
+
+  const closeManager = useCallback(() => setManager(null), []);
+
+  useEffect(() => {
+    if (manager) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -60,11 +92,13 @@ export const SettingsModal: FC<Props> = ({ onClose }) => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleSave, handleCancel]);
+  }, [manager, handleSave, handleCancel]);
 
   if (loading) return null;
 
-  return createPortal(
+  return (
+    <>
+    {createPortal(
     <div className={styles.overlay} onClick={handleCancel}>
       <div className={styles.modal} onClick={e => e.stopPropagation()}>
         <div className={styles.header}>
@@ -128,6 +162,20 @@ export const SettingsModal: FC<Props> = ({ onClose }) => {
             </div>
           </div>
 
+          <div className={styles.field}>
+            <label>MANAGE</label>
+            <div className={styles.manageRow}>
+              <button className={styles.manageBtn} onClick={() => { soundEngine.playClick(); setManager('templates'); }}>
+                <BookmarkPlus size={14} />
+                TEMPLATES
+              </button>
+              <button className={styles.manageBtn} onClick={() => { soundEngine.playClick(); setManager('categories'); }}>
+                <Tags size={14} />
+                CATEGORIES
+              </button>
+            </div>
+          </div>
+
           {isDev && (
             <div className={styles.field}>
               <label>DEBUG_SPEED_MULTIPLIER (DEV_ONLY)</label>
@@ -159,5 +207,21 @@ export const SettingsModal: FC<Props> = ({ onClose }) => {
       </div>
     </div>,
     document.body
+    )}
+    {manager === 'templates' && <TemplateManagerModal onClose={closeManager} />}
+    {/* Portalled after Settings so it stacks above it (same z-index, later in the DOM) */}
+    {manager === 'categories' && createPortal(
+      <CategoryManagerModal
+        categories={categories}
+        onAdd={addCategory}
+        onUpdate={updateCategory}
+        onDelete={deleteCategory}
+        onReorder={reorderCategories}
+        onClose={closeManager}
+        objectiveCountByCategory={objectiveCountByCategory}
+      />,
+      document.body,
+    )}
+    </>
   );
 };

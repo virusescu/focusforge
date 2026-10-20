@@ -8,6 +8,7 @@ import { soundEngine } from '../utils/audio';
 import { setStatusHint, clearStatusHint } from '../utils/statusHint';
 import { usePanelDrag } from '../hooks/usePanelDrag';
 import { ObjectiveCard } from './ObjectiveCard';
+import { TemplateButtons } from './TemplateButtons';
 import type { Bucket, StrategicObjective } from '../types';
 
 interface BucketPanelProps {
@@ -197,6 +198,13 @@ export const BucketPanel: FC<BucketPanelProps> = ({ bucket, objectives, zoom, zI
         </SortableContext>
         {objectives.length === 0 && <div className={styles.empty}>EMPTY</div>}
       </div>
+
+      <TemplateButtons
+        className={styles.templates}
+        defaultBucketId={isMissionPanel ? undefined : bucket.id}
+        // Same as this panel's add box: Mission panel adds to Mission, a bucket panel only to its bucket
+        defaultInMission={isMissionPanel}
+      />
 
       <div className={styles.footer}>
         <input

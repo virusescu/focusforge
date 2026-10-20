@@ -78,6 +78,23 @@
     }
   }
 
+  .bucketSelect {
+    flex: 0 1 96px;
+    min-width: 0;
+    background: var(--bg-dark);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    padding: 0.4rem 0.2rem;
+    outline: none;
+    cursor: pointer;
+
+    &:focus {
+      border-color: var(--primary);
+    }
+  }
+
   .addBtn {
     background: transparent;
     border: 1px solid var(--primary);
@@ -94,6 +111,11 @@
       box-shadow: 0 0 10px var(--primary-glow);
     }
   }
+}
+
+.templates {
+  flex-shrink: 0;
+  margin-bottom: 1rem;
 }
 
 .objectiveList {

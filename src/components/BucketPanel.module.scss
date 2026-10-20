@@ -123,6 +123,12 @@
   letter-spacing: 0.1em;
 }
 
+.templates {
+  flex-shrink: 0;
+  padding: 0.5rem 0.5rem 0;
+  border-top: 1px solid var(--border);
+}
+
 .footer {
   display: flex;
   gap: 0.4rem;

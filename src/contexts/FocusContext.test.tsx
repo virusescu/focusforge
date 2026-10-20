@@ -38,6 +38,11 @@ const mockSetObjectiveMission = vi.fn();
 const mockDuplicateObjective = vi.fn();
 const mockReorderCategories = vi.fn();
 const mockGetCategories = vi.fn();
+const mockGetTemplates = vi.fn();
+const mockAddTemplate = vi.fn();
+const mockUpdateTemplate = vi.fn();
+const mockDeleteTemplate = vi.fn();
+const mockReorderTemplates = vi.fn();
 
 const UNSORTED = { id: 2, name: 'Unsorted', color: '#888888', x: 360, y: 0, w: 300, h: 420, sort_order: 1, kind: 'unsorted' as const };
 const WORK = { id: 9, name: 'Work', color: '#3388ff', x: 700, y: 0, w: 300, h: 420, sort_order: 2, kind: 'custom' as const };
@@ -61,6 +66,11 @@ vi.mock('../db', () => ({
   duplicateObjective: (id: number) => mockDuplicateObjective(id),
   reorderCategories: (ids: number[]) => mockReorderCategories(ids),
   getCategories: () => mockGetCategories(),
+  getTemplates: () => mockGetTemplates(),
+  addTemplate: (...args: unknown[]) => mockAddTemplate(...args),
+  updateTemplate: (...args: unknown[]) => mockUpdateTemplate(...args),
+  deleteTemplate: (id: number) => mockDeleteTemplate(id),
+  reorderTemplates: (ids: number[]) => mockReorderTemplates(ids),
   addCategory: vi.fn().mockResolvedValue(0),
   updateCategory: vi.fn().mockResolvedValue(undefined),
   deleteCategory: vi.fn().mockResolvedValue(undefined),
@@ -117,6 +127,85 @@ describe('FocusContext', () => {
     mockDuplicateObjective.mockResolvedValue(5);
     mockReorderCategories.mockResolvedValue(undefined);
     mockGetCategories.mockResolvedValue([]);
+    mockGetTemplates.mockResolvedValue([]);
+    mockAddTemplate.mockResolvedValue(1);
+    mockUpdateTemplate.mockResolvedValue(undefined);
+    mockDeleteTemplate.mockResolvedValue(undefined);
+    mockReorderTemplates.mockResolvedValue(undefined);
+  });
+
+  const tpl = (id: number, name: string, sort_order: number) => ({ id, name, title: `$${name}`, details: '', color: '#fff', category_id: null, sort_order });
+
+  it("loads the user's templates", async () => {
+    mockGetTemplates.mockResolvedValue([tpl(1, 'Bug', 0), tpl(2, 'Task', 1)]);
+    const { result } = renderHook(() => useFocus(), { wrapper });
+    await waitFor(() => expect(result.current.templates.map(t => t.name)).toEqual(['Bug', 'Task']));
+  });
+
+  it('addTemplate saves it and shows it in the list', async () => {
+    const { result } = renderHook(() => useFocus(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    mockGetTemplates.mockResolvedValue([tpl(5, 'Bug', 0)]);
+
+    await act(async () => { await result.current.addTemplate({ name: 'Bug', title: '$t', details: '', color: '#fff', category_id: null }); });
+
+    expect(mockAddTemplate).toHaveBeenCalledWith(1, { name: 'Bug', title: '$t', details: '', color: '#fff', category_id: null });
+    expect(result.current.templates.map(t => t.id)).toEqual([5]);
+  });
+
+  it('updateTemplate is optimistic and saves', async () => {
+    mockGetTemplates.mockResolvedValue([tpl(1, 'Bug', 0)]);
+    const { result } = renderHook(() => useFocus(), { wrapper });
+    await waitFor(() => expect(result.current.templates).toHaveLength(1));
+
+    await act(async () => { await result.current.updateTemplate(1, { name: 'Defect', title: '$t', details: 'd', color: '#000', category_id: 2 }); });
+
+    expect(result.current.templates[0]).toMatchObject({ id: 1, name: 'Defect', details: 'd', color: '#000', category_id: 2 });
+    expect(mockUpdateTemplate).toHaveBeenCalledWith(1, { name: 'Defect', title: '$t', details: 'd', color: '#000', category_id: 2 });
+  });
+
+  it('a failed template update reloads the saved copy', async () => {
+    mockGetTemplates.mockResolvedValue([tpl(1, 'Bug', 0)]);
+    mockUpdateTemplate.mockRejectedValue(new Error('offline'));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { result } = renderHook(() => useFocus(), { wrapper });
+    await waitFor(() => expect(result.current.templates).toHaveLength(1));
+
+    await act(async () => { await result.current.updateTemplate(1, { name: 'Defect', title: '', details: '', color: '#000', category_id: null }); });
+
+    expect(result.current.templates[0].name).toBe('Bug');
+  });
+
+  it('deleteTemplate removes it immediately and from the DB', async () => {
+    mockGetTemplates.mockResolvedValue([tpl(1, 'Bug', 0), tpl(2, 'Task', 1)]);
+    const { result } = renderHook(() => useFocus(), { wrapper });
+    await waitFor(() => expect(result.current.templates).toHaveLength(2));
+
+    await act(async () => { await result.current.deleteTemplate(1); });
+
+    expect(result.current.templates.map(t => t.id)).toEqual([2]);
+    expect(mockDeleteTemplate).toHaveBeenCalledWith(1);
+  });
+
+  it('reorderTemplates reorders optimistically and renumbers sort_order', async () => {
+    mockGetTemplates.mockResolvedValue([tpl(1, 'A', 0), tpl(2, 'B', 1), tpl(3, 'C', 2)]);
+    const { result } = renderHook(() => useFocus(), { wrapper });
+    await waitFor(() => expect(result.current.templates).toHaveLength(3));
+
+    await act(async () => { await result.current.reorderTemplates([3, 1, 2]); });
+
+    expect(result.current.templates.map(t => t.id)).toEqual([3, 1, 2]);
+    expect(result.current.templates.map(t => t.sort_order)).toEqual([0, 1, 2]);
+    expect(mockReorderTemplates).toHaveBeenCalledWith([3, 1, 2]);
+  });
+
+  it('addObjective passes details through to the DB', async () => {
+    const { result } = renderHook(() => useFocus(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => { await result.current.addObjective('Fix', 3, false, { bucketId: 9, inMission: false, details: '# Notes' }); });
+
+    expect(mockAddObjective).toHaveBeenCalledWith(1, 'Fix', 3, 0, false, 9, '# Notes');
   });
 
   it('duplicateObjective calls the DB and reloads the pool', async () => {
@@ -193,7 +282,7 @@ describe('FocusContext', () => {
       await result.current.addObjective('New Objective');
     });
 
-    expect(mockAddObjective).toHaveBeenCalledWith(1, 'New Objective', undefined, 1, false, null);
+    expect(mockAddObjective).toHaveBeenCalledWith(1, 'New Objective', undefined, 1, false, null, null);
     expect(result.current.objectivePool).toEqual([newObjective]);
   });
 
@@ -331,7 +420,7 @@ describe('FocusContext', () => {
     await act(async () => {
       await result.current.addObjective('In work', 5, false, { bucketId: 9, inMission: false });
     });
-    expect(mockAddObjective).toHaveBeenCalledWith(1, 'In work', 5, 0, false, 9);
+    expect(mockAddObjective).toHaveBeenCalledWith(1, 'In work', 5, 0, false, 9, null);
   });
 
   it('setObjectiveMission updates optimistically and keeps the bucket', async () => {

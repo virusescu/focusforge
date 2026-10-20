@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
-import type { FocusSession, DailyStat, StrategicObjective, ObjectiveCategory, Bucket, BucketGeometry } from '../types';
+import type { FocusSession, DailyStat, StrategicObjective, ObjectiveCategory, Bucket, BucketGeometry, Template, TemplateInput } from '../types';
 import { soundEngine, playObjectiveComplete } from '../utils/audio';
 import { useTimer } from '../hooks/useTimer';
 import { useUser } from './UserContext';
@@ -13,6 +13,11 @@ import {
   addObjective as dbAddObjective,
   duplicateObjective as dbDuplicateObjective,
   reorderCategories as dbReorderCategories,
+  getTemplates,
+  addTemplate as dbAddTemplate,
+  updateTemplate as dbUpdateTemplate,
+  deleteTemplate as dbDeleteTemplate,
+  reorderTemplates as dbReorderTemplates,
   deleteObjective as dbDeleteObjective,
   updateObjective as dbUpdateObjective,
   completeObjective as dbCompleteObjective,
@@ -38,6 +43,7 @@ import {
 export interface AddObjectiveOptions {
   bucketId?: number | null; // default: Unsorted (resolved by db)
   inMission?: boolean;      // default: true
+  details?: string | null;  // markdown, default: none
 }
 
 interface FocusContextType {
@@ -55,6 +61,7 @@ interface FocusContextType {
   isGlitching: boolean;
   completedObjectiveText: string | null;
   categories: ObjectiveCategory[];
+  templates: Template[];    // in the user's chosen order
   saveSession: (startTime: string, durationSeconds: number, pauseTimes?: string[]) => Promise<void>;
   refreshData: () => Promise<void>;
   addObjective: (text: string, categoryId?: number | null, prepend?: boolean, options?: AddObjectiveOptions) => Promise<void>;
@@ -82,6 +89,10 @@ interface FocusContextType {
   updateCategory: (id: number, label: string, color: string, coinBounty?: number) => Promise<void>;
   deleteCategory: (id: number) => Promise<void>;
   reorderCategories: (orderedIds: number[]) => Promise<void>;
+  addTemplate: (template: TemplateInput) => Promise<void>;
+  updateTemplate: (id: number, template: TemplateInput) => Promise<void>;
+  deleteTemplate: (id: number) => Promise<void>;
+  reorderTemplates: (orderedIds: number[]) => Promise<void>;
   loading: boolean;
   timerStatus: 'idle' | 'active' | 'paused';
   // Timer state
@@ -116,6 +127,7 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
   const [globalStats, setGlobalStats] = useState<FocusContextType['globalStats']>(null);
   const [objectivePool, setObjectivePool] = useState<StrategicObjective[]>([]);
   const [categories, setCategories] = useState<ObjectiveCategory[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
   const [buckets, setBuckets] = useState<Bucket[]>([]);
 
   const missionObjectives = useMemo(
@@ -183,18 +195,20 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
     try {
       // Buckets first: getBuckets creates the system buckets and backfills objectives.bucket_id
       const bkts = await getBuckets(authUser.id);
-      const [sessions, stats, globals, objectives, cats] = await Promise.all([
+      const [sessions, stats, globals, objectives, cats, tpls] = await Promise.all([
         getRecentSessions(authUser.id, 3),
         getDailyFocusStats(authUser.id, 21),
         getGlobalStats(authUser.id),
         getObjectives(authUser.id),
-        getCategories(authUser.id)
+        getCategories(authUser.id),
+        getTemplates(authUser.id)
       ]);
       setRecentSessions(sessions);
       setDailyStats(stats);
       setGlobalStats(globals);
       setObjectivePool(objectives);
       setCategories(cats);
+      setTemplates(tpls);
       setBuckets(bkts);
     } catch (e) {
       console.error("Failed to load focus data", e);
@@ -216,7 +230,7 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
   const addObjective = useCallback(async (text: string, categoryId?: number | null, prepend: boolean = false, options: AddObjectiveOptions = {}) => {
     if (!authUser) return;
     const isMission = options.inMission === false ? 0 : 1;
-    await dbAddObjective(authUser.id, text, categoryId, isMission, prepend, options.bucketId ?? null);
+    await dbAddObjective(authUser.id, text, categoryId, isMission, prepend, options.bucketId ?? null, options.details ?? null);
     await refreshData();
   }, [authUser, refreshData]);
 
@@ -441,6 +455,57 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [refreshData]);
 
+  const reloadTemplates = useCallback(async () => {
+    if (!authUser) return;
+    try {
+      setTemplates(await getTemplates(authUser.id));
+    } catch (e) {
+      console.error('Failed to load templates', e);
+    }
+  }, [authUser]);
+
+  const addTemplate = useCallback(async (template: TemplateInput) => {
+    if (!authUser) return;
+    await dbAddTemplate(authUser.id, template);
+    await reloadTemplates();
+  }, [authUser, reloadTemplates]);
+
+  // Optimistic: edits are saved on blur in the manager, so the list must not flicker or lose focus
+  const updateTemplate = useCallback(async (id: number, template: TemplateInput) => {
+    setTemplates(prev => prev.map(t => t.id === id ? { ...t, ...template } : t));
+    try {
+      await dbUpdateTemplate(id, template);
+    } catch (e) {
+      console.error('Template update failed', e);
+      await reloadTemplates();
+    }
+  }, [reloadTemplates]);
+
+  const deleteTemplate = useCallback(async (id: number) => {
+    setTemplates(prev => prev.filter(t => t.id !== id));
+    try {
+      await dbDeleteTemplate(id);
+    } catch (e) {
+      console.error('Template delete failed', e);
+      await reloadTemplates();
+    }
+  }, [reloadTemplates]);
+
+  const reorderTemplates = useCallback(async (orderedIds: number[]) => {
+    setTemplates(prev => {
+      const byId = new Map(prev.map(t => [t.id, t]));
+      const reordered = orderedIds.map(id => byId.get(id)).filter((t): t is Template => !!t);
+      const rest = prev.filter(t => !orderedIds.includes(t.id));
+      return [...reordered, ...rest].map((t, i) => ({ ...t, sort_order: i }));
+    });
+    try {
+      await dbReorderTemplates(orderedIds);
+    } catch (e) {
+      console.error('Template reorder failed', e);
+      await reloadTemplates();
+    }
+  }, [reloadTemplates]);
+
   const neutralizeObjective = useCallback(async (id: number) => {
     const obj = objectivePool.find(o => o.id === id);
     setCompletedObjectiveText(obj?.text ?? null);
@@ -508,6 +573,7 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
       isGlitching,
       completedObjectiveText,
       categories,
+      templates,
       saveSession,
       refreshData,
       addObjective,
@@ -535,6 +601,10 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
       updateCategory,
       deleteCategory,
       reorderCategories,
+      addTemplate,
+      updateTemplate,
+      deleteTemplate,
+      reorderTemplates,
       loading,
       timerStatus,
       seconds,

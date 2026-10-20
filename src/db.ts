@@ -1,5 +1,5 @@
 import { createClient, type Client, type InArgs } from '@libsql/client';
-import type { FocusSession, DailyStat, StrategicObjective, ObjectiveCategory, AuthUser, UserSettings, GameSeason, GameState, PrestigeTitleDefinition, SeasonArchive, StreakLogEntry, Alarm, Bucket, BucketKind, BucketGeometry, CanvasNote } from './types';
+import type { FocusSession, DailyStat, StrategicObjective, ObjectiveCategory, AuthUser, UserSettings, GameSeason, GameState, PrestigeTitleDefinition, SeasonArchive, StreakLogEntry, Alarm, Bucket, BucketKind, BucketGeometry, CanvasNote, Template, TemplateInput } from './types';
 import { getQuarter, getSeasonDates, getSeasonLabel, getSeasonName, getSeasonBadgeColor } from './utils/gameEconomy';
 
 let db: Client | null = null;
@@ -75,6 +75,21 @@ export async function initDb() {
       h REAL NOT NULL DEFAULT 420,
       sort_order INTEGER NOT NULL DEFAULT 0,
       kind TEXT NOT NULL DEFAULT 'custom',
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+
+  await database.execute(`
+    CREATE TABLE IF NOT EXISTS templates (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      title TEXT NOT NULL DEFAULT '',
+      details TEXT NOT NULL DEFAULT '',
+      color TEXT NOT NULL,
+      category_id INTEGER,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id)
     )
   `);
@@ -638,7 +653,65 @@ export async function reorderCategories(orderedIds: number[]): Promise<void> {
 export async function deleteCategory(id: number): Promise<void> {
   const database = getDb();
   await database.execute({ sql: 'UPDATE objectives SET category_id = NULL WHERE category_id = ?', args: [id] });
+  await database.execute({ sql: 'UPDATE templates SET category_id = NULL WHERE category_id = ?', args: [id] });
   await database.execute({ sql: 'DELETE FROM objective_categories WHERE id = ?', args: [id] });
+}
+
+// ─── Templates ───────────────────────────────────────────────────
+
+export async function getTemplates(userId: number): Promise<Template[]> {
+  const database = getDb();
+  const result = await database.execute({
+    sql: 'SELECT id, name, title, details, color, category_id, sort_order FROM templates WHERE user_id = ? ORDER BY sort_order ASC, id ASC',
+    args: [userId],
+  });
+  return result.rows.map(row => ({
+    id: Number(row.id),
+    name: row.name as string,
+    title: (row.title as string | null) ?? '',
+    details: (row.details as string | null) ?? '',
+    color: row.color as string,
+    category_id: (row.category_id as number | null) ?? null,
+    sort_order: Number(row.sort_order),
+  }));
+}
+
+// New templates go to the end of the user's template order
+export async function addTemplate(userId: number, template: TemplateInput): Promise<number> {
+  const database = getDb();
+  const maxResult = await database.execute({
+    sql: 'SELECT MAX(sort_order) as maxOrder FROM templates WHERE user_id = ?',
+    args: [userId],
+  });
+  const nextOrder = ((maxResult.rows[0]?.maxOrder as number | null) ?? -1) + 1;
+  const result = await database.execute({
+    sql: 'INSERT INTO templates (user_id, name, title, details, color, category_id, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    args: [userId, template.name, template.title, template.details, template.color, template.category_id, nextOrder],
+  });
+  return Number(result.lastInsertRowid);
+}
+
+export async function updateTemplate(id: number, template: TemplateInput): Promise<void> {
+  const database = getDb();
+  await database.execute({
+    sql: 'UPDATE templates SET name = ?, title = ?, details = ?, color = ?, category_id = ? WHERE id = ?',
+    args: [template.name, template.title, template.details, template.color, template.category_id, id],
+  });
+}
+
+export async function deleteTemplate(id: number): Promise<void> {
+  const database = getDb();
+  await database.execute({ sql: 'DELETE FROM templates WHERE id = ?', args: [id] });
+}
+
+export async function reorderTemplates(orderedIds: number[]): Promise<void> {
+  const database = getDb();
+  for (let i = 0; i < orderedIds.length; i++) {
+    await database.execute({
+      sql: 'UPDATE templates SET sort_order = ? WHERE id = ?',
+      args: [i, orderedIds[i]],
+    });
+  }
 }
 
 // ─── Buckets ─────────────────────────────────────────────────────
@@ -917,7 +990,8 @@ export async function addObjective(
   categoryId?: number | null,
   isMission: number = 1,
   prepend: boolean = false,
-  bucketId: number | null = null
+  bucketId: number | null = null,
+  details: string | null = null
 ): Promise<number> {
   const database = getDb();
   let sortOrder: number;
@@ -943,8 +1017,8 @@ export async function addObjective(
   });
   const bucketSortOrder = ((bucketMax.rows[0]?.maxOrder as number | null) ?? -1) + 1;
   const result = await database.execute({
-    sql: 'INSERT INTO objectives (user_id, text, sort_order, category_id, is_mission, bucket_id, bucket_sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    args: [userId, text, sortOrder, categoryId ?? null, isMission, targetBucketId, bucketSortOrder],
+    sql: 'INSERT INTO objectives (user_id, text, sort_order, category_id, is_mission, details, bucket_id, bucket_sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    args: [userId, text, sortOrder, categoryId ?? null, isMission, details, targetBucketId, bucketSortOrder],
   });
   return Number(result.lastInsertRowid) ?? 0;
 }
