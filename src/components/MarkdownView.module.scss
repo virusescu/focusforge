@@ -163,3 +163,28 @@
   flex-shrink: 0;
   margin: 0;
 }
+
+.copyRow {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+
+  &:not(:hover) .copyRowBtn {
+    opacity: 0;
+  }
+}
+
+.copyRowBtn {
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0 2px;
+  color: var(--text-dim, rgba(255, 255, 255, 0.4));
+  flex-shrink: 0;
+  line-height: 1;
+  transition: color 0.15s, opacity 0.15s;
+
+  &:hover {
+    color: var(--primary);
+  }
+}
