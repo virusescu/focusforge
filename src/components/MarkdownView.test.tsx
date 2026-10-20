@@ -93,6 +93,60 @@ describe('[c] row copy marker', () => {
   });
 });
 
+describe('[c] on one line of a multi-line paragraph', () => {
+  beforeEach(() => {
+    vi.mocked(copyRich).mockClear();
+    vi.mocked(copyPlain).mockClear();
+  });
+
+  const PARA = 'first line\n**bold** second [c]\nthird line';
+
+  it('only the marked line gets a copy button', () => {
+    render(<MarkdownView source={PARA} />);
+    expect(screen.getAllByRole('button', { name: /copy row/i })).toHaveLength(1);
+    expect(screen.getByText('first line', { exact: false })).toBeInTheDocument();
+    expect(screen.getByText('third line', { exact: false })).toBeInTheDocument();
+  });
+
+  it('click copies just that line, not the whole paragraph', () => {
+    render(<MarkdownView source={PARA} />);
+    fireEvent.click(screen.getByRole('button', { name: /copy row/i }));
+    const [html, plain] = vi.mocked(copyRich).mock.calls[0];
+    expect(plain).toContain('second');
+    expect(plain).not.toContain('first line');
+    expect(plain).not.toContain('third line');
+    expect(html).toContain('<strong>bold</strong>');
+  });
+
+  it('shift+click copies that line as markdown', () => {
+    render(<MarkdownView source={PARA} />);
+    fireEvent.click(screen.getByRole('button', { name: /copy row/i }), { shiftKey: true });
+    expect(copyPlain).toHaveBeenCalledWith('**bold** second');
+    expect(copyRich).not.toHaveBeenCalled();
+  });
+
+  it('each marked line gets its own button and source', () => {
+    render(<MarkdownView source={'a [c]\nb\nc [c]'} />);
+    const buttons = screen.getAllByRole('button', { name: /copy row/i });
+    expect(buttons).toHaveLength(2);
+    fireEvent.click(buttons[1], { shiftKey: true });
+    expect(copyPlain).toHaveBeenCalledWith('c');
+  });
+
+  it('works inside a list item', () => {
+    render(<MarkdownView source={'- keep\n- npm run build [c]'} />);
+    expect(screen.getAllByRole('button', { name: /copy row/i })).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: /copy row/i }), { shiftKey: true });
+    expect(copyPlain).toHaveBeenCalledWith('npm run build');
+  });
+
+  it('works on a heading', () => {
+    render(<MarkdownView source={'## Title [c]'} />);
+    fireEvent.click(screen.getByRole('button', { name: /copy row/i }), { shiftKey: true });
+    expect(copyPlain).toHaveBeenCalledWith('## Title');
+  });
+});
+
 describe('code block copy button', () => {
   beforeEach(() => {
     vi.mocked(copyPlain).mockClear();

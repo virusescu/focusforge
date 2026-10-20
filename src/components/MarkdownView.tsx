@@ -14,7 +14,7 @@ interface RemarkNode {
   type?: string;
   checked?: boolean | null;
   position?: { start: { line: number; offset: number }; end: { offset: number } };
-  data?: { hProperties?: Record<string, unknown> };
+  data?: { hName?: string; hProperties?: Record<string, unknown> };
   children?: RemarkNode[];
   value?: string;
 }
@@ -34,48 +34,75 @@ function remarkTaskLineIndex() {
   };
 }
 
-// ─── Remark plugin: strip [c] markers and annotate nodes with copy data ─────────
-// Only inspects `text` nodes (not `inlineCode`), so [c] inside backticks is preserved.
+// ─── Remark plugin: [c] marks ONE line as copyable ──────────────────────────────
+// remark-breaks turns each newline into a `break` node inside the same paragraph, so a paragraph
+// is split on `break` nodes and only the line holding the marker is wrapped in a <span> carrying
+// the data-* props. Only `text` nodes are inspected, so [c] inside `code` is left alone.
+const MARKER = /\[c\]/;
+const MARKER_ALL = /[ \t]*\[c\]/g;
+
+function hasMarker(nodes: RemarkNode[]): boolean {
+  return nodes.some(n => {
+    if (n.type === 'inlineCode') return false;
+    if (n.type === 'text') return MARKER.test(n.value ?? '');
+    return n.children ? hasMarker(n.children) : false;
+  });
+}
+
+function stripMarker(nodes: RemarkNode[]): void {
+  for (const n of nodes) {
+    if (n.type === 'inlineCode') continue;
+    if (n.type === 'text' && n.value !== undefined) n.value = n.value.replace(MARKER_ALL, '');
+    else if (n.children) stripMarker(n.children);
+  }
+  const first = nodes[0];
+  if (first?.type === 'text' && first.value !== undefined) first.value = first.value.trimStart();
+}
+
+const cleanRawLine = (line: string) => line.replace(MARKER_ALL, '').trim();
+
 function remarkCopyMarker(source: string) {
   return () => (tree: RemarkNode) => {
-    function hasMarker(node: RemarkNode): boolean {
-      if (!Array.isArray(node.children)) return false;
-      return node.children.some(child => {
-        if (child.type === 'inlineCode') return false;
-        if (child.type === 'text' && child.value !== undefined) return /\[c\]/.test(child.value);
-        return hasMarker(child);
-      });
-    }
+    const wrap = (segment: RemarkNode[], raw: string): RemarkNode => ({
+      type: 'copyLine',
+      data: { hName: 'span', hProperties: { 'data-copy-line': 'true', 'data-copy-source': raw } },
+      children: segment,
+    });
 
-    function stripMarker(node: RemarkNode): void {
-      if (!Array.isArray(node.children)) return;
+    function splitLines(node: RemarkNode) {
+      if (!node.children || !node.position) return;
+      const rawLines = source.slice(node.position.start.offset, node.position.end.offset).split('\n');
+      const segments: RemarkNode[][] = [[]];
+      const breaks: RemarkNode[] = [];
       for (const child of node.children) {
-        if (child.type === 'text' && child.value !== undefined) {
-          child.value = child.value.replace(/\s*\[c\]\s*/g, ' ').trim();
+        if (child.type === 'break') {
+          breaks.push(child);
+          segments.push([]);
         } else {
-          stripMarker(child);
+          segments[segments.length - 1].push(child);
         }
       }
+      if (!segments.some(hasMarker)) return;
+      // Lines and segments line up unless an inline node itself spans a newline
+      const aligned = rawLines.length === segments.length;
+      const next: RemarkNode[] = [];
+      segments.forEach((segment, i) => {
+        if (hasMarker(segment)) {
+          const raw = cleanRawLine(aligned ? rawLines[i] : rawLines.join(' '));
+          stripMarker(segment);
+          next.push(wrap(segment, raw));
+        } else {
+          next.push(...segment);
+        }
+        if (i < breaks.length) next.push(breaks[i]);
+      });
+      node.children = next;
     }
 
     function walk(node: RemarkNode) {
-      if (
-        (node.type === 'paragraph' || node.type === 'heading' || node.type === 'listItem') &&
-        node.position &&
-        hasMarker(node)
-      ) {
-        const rawSource = source
-          .slice(node.position.start.offset, node.position.end.offset)
-          .replace(/\[c\]/g, '')
-          .replace(/\s+/g, ' ')
-          .trim();
-        stripMarker(node);
-        node.data = node.data ?? {};
-        node.data.hProperties = {
-          ...(node.data.hProperties ?? {}),
-          'data-copy-line': 'true',
-          'data-copy-source': rawSource,
-        };
+      if (node.type === 'paragraph' || node.type === 'heading') {
+        splitLines(node);
+        return;
       }
       if (Array.isArray(node.children)) node.children.forEach(walk);
     }
@@ -88,61 +115,53 @@ const LineIndexContext = createContext<number>(-1);
 type ToggleFn = (lineIndex: number) => void;
 const ToggleContext = createContext<ToggleFn>(() => {});
 
-// ─── CopyRowButton ───────────────────────────────────────────────────────────────
-interface CopyRowButtonProps {
-  copySource: string;
-  contentRef: React.RefObject<HTMLSpanElement | null>;
-}
+// ─── CopyLine: a [c]-marked line with its own copy button ───────────────────────
+type CopyLineProps = ComponentProps<'span'> & ExtraProps & { 'data-copy-line'?: string; 'data-copy-source'?: string };
 
-const CopyRowButton: FC<CopyRowButtonProps> = ({ copySource, contentRef }) => {
+const CopyLine: FC<CopyLineProps> = (allProps) => {
+  const { node, 'data-copy-line': copyLine, 'data-copy-source': copySource, children, ...props } = allProps;
+  void node;
+  const contentRef = useRef<HTMLSpanElement>(null);
   const [copied, setCopied] = useState(false);
+
+  if (copyLine !== 'true') return <span {...props}>{children}</span>;
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const el = contentRef.current;
     if (e.shiftKey) {
-      copyPlain(copySource);
+      void copyPlain(copySource ?? '');
     } else {
-      const html = el?.innerHTML ?? '';
-      const plain = el?.innerText ?? copySource;
-      copyRich(html, plain);
+      const el = contentRef.current;
+      void copyRich(el?.innerHTML ?? '', el?.innerText ?? el?.textContent ?? copySource ?? '');
     }
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
 
   return (
-    <button
-      className={styles.copyRowBtn}
-      onClick={handleClick}
-      aria-label="copy row"
-      title="Copy (Shift+click for raw markdown)"
-    >
-      {copied ? <Check size={12} /> : <Copy size={12} />}
-    </button>
+    <span {...props} className={styles.copyLine}>
+      <span ref={contentRef}>{children}</span>
+      <button
+        className={styles.copyRowBtn}
+        onClick={handleClick}
+        // Keeps a Shift+click from extending the text selection
+        onMouseDown={e => e.preventDefault()}
+        aria-label="copy row"
+        title="Copy line (Shift+click for markdown)"
+      >
+        {copied ? <Check size={12} /> : <Copy size={12} />}
+      </button>
+    </span>
   );
 };
 
 // ─── Stable markdown component overrides ────────────────────────────────────────
 type MdProps<T extends keyof React.JSX.IntrinsicElements> = ComponentProps<T> & ExtraProps;
 
-const TaskListItem: FC<MdProps<'li'> & { 'data-src-line'?: string | number; 'data-copy-line'?: string; 'data-copy-source'?: string }> = (allProps) => {
-  const { node, 'data-src-line': srcLine, 'data-copy-line': copyLine, 'data-copy-source': copySource, children, ...props } = allProps;
-  void node;
+const TaskListItem: FC<MdProps<'li'> & { 'data-src-line'?: string | number }> = ({ 'data-src-line': srcLine, children, ...allProps }) => {
+  const { node, ...props } = allProps;
+  void node; // react-markdown's AST node must not reach the DOM
   const lineIndex = srcLine !== undefined ? Number(srcLine) : -1;
-  const contentRef = useRef<HTMLSpanElement>(null);
-
-  if (copyLine === 'true' && copySource !== undefined) {
-    return (
-      <LineIndexContext.Provider value={lineIndex}>
-        <li {...props}>
-          <span ref={contentRef}>{children}</span>
-          <CopyRowButton copySource={copySource} contentRef={contentRef} />
-        </li>
-      </LineIndexContext.Provider>
-    );
-  }
-
   return (
     <LineIndexContext.Provider value={lineIndex}>
       <li {...props}>{children}</li>
@@ -190,38 +209,6 @@ const ScrollTable: FC<MdProps<'table'>> = (allProps) => {
   );
 };
 
-// CopyParagraph: wraps paragraph/heading nodes that have data-copy-line set
-type CopyBlockProps = MdProps<'p'> & { 'data-copy-line'?: string; 'data-copy-source'?: string };
-
-const makeCopyBlock = (Tag: keyof React.JSX.IntrinsicElements): FC<CopyBlockProps> => {
-  const El = Tag as React.ElementType;
-  const CopyBlock: FC<CopyBlockProps> = (allProps) => {
-    const { node, 'data-copy-line': copyLine, 'data-copy-source': copySource, children, ...props } = allProps;
-    void node;
-    const contentRef = useRef<HTMLSpanElement>(null);
-
-    if (copyLine === 'true' && copySource !== undefined) {
-      return (
-        <El {...props} className={`${(props as { className?: string }).className ?? ''} ${styles.copyRow}`}>
-          <span ref={contentRef}>{children}</span>
-          <CopyRowButton copySource={copySource} contentRef={contentRef} />
-        </El>
-      );
-    }
-    return <El {...props}>{children}</El>;
-  };
-  CopyBlock.displayName = `CopyBlock(${String(Tag)})`;
-  return CopyBlock;
-};
-
-const CopyParagraph = makeCopyBlock('p');
-const CopyH1 = makeCopyBlock('h1');
-const CopyH2 = makeCopyBlock('h2');
-const CopyH3 = makeCopyBlock('h3');
-const CopyH4 = makeCopyBlock('h4');
-const CopyH5 = makeCopyBlock('h5');
-const CopyH6 = makeCopyBlock('h6');
-
 // ─── CodeBlock: wraps <pre> with a copy button ──────────────────────────────────
 const CodeBlock: FC<MdProps<'pre'>> = (allProps) => {
   const { node, children, ...props } = allProps;
@@ -231,7 +218,7 @@ const CodeBlock: FC<MdProps<'pre'>> = (allProps) => {
 
   const handleCopy = () => {
     const code = preRef.current?.querySelector('code')?.textContent ?? '';
-    copyPlain(code);
+    void copyPlain(code);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
@@ -241,6 +228,7 @@ const CodeBlock: FC<MdProps<'pre'>> = (allProps) => {
       <button
         className={styles.codeBlockCopyBtn}
         onClick={handleCopy}
+        onMouseDown={e => e.preventDefault()}
         aria-label="copy code"
         title="Copy code"
       >
@@ -256,13 +244,7 @@ const MARKDOWN_COMPONENTS = {
   input: TaskCheckbox,
   a: ExternalLink,
   table: ScrollTable,
-  p: CopyParagraph,
-  h1: CopyH1,
-  h2: CopyH2,
-  h3: CopyH3,
-  h4: CopyH4,
-  h5: CopyH5,
-  h6: CopyH6,
+  span: CopyLine,
   pre: CodeBlock,
 };
 
