@@ -1,0 +1,55 @@
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.3rem 0.4rem;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(var(--primary-rgb), 0.15);
+  border-top: none;
+  border-radius: 0 0 3px 3px;
+}
+
+.toolbarGroup {
+  display: flex;
+  gap: 0.15rem;
+}
+
+.toolbarDivider {
+  width: 1px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.12);
+  margin: 0 0.2rem;
+  flex-shrink: 0;
+}
+
+.toolBtn {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--text-muted);
+  padding: 0.2rem 0.35rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
+
+  &:hover {
+    color: var(--primary);
+    border-color: rgba(var(--primary-rgb), 0.4);
+    background: rgba(var(--primary-rgb), 0.08);
+  }
+}
+
+.compact {
+  flex-wrap: wrap;
+  gap: 0.1rem;
+  padding: 0.2rem 0.25rem;
+
+  .toolBtn {
+    padding: 0.15rem 0.25rem;
+  }
+
+  .toolbarDivider {
+    margin: 0 0.1rem;
+  }
+}

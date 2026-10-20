@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { StrictMode } from 'react';
 import { render, screen, fireEvent, within, act } from '@testing-library/react';
-import type { Bucket, StrategicObjective } from '../types';
+import type { Bucket, CanvasNote, StrategicObjective } from '../types';
 import { BucketsPage } from './BucketsPage';
 
 const mockAddObjective = vi.fn();
@@ -61,12 +61,32 @@ vi.mock('../utils/audio', () => ({
     playEditStart: vi.fn(),
     playReorder: vi.fn(),
     playNavSelect: vi.fn(),
+    playCheckboxUncheck: vi.fn(),
   },
+  playCheckboxCheckWithFile: vi.fn(),
 }));
 
 vi.mock('./ObjectiveDetails', () => ({
   ObjectiveDetails: () => <div data-testid="details" />,
 }));
+
+vi.mock('@tauri-apps/plugin-shell', () => ({ open: vi.fn() }));
+
+const mockAddNote = vi.fn();
+let mockNotes: CanvasNote[] = [];
+vi.mock('../hooks/useCanvasNotes', () => ({
+  useCanvasNotes: () => ({
+    notes: mockNotes,
+    addNote: mockAddNote,
+    updateContent: vi.fn(),
+    updateColor: vi.fn(),
+    updateGeometry: vi.fn(),
+    bringToFront: vi.fn(),
+    deleteNote: vi.fn(),
+  }),
+}));
+
+const NOTE = (id: number, sort_order = 0): CanvasNote => ({ id, content: `note ${id}`, color: '#ffcc33', x: 0, y: 600, w: 260, h: 200, sort_order });
 
 describe('BucketsPage', () => {
   beforeEach(() => {
@@ -77,6 +97,8 @@ describe('BucketsPage', () => {
     mockBringBucketToFront.mockClear();
     mockSetObjectiveMission.mockClear();
     mockViewedId = null;
+    mockAddNote.mockReset();
+    mockNotes = [];
   });
 
   it('renders one panel per bucket with the mission title', () => {
@@ -192,13 +214,22 @@ describe('BucketsPage', () => {
     expect(mockUpdateBucketGeometry).toHaveBeenCalledWith(9, { x: 420, y: 20, w: 300, h: 420 });
   });
 
-  it('holding Shift while moving snaps the saved position to 20', () => {
+  it('moving without Shift snaps the saved position to 20', () => {
+    render(<BucketsPage onBack={vi.fn()} />);
+    const header = screen.getByText('Work').parentElement as HTMLElement;
+    fireEvent.pointerDown(header, { button: 0, pointerId: 1, clientX: 0, clientY: 0 });
+    fireEvent.pointerMove(header, { pointerId: 1, buttons: 1, clientX: 53, clientY: 17 });
+    fireEvent.pointerUp(header, { pointerId: 1, clientX: 53, clientY: 17 });
+    expect(mockUpdateBucketGeometry).toHaveBeenCalledWith(9, { x: 400, y: 20, w: 300, h: 420 });
+  });
+
+  it('holding Shift while moving saves the free position in whole units', () => {
     render(<BucketsPage onBack={vi.fn()} />);
     const header = screen.getByText('Work').parentElement as HTMLElement;
     fireEvent.pointerDown(header, { button: 0, pointerId: 1, clientX: 0, clientY: 0 });
     fireEvent.pointerMove(header, { pointerId: 1, buttons: 1, shiftKey: true, clientX: 53, clientY: 17 });
     fireEvent.pointerUp(header, { pointerId: 1, shiftKey: true, clientX: 53, clientY: 17 });
-    expect(mockUpdateBucketGeometry).toHaveBeenCalledWith(9, { x: 400, y: 20, w: 300, h: 420 });
+    expect(mockUpdateBucketGeometry).toHaveBeenCalledWith(9, { x: 393, y: 17, w: 300, h: 420 });
   });
 
   it('dropping a moved panel brings it to the front', () => {
@@ -277,5 +308,78 @@ describe('BucketsPage', () => {
     } finally {
       rectSpy.mockRestore();
     }
+  });
+
+  it('renders notes above every bucket panel', () => {
+    mockNotes = [NOTE(1, 0), NOTE(2, 1)];
+    render(<BucketsPage onBack={vi.fn()} />);
+    const z = (el: Element | null) => Number((el as HTMLElement).style.zIndex);
+    const bucketZ = Math.max(...[...document.querySelectorAll('[data-bucket-id]')].map(z));
+    const n1 = z(document.querySelector('[data-note-id="1"]'));
+    const n2 = z(document.querySelector('[data-note-id="2"]'));
+    expect(n1).toBeGreaterThan(bucketZ);
+    expect(n2).toBeGreaterThan(n1);
+  });
+
+  it('NEW_NOTE adds a default note at the top-right and opens it for editing', async () => {
+    mockAddNote.mockImplementation(async () => {
+      mockNotes = [{ ...NOTE(50), content: '' }];
+      return 50;
+    });
+    const { rerender } = render(<BucketsPage onBack={vi.fn()} />);
+    await act(async () => { fireEvent.click(screen.getByText('NEW_NOTE')); });
+    expect(mockAddNote).toHaveBeenCalledWith('#ffcc33', expect.objectContaining({ w: 260, h: 200 }));
+    const geometry = mockAddNote.mock.calls[0][1];
+    // Math.abs: a negative grid value gives -0, which toBe(0) rejects
+    expect(Math.abs(geometry.x % 20)).toBe(0);
+    expect(Math.abs(geometry.y % 20)).toBe(0);
+    rerender(<BucketsPage onBack={vi.fn()} />);
+    const note = document.querySelector('[data-note-id="50"]') as HTMLElement;
+    expect(within(note).getByRole('textbox')).toBeInTheDocument();
+  });
+
+  it('Escape and Space typed in a note editor stay in the note', () => {
+    mockNotes = [NOTE(1)];
+    localStorage.setItem('bucket_canvas_viewport', JSON.stringify({ panX: -500, panY: -500, zoom: 1 }));
+    const onBack = vi.fn();
+    render(<BucketsPage onBack={onBack} />);
+    const note = document.querySelector('[data-note-id="1"]') as HTMLElement;
+    fireEvent.doubleClick(note);
+    const ta = within(note).getByRole('textbox');
+    fireEvent.keyDown(ta, { key: ' ' });
+    expect(screen.getByTestId('canvas-world').style.transform).toBe('translate(-500px, -500px) scale(1)');
+    fireEvent.keyDown(ta, { key: 'Escape' });
+    expect(onBack).not.toHaveBeenCalled();
+    expect(within(note).queryByRole('textbox')).toBeNull();
+  });
+
+  it('wheel over a note does not zoom the canvas', () => {
+    mockNotes = [NOTE(1)];
+    render(<BucketsPage onBack={vi.fn()} />);
+    fireEvent.wheel(screen.getByText('note 1'), { deltaY: -500 });
+    expect(screen.getByText('100%')).toBeInTheDocument();
+  });
+
+  it('pointerdown on empty canvas closes the note editor', () => {
+    mockNotes = [NOTE(1)];
+    render(<BucketsPage onBack={vi.fn()} />);
+    const n1 = document.querySelector('[data-note-id="1"]') as HTMLElement;
+    fireEvent.doubleClick(n1);
+    expect(within(n1).getByRole('textbox')).toBeInTheDocument();
+    fireEvent.pointerDown(screen.getByTestId('canvas-world'));
+    expect(within(n1).queryByRole('textbox')).toBeNull();
+  });
+
+  it('only one note is edited at a time', () => {
+    mockNotes = [NOTE(1), NOTE(2, 1)];
+    render(<BucketsPage onBack={vi.fn()} />);
+    const n1 = document.querySelector('[data-note-id="1"]') as HTMLElement;
+    const n2 = document.querySelector('[data-note-id="2"]') as HTMLElement;
+    fireEvent.doubleClick(n1);
+    expect(within(n1).getByRole('textbox')).toBeInTheDocument();
+    fireEvent.pointerDown(n2);
+    fireEvent.doubleClick(n2);
+    expect(within(n1).queryByRole('textbox')).toBeNull();
+    expect(within(n2).getByRole('textbox')).toBeInTheDocument();
   });
 });

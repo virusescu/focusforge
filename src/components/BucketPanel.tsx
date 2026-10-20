@@ -6,9 +6,9 @@ import styles from './BucketPanel.module.scss';
 import { useFocus } from '../contexts/FocusContext';
 import { soundEngine } from '../utils/audio';
 import { setStatusHint, clearStatusHint } from '../utils/statusHint';
-import { movePanel, resizePanel } from '../utils/canvas';
+import { usePanelDrag } from '../hooks/usePanelDrag';
 import { ObjectiveCard } from './ObjectiveCard';
-import type { Bucket, BucketGeometry, StrategicObjective } from '../types';
+import type { Bucket, StrategicObjective } from '../types';
 
 interface BucketPanelProps {
   bucket: Bucket;
@@ -19,19 +19,8 @@ interface BucketPanelProps {
   onManageCategories: () => void;
 }
 
-const DRAGGING_Z_INDEX = 100000;
-
-interface PointerDrag {
-  mode: 'move' | 'resize';
-  startX: number;
-  startY: number;
-  start: BucketGeometry;
-  captured: boolean;
-}
-
-// Pointer travel (screen px) before a header press becomes a move. Capturing earlier would
-// retarget the click/dblclick to the header and break double-click rename.
-const DRAG_THRESHOLD_PX = 3;
+// A dragged bucket lifts above other buckets but stays below every note (BucketsPage NOTE_Z_BASE = 10000)
+const DRAGGING_Z_INDEX = 9999;
 
 export const BucketPanel: FC<BucketPanelProps> = ({ bucket, objectives, zoom, zIndex, onOpenDetails, onManageCategories }) => {
   const { categories, viewedObjectiveId, addObjective, updateBucket, updateBucketGeometry, bringBucketToFront, deleteBucket } = useFocus();
@@ -39,9 +28,16 @@ export const BucketPanel: FC<BucketPanelProps> = ({ bucket, objectives, zoom, zI
   // Drop target ids parsed by BucketsPage: 'mission' or 'bucket-<id>'
   const containerId = isMissionPanel ? 'mission' : `bucket-${bucket.id}`;
 
-  // Geometry while a move/resize is in progress; null means "use the bucket's stored geometry"
-  const [dragGeom, setDragGeom] = useState<BucketGeometry | null>(null);
-  const dragRef = useRef<PointerDrag | null>(null);
+  const { geom, isDragging, beginPointerDrag, handlePointerMove, handlePointerUp } = usePanelDrag({
+    geometry: { x: bucket.x, y: bucket.y, w: bucket.w, h: bucket.h },
+    zoom,
+    onDragEnd: (final, changed) => {
+      // The last panel moved or resized stays on top
+      bringBucketToFront(bucket.id);
+      if (changed) updateBucketGeometry(bucket.id, final);
+    },
+  });
+
   const [isRenaming, setIsRenaming] = useState(false);
   const [nameText, setNameText] = useState(bucket.name);
   const [newText, setNewText] = useState('');
@@ -56,66 +52,9 @@ export const BucketPanel: FC<BucketPanelProps> = ({ bucket, objectives, zoom, zI
     }
   }, [isRenaming]);
 
-  const geom: BucketGeometry = dragGeom ?? { x: bucket.x, y: bucket.y, w: bucket.w, h: bucket.h };
-
-  const beginPointerDrag = (e: React.PointerEvent<HTMLElement>, mode: PointerDrag['mode']) => {
-    if (e.button !== 0) return;
-    e.stopPropagation();
-    // The resize handle has no click behaviour, so it captures right away
-    const captured = mode === 'resize';
-    if (captured) e.currentTarget.setPointerCapture?.(e.pointerId);
-    dragRef.current = { mode, startX: e.clientX, startY: e.clientY, start: geom, captured };
-  };
-
-  // Shift snaps to the SNAP_STEP grid
-  const geometryAt = (drag: PointerDrag, e: React.PointerEvent): BucketGeometry => {
-    const dx = e.clientX - drag.startX;
-    const dy = e.clientY - drag.startY;
-    return drag.mode === 'move'
-      ? movePanel(drag.start, dx, dy, zoom, e.shiftKey)
-      : resizePanel(drag.start, dx, dy, zoom, e.shiftKey);
-  };
-
   const handleHeaderPointerDown = (e: React.PointerEvent<HTMLElement>) => {
     if ((e.target as Element).closest('button, input')) return;
     beginPointerDrag(e, 'move');
-  };
-
-  const handlePointerMove = (e: React.PointerEvent<HTMLElement>) => {
-    const drag = dragRef.current;
-    if (!drag) return;
-    e.stopPropagation();
-    if (!drag.captured) {
-      // Released outside the header before the drag started; we never saw the pointerup
-      if ((e.buttons & 1) === 0) {
-        dragRef.current = null;
-        return;
-      }
-      if (Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) < DRAG_THRESHOLD_PX) return;
-      drag.captured = true;
-      e.currentTarget.setPointerCapture?.(e.pointerId);
-    }
-    setDragGeom(geometryAt(drag, e));
-  };
-
-  const handlePointerUp = (e: React.PointerEvent<HTMLElement>) => {
-    const drag = dragRef.current;
-    if (!drag) return;
-    e.stopPropagation();
-    dragRef.current = null;
-    setDragGeom(null);
-    if (!drag.captured) return; // a click, not a drag
-    e.currentTarget.releasePointerCapture?.(e.pointerId);
-    // From the event, not dragGeom: the last pointermove may not have rendered yet.
-    // A cancelled pointer has no meaningful position, so it keeps the last rendered geometry.
-    const final = e.type === 'pointercancel' ? dragGeom : geometryAt(drag, e);
-    if (!final) return;
-    // The last panel moved or resized stays on top
-    bringBucketToFront(bucket.id);
-    const s = drag.start;
-    if (final.x !== s.x || final.y !== s.y || final.w !== s.w || final.h !== s.h) {
-      updateBucketGeometry(bucket.id, final);
-    }
   };
 
   const startRename = (e: React.MouseEvent) => {
@@ -172,7 +111,7 @@ export const BucketPanel: FC<BucketPanelProps> = ({ bucket, objectives, zoom, zI
 
   return (
     <div
-      className={`${styles.panel} ${dragGeom ? styles.dragging : ''}`}
+      className={`${styles.panel} ${isDragging ? styles.dragging : ''}`}
       data-bucket-id={bucket.id}
       data-details-barrier
       style={{
@@ -180,7 +119,7 @@ export const BucketPanel: FC<BucketPanelProps> = ({ bucket, objectives, zoom, zI
         top: geom.y,
         width: geom.w,
         height: geom.h,
-        zIndex: dragGeom ? DRAGGING_Z_INDEX : zIndex,
+        zIndex: isDragging ? DRAGGING_Z_INDEX : zIndex,
         // Opaque so stacked panels don't show through each other
         background: `color-mix(in srgb, ${bucket.color} 10%, var(--bg-dark))`,
         borderColor: bucket.color,

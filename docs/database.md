@@ -28,6 +28,7 @@ Related docs: [architecture.md](architecture.md) · [economy.md](economy.md)
 | `session_pauses` | `id`, `session_id` → `focus_sessions`, `pause_time` | One row per counted pause. Deleted together with the session. |
 | `objective_categories` | `id`, `user_id`, `label`, `color`, `sort_order`, `coin_bounty` (25) | Seeded per user: Hard (50), Normal (25), Easy (10). |
 | `buckets` | `id`, `user_id`, `name`, `color` (hex), `x`, `y`, `w` (300), `h` (420), `sort_order`, `kind` (`mission` / `unsorted` / `custom`) | Panels on the Buckets canvas; `x`/`y`/`w`/`h` are world units. `sort_order` is the stacking order (higher = in front); `bringBucketToFront` sets it to the user's max + 1 after a panel is moved or resized. Every user has exactly one `mission` and one `unsorted` system bucket, created by `ensureSystemBuckets` and enforced by the partial unique index `idx_buckets_user_system` on `(user_id, kind) WHERE kind IN ('mission','unsorted')`. The `mission` row only stores the Mission panel's name, color and geometry; no objective has its `bucket_id`. System buckets cannot be deleted. Deleting a custom bucket moves its objectives (open and completed) to Unsorted, appended after Unsorted's open objectives in their existing order. |
+| `canvas_notes` | `id`, `user_id`, `content` (markdown, '' default), `color` (hex), `x`, `y`, `w` (260), `h` (200), `sort_order`, `created_at` | Sticky notes on the Buckets canvas, in world units. `sort_order` is the stacking order among notes only (higher = in front); every note is drawn above every bucket. `bringCanvasNoteToFront` sets it to the user's max + 1 after a note is moved or resized. |
 | `objectives` | `id`, `user_id`, `text`, `created_at`, `sort_order` (Mission order), `completed_at`, `category_id` → categories, `is_mission` (1 = in Mission, 0 = only in its bucket), `details` (markdown), `last_interacted_at`, `bucket_id` → buckets, `bucket_sort_order` (order inside the bucket) | Open objectives have `completed_at IS NULL`. Completing one clears `details`. Every objective belongs to a non-mission bucket; being in Mission is a flag on top of that, so a Mission objective also appears in its bucket. |
 | `alarms` | `id`, `user_id`, `title`, `time` (HH:MM), `days_of_week` (JSON array 0–6, Sun–Sat), `is_active` | |
 
@@ -50,6 +51,7 @@ users ─┬─< user_settings
        ├─< objective_categories ─< objectives
        ├─< objectives
        ├─< buckets ─< objectives
+       ├─< canvas_notes
        ├─< alarms
        └─< game_seasons ─┬─ game_state            (1 per season)
                          ├─< game_coin_transactions

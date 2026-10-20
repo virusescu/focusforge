@@ -17,6 +17,7 @@ All core systems are implemented and shipping:
 - **Objective Categories** — Color-coded categories with inline assignment, drag-and-drop reorder
 - **Kill Rate** — Objective throughput metric (day/week/all-time) in operator diagnostics
 - **Vault (Score & Progression)** — Coins as a score (no spending), streaks, daily challenge, prestige titles (12 ranks), seasonal resets with archives. Tool shop, streak repair and reward toasts were removed — see [economy.md](economy.md)
+- **Canvas sticky notes** — Done: colored, movable, resizable markdown notes on the Buckets canvas
 - **Google OAuth** — Multi-user auth via system browser callback
 - **Cloud Database** — Turso (LibSQL) with user_id scoping
 - **OTA Updates** — Tauri updater plugin, GitHub Actions CI/CD, signed releases, update prompt on startup

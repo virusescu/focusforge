@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   clampZoom, screenToWorld, worldToScreen, zoomAt, recenter, movePanel, resizePanel,
   wheelZoomFactor, loadViewport, saveViewport, DEFAULT_VIEWPORT, MIN_ZOOM, MAX_ZOOM,
-  MIN_PANEL_W, MIN_PANEL_H, VIEWPORT_STORAGE_KEY, SNAP_STEP, stackingOrder,
+  MIN_PANEL_W, MIN_PANEL_H, VIEWPORT_STORAGE_KEY, SNAP_STEP, stackingOrder, snapToGrid,
 } from './canvas';
 
 describe('canvas math', () => {
@@ -15,6 +15,25 @@ describe('canvas math', () => {
   it('resizePanel with snap rounds the size to SNAP_STEP and still enforces the minimum', () => {
     expect(resizePanel({ x: 3, y: 7, w: 300, h: 400 }, 14, 26, 1, true)).toEqual({ x: 3, y: 7, w: 320, h: 420 });
     expect(resizePanel({ x: 0, y: 0, w: 300, h: 400 }, -1000, -1000, 1, true)).toEqual({ x: 0, y: 0, w: MIN_PANEL_W, h: MIN_PANEL_H });
+  });
+
+  it('snapToGrid rounds to the nearest SNAP_STEP', () => {
+    expect(snapToGrid(29)).toBe(20);
+    expect(snapToGrid(31)).toBe(40);
+    expect(snapToGrid(-11)).toBe(-20);
+  });
+
+  it('movePanel without snap rounds to whole units', () => {
+    expect(movePanel({ x: 0, y: 0, w: 300, h: 400 }, 7, 3, 2)).toEqual({ x: 4, y: 2, w: 300, h: 400 });
+  });
+
+  it('resizePanel without snap rounds to whole units', () => {
+    expect(resizePanel({ x: 0, y: 0, w: 300, h: 400 }, 7, 3, 2)).toEqual({ x: 0, y: 0, w: 304, h: 402 });
+  });
+
+  it('resizePanel honours a custom minimum size', () => {
+    expect(resizePanel({ x: 0, y: 0, w: 300, h: 400 }, -1000, -1000, 1, true, { w: 160, h: 100 }))
+      .toEqual({ x: 0, y: 0, w: 160, h: 100 });
   });
 
   it('stackingOrder puts higher sort_order in front, ties broken by id', () => {

@@ -1,5 +1,5 @@
 import { createClient, type Client, type InArgs } from '@libsql/client';
-import type { FocusSession, DailyStat, StrategicObjective, ObjectiveCategory, AuthUser, UserSettings, GameSeason, GameState, PrestigeTitleDefinition, SeasonArchive, StreakLogEntry, Alarm, Bucket, BucketKind, BucketGeometry } from './types';
+import type { FocusSession, DailyStat, StrategicObjective, ObjectiveCategory, AuthUser, UserSettings, GameSeason, GameState, PrestigeTitleDefinition, SeasonArchive, StreakLogEntry, Alarm, Bucket, BucketKind, BucketGeometry, CanvasNote } from './types';
 import { getQuarter, getSeasonDates, getSeasonLabel, getSeasonName, getSeasonBadgeColor } from './utils/gameEconomy';
 
 let db: Client | null = null;
@@ -75,6 +75,22 @@ export async function initDb() {
       h REAL NOT NULL DEFAULT 420,
       sort_order INTEGER NOT NULL DEFAULT 0,
       kind TEXT NOT NULL DEFAULT 'custom',
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+
+  await database.execute(`
+    CREATE TABLE IF NOT EXISTS canvas_notes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      content TEXT NOT NULL DEFAULT '',
+      color TEXT NOT NULL,
+      x REAL NOT NULL DEFAULT 0,
+      y REAL NOT NULL DEFAULT 0,
+      w REAL NOT NULL DEFAULT 260,
+      h REAL NOT NULL DEFAULT 200,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id)
     )
   `);
@@ -752,6 +768,73 @@ export async function deleteBucket(id: number): Promise<void> {
     args: [unsortedId, maxOrder + 1 - minOrder, id],
   });
   await database.execute({ sql: 'DELETE FROM buckets WHERE id = ?', args: [id] });
+}
+
+// ─── Canvas notes ────────────────────────────────────────────────
+
+export async function getCanvasNotes(userId: number): Promise<CanvasNote[]> {
+  const database = getDb();
+  const result = await database.execute({
+    sql: 'SELECT * FROM canvas_notes WHERE user_id = ? ORDER BY sort_order ASC, id ASC',
+    args: [userId],
+  });
+  return result.rows.map(row => ({
+    id: Number(row.id),
+    content: (row.content as string | null) ?? '',
+    color: row.color as string,
+    x: Number(row.x),
+    y: Number(row.y),
+    w: Number(row.w),
+    h: Number(row.h),
+    sort_order: Number(row.sort_order),
+  }));
+}
+
+// New notes start empty, on top of the user's other notes
+export async function addCanvasNote(userId: number, color: string, geometry: BucketGeometry): Promise<number> {
+  const database = getDb();
+  const maxResult = await database.execute({
+    sql: 'SELECT MAX(sort_order) as maxOrder FROM canvas_notes WHERE user_id = ?',
+    args: [userId],
+  });
+  const maxOrder = (maxResult.rows[0]?.maxOrder as number | null) ?? -1;
+  const result = await database.execute({
+    sql: 'INSERT INTO canvas_notes (user_id, content, color, x, y, w, h, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    args: [userId, '', color, geometry.x, geometry.y, geometry.w, geometry.h, maxOrder + 1],
+  });
+  return Number(result.lastInsertRowid);
+}
+
+export async function updateCanvasNoteContent(id: number, content: string): Promise<void> {
+  const database = getDb();
+  await database.execute({ sql: 'UPDATE canvas_notes SET content = ? WHERE id = ?', args: [content, id] });
+}
+
+export async function updateCanvasNoteColor(id: number, color: string): Promise<void> {
+  const database = getDb();
+  await database.execute({ sql: 'UPDATE canvas_notes SET color = ? WHERE id = ?', args: [color, id] });
+}
+
+export async function updateCanvasNoteGeometry(id: number, geometry: BucketGeometry): Promise<void> {
+  const database = getDb();
+  await database.execute({
+    sql: 'UPDATE canvas_notes SET x = ?, y = ?, w = ?, h = ? WHERE id = ?',
+    args: [geometry.x, geometry.y, geometry.w, geometry.h, id],
+  });
+}
+
+// Gives the note the highest sort_order among its user's notes, which puts it in front of the other notes
+export async function bringCanvasNoteToFront(id: number): Promise<void> {
+  const database = getDb();
+  await database.execute({
+    sql: 'UPDATE canvas_notes SET sort_order = (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM canvas_notes WHERE user_id = (SELECT user_id FROM canvas_notes WHERE id = ?)) WHERE id = ?',
+    args: [id, id],
+  });
+}
+
+export async function deleteCanvasNote(id: number): Promise<void> {
+  const database = getDb();
+  await database.execute({ sql: 'DELETE FROM canvas_notes WHERE id = ?', args: [id] });
 }
 
 export async function moveObjectiveToBucket(id: number, bucketId: number): Promise<void> {

@@ -12,7 +12,7 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
-import { ArrowLeft, Plus } from 'lucide-react';
+import { ArrowLeft, Plus, StickyNote } from 'lucide-react';
 import styles from './BucketsPage.module.scss';
 import { useFocus } from '../contexts/FocusContext';
 import { soundEngine } from '../utils/audio';
@@ -27,10 +27,13 @@ import {
   zoomAt,
   isTypingTarget,
   stackingOrder,
+  snapToGrid,
 } from '../utils/canvas';
 import { BucketPanel } from './BucketPanel';
 import { ObjectiveDetails } from './ObjectiveDetails';
 import { CategoryManagerModal } from './CategoryManagerModal';
+import { CanvasNoteView } from './CanvasNoteView';
+import { useCanvasNotes } from '../hooks/useCanvasNotes';
 import type { StrategicObjective } from '../types';
 
 const BUCKET_COLORS = ['#3388ff', '#ff8844', '#44cc88', '#cc44cc', '#ffcc33', '#33cccc'];
@@ -38,6 +41,13 @@ const DEFAULT_BUCKET_W = 300;
 const DEFAULT_BUCKET_H = 420;
 const GRID_SIZE = 24;
 const SAVE_DELAY_MS = 300;
+const DEFAULT_NOTE_COLOR = '#ffcc33';
+const DEFAULT_NOTE_W = 260;
+const DEFAULT_NOTE_H = 200;
+// Screen px between a new note and the top/right edges of the viewport
+const NEW_NOTE_MARGIN_PX = 24;
+// Every note sits above every bucket panel (buckets use z-index 1..N)
+const NOTE_Z_BASE = 10000;  // keep above BucketPanel's DRAGGING_Z_INDEX (9999)
 
 interface DragData {
   objectiveId: number;
@@ -73,6 +83,9 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
     updateCategory,
     deleteCategory,
   } = useFocus();
+  const { notes, addNote, updateContent, updateColor, updateGeometry, bringToFront, deleteNote } = useCanvasNotes();
+  // At most one note is edited at a time
+  const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
 
   const [vp, setVp] = useState<Viewport>(loadViewport);
   const vpRef = useRef(vp);
@@ -191,6 +204,23 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
     });
   };
 
+  const handleNewNote = async () => {
+    soundEngine.playClick();
+    const rect = getRect();
+    const corner = screenToWorld(vp, rect.width - DEFAULT_NOTE_W * vp.zoom - NEW_NOTE_MARGIN_PX, NEW_NOTE_MARGIN_PX);
+    const id = await addNote(DEFAULT_NOTE_COLOR, {
+      x: snapToGrid(corner.x),
+      y: snapToGrid(corner.y),
+      w: DEFAULT_NOTE_W,
+      h: DEFAULT_NOTE_H,
+    });
+    if (id !== null) setEditingNoteId(id);
+  };
+
+  const handleStartNoteEdit = useCallback((id: number) => setEditingNoteId(id), []);
+  // Only clears if this note is still the one being edited (another may have opened since)
+  const handleEndNoteEdit = useCallback((id: number) => setEditingNoteId(cur => (cur === id ? null : cur)), []);
+
   const handleOpenDetails = useCallback((id: number) => {
     setViewedObjective(id);
     setDetailsOpen(true);
@@ -274,6 +304,7 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
 
   const gridSize = GRID_SIZE * vp.zoom;
   const stackOrder = useMemo(() => stackingOrder(buckets), [buckets]);
+  const noteStackOrder = useMemo(() => stackingOrder(notes), [notes]);
 
   return (
     <div className={styles.page}>
@@ -287,6 +318,10 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
           <button className={styles.toolBtn} onClick={handleNewBucket}>
             <Plus size={14} />
             <span>NEW_BUCKET</span>
+          </button>
+          <button className={styles.toolBtn} onClick={handleNewNote}>
+            <StickyNote size={14} />
+            <span>NEW_NOTE</span>
           </button>
           <span className={styles.zoomReadout}>{Math.round(vp.zoom * 100)}%</span>
           <button className={styles.toolBtn} onClick={handleRecenter} title="Recenter (Space)">
@@ -329,6 +364,22 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
                 zIndex={stackOrder.get(bucket.id) ?? 1}
                 onOpenDetails={handleOpenDetails}
                 onManageCategories={handleManageCategories}
+              />
+            ))}
+            {notes.map(note => (
+              <CanvasNoteView
+                key={note.id}
+                note={note}
+                zoom={vp.zoom}
+                zIndex={NOTE_Z_BASE + (noteStackOrder.get(note.id) ?? 1)}
+                isEditing={editingNoteId === note.id}
+                onStartEdit={handleStartNoteEdit}
+                onEndEdit={handleEndNoteEdit}
+                onContentChange={updateContent}
+                onColorChange={updateColor}
+                onGeometryChange={updateGeometry}
+                onBringToFront={bringToFront}
+                onDelete={deleteNote}
               />
             ))}
           </div>

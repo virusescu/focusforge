@@ -116,13 +116,16 @@ and shows `UpdatePrompt` if one is available.
 |---|---|
 | `Header` | Title bar / drag region, coin counter + `+N` flash, streak bars, season timer, prestige rank, version, window controls. |
 | `SidebarLeft` | Mission list (each row has a left stripe in its bucket's color; hover shows the bucket name) with drag-and-drop reordering (`@dnd-kit`, drag from anywhere on the row; pointer only), inline edit (F2), category dots, remove-from-Mission button, a BUCKETS button that opens the Buckets page, forge progress, streak/daily/multiplier readout. |
-| `BucketsPage` | The Buckets view: an infinite pan/zoom canvas (CSS-transformed world, viewport saved in `localStorage` key `bucket_canvas_viewport`) with one `BucketPanel` per bucket plus the Mission panel. Handles card drag-and-drop between panels, NEW_BUCKET, the details drawer and the category manager. |
-| `BucketPanel` | One colored panel on the canvas. It can be moved by its header and resized from its corner (minimum 200×120; Shift snaps to a 20-unit grid). Every panel's color is editable, including Mission and Unsorted; the name of every panel except Mission is editable. Delete is available for custom buckets only. Panels stack by `sort_order` (`stackingOrder` in `utils/canvas.ts`); dropping a moved or resized panel calls `bringBucketToFront`, so the last one dragged stays on top, and the order is saved. Holds a sortable list of cards and an add box. |
+| `BucketsPage` | The Buckets view: an infinite pan/zoom canvas (CSS-transformed world, viewport saved in `localStorage` key `bucket_canvas_viewport`) with one `BucketPanel` per bucket plus the Mission panel. Handles card drag-and-drop between panels, NEW_BUCKET, the details drawer and the category manager. Also renders the `CanvasNoteView` sticky notes (loaded via `useCanvasNotes`) in a layer above all panels (`NOTE_Z_BASE`), owns `editingNoteId` (one note is edited at a time), and has a NEW_NOTE button that adds a `#ffcc33` 260×200 note near the top-right of the view, opened for editing. |
+| `BucketPanel` | One colored panel on the canvas. It can be moved by its header and resized from its corner (minimum 200×120; moves/resizes snap to a 20-unit grid, hold Shift to move/resize freely in whole units, via `usePanelDrag`). Every panel's color is editable, including Mission and Unsorted; the name of every panel except Mission is editable. Delete is available for custom buckets only. Panels stack by `sort_order` (`stackingOrder` in `utils/canvas.ts`); dropping a moved or resized panel calls `bringBucketToFront`, so the last one dragged stays on top, and the order is saved. Holds a sortable list of cards and an add box. |
+| `CanvasNoteView` | A sticky note on the Buckets canvas, tinted with its color. Drag it from anywhere except controls and resize it from the corner (minimum 160×100). On hover it shows a color input and delete (delete asks for confirmation if the note has text). Double-click edits it in place with a compact `MarkdownToolbar`: Esc or clicking outside saves, Shift+Esc cancels. Task checkboxes toggle without entering edit mode. The last note moved comes to the front among notes. |
+| `MarkdownView` | Shared GFM renderer (used by objective details and notes): task toggles, external links, scrollable styled tables, blank-line preservation. |
+| `MarkdownToolbar` | Shared formatting toolbar, in normal and compact variants. |
 | `ObjectiveCard` | A sortable objective card used in bucket panels and the Mission panel, dragged from anywhere on the card (not while renaming): category dot, inline rename (double-click / F2), details, Mission toggle, delete. |
 | `BucketTag` | Colored dot + bucket name in the bucket's color. Used in the LOCKED_ON label and the details header. |
 | `MainDisplay` | The "Neural Forge" timer ring, active objective (its LOCKED_ON label shows the objective's bucket), hold-to-charge neutralize, global keyboard shortcuts. |
 | `SidebarRight` | Activity map (21-day heatmap → opens Analytics for a day), recent forges, system log, and the big nav buttons (Buckets, Analytics, Alarms, Intelligence Hub, Vault; they shrink to fit narrow widths). Hosts `ObjectiveDetails` when the details panel is open. Resizable (280–700 px). |
-| `ObjectiveDetails` | Markdown notes editor for an objective, with toolbar, shortcuts, auto-link on paste and line reordering. The header shows the title and the objective's bucket (`BucketTag`). |
+| `ObjectiveDetails` | Markdown notes editor for an objective, built on `MarkdownView` / `MarkdownToolbar` / `useMarkdownEditor`, with toolbar, shortcuts, auto-link on paste and line reordering. The header shows the title and the objective's bucket (`BucketTag`). |
 | `AnalyticsView` | Day view timeline, session edit/delete, completed objectives, kill rate, category management. Reads the DB directly. |
 | `IntelligenceHub` | Focus by hour, focus by day, session length distribution, fragmentation index, clean-forge ratio. Reads the DB directly. |
 | `VaultPage` | Season overview, daily challenge, streak status, prestige ranks, seasonal archive, economy help. |
@@ -140,8 +143,12 @@ and shows `UpdatePrompt` if one is available.
 |---|---|
 | `hooks/useTimer.ts` | Pure timer state machine (seconds, pause countdown, pause timestamps) that emits the timer events. |
 | `hooks/useSystemLog.ts` | Flavour-text log fed by timer events, using messages from `logData.ts`. |
+| `hooks/usePanelDrag.ts` | Pointer move/resize drag for canvas panels and notes; snaps to the 20-unit grid by default, Shift moves/resizes freely in whole units. |
+| `hooks/useMarkdownEditor.ts` | Shared markdown editing logic (shortcuts, formatting, auto-link on paste, line reordering) used by objective details and notes. |
+| `hooks/useCanvasNotes.ts` | Loads and mutates the user's canvas notes (add, update, delete, bring to front) against the DB. |
 | `utils/gameEconomy.ts` | Pure economy functions with no side effects (see [economy.md](economy.md)). |
-| `utils/canvas.ts` | Pure viewport/geometry math for the Buckets canvas (screen↔world, zoom at cursor with 0.25–2 clamp, recenter, panel move/resize) plus viewport persistence. |
+| `utils/canvas.ts` | Pure viewport/geometry math for the Buckets canvas (screen↔world, zoom at cursor with 0.25–2 clamp, recenter, panel move/resize, `snapToGrid`) plus viewport persistence. |
+| `utils/markdown.ts` | Pure markdown helpers shared by the markdown view and editor. |
 | `utils/audio.ts` | `soundEngine`: every UI sound is synthesised with the Web Audio API, with no audio assets. |
 | `utils/dateUtils.ts`, `utils/statusHint.ts`, `utils/logger.ts` | Date helpers, footer status hints, logging. |
 
@@ -165,7 +172,7 @@ and shows `UpdatePrompt` if one is available.
 
 **Buckets page:** drag background / middle mouse pan · wheel zoom (around the cursor) ·
 Space recenter origin (keeps zoom) · F2 rename card · Escape back (closes the details drawer first) ·
-hold Shift while moving/resizing a panel to snap to a 20-unit grid. Keys are ignored while typing in an input.
+moves and resizes snap to a 20-unit grid by default, Shift moves/resizes freely in whole units · double-click a note to edit it · Esc saves and Shift+Esc cancels in a note. Keys are ignored while typing in an input.
 
 **Details editor:** Ctrl+B / I / S bold / italic / strikethrough (toggle) ·
 Ctrl+1/2/3 headings · Ctrl+L bullet · Ctrl+T task · Ctrl+D duplicate line ·

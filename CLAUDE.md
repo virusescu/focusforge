@@ -41,7 +41,7 @@ FocusForge is a desktop productivity app — a precision focus timer with a ligh
 
 Focus → Game communication goes through `window` CustomEvents (`timer-saved`, `objective-neutralized`); see `docs/architecture.md`.
 
-**Database layer** (`src/db.ts`) — ~45 async functions over 13 tables (sessions, objectives, categories, game state, coin transactions, prestige, season archives, alarms, etc.). Schema and migrations: `docs/database.md`.
+**Database layer** (`src/db.ts`) — ~45 async functions over 15 tables (sessions, objectives, categories, game state, coin transactions, prestige, season archives, alarms, etc.). Schema and migrations: `docs/database.md`.
 
 **Game economy** (`src/utils/gameEconomy.ts`) — Pure calculation functions with no side effects. Session rewards use base rate (1 coin/min) with duration milestones, pause penalties, streak multipliers and the daily challenge bonus. Formulas: `docs/economy.md`. Contexts call these to compute rewards before writing to DB.
 

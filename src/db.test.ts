@@ -12,7 +12,7 @@ vi.mock('@libsql/client', () => ({
   }),
 }));
 
-import { initDbClient, saveFocusSession, getRecentSessions, deleteFocusSession, getObjectives, addObjective, deleteObjective, completeObjective, getKillRate, getAllSessions, getFragmentationStats, getAlarms, addAlarm, toggleAlarm, deleteAlarm, ensureSystemBuckets, getBuckets, deleteBucket, moveObjectiveToBucket, reorderBucketObjectives, bringBucketToFront } from './db';
+import { initDbClient, saveFocusSession, getRecentSessions, deleteFocusSession, getObjectives, addObjective, deleteObjective, completeObjective, getKillRate, getAllSessions, getFragmentationStats, getAlarms, addAlarm, toggleAlarm, deleteAlarm, ensureSystemBuckets, getBuckets, deleteBucket, moveObjectiveToBucket, reorderBucketObjectives, bringBucketToFront, getCanvasNotes, addCanvasNote, updateCanvasNoteContent, updateCanvasNoteGeometry, bringCanvasNoteToFront, deleteCanvasNote } from './db';
 
 describe('db utility functions', () => {
   beforeEach(() => {
@@ -398,6 +398,63 @@ describe('db utility functions', () => {
       const buckets = await getBuckets(7);
 
       expect(buckets).toEqual([{ id: 2, name: 'Unsorted', color: '#888888', x: 360, y: 0, w: 300, h: 420, sort_order: 1, kind: 'unsorted' }]);
+    });
+  });
+
+  describe('Canvas Note Methods', () => {
+    it('getCanvasNotes maps rows to CanvasNote objects in stacking order', async () => {
+      mockExecute.mockResolvedValueOnce({
+        rows: [{ id: 3, user_id: 7, content: '# Hi', color: '#ffcc33', x: 10, y: -20, w: 260, h: 200, sort_order: 2, created_at: 'x' }],
+      });
+      const notes = await getCanvasNotes(7);
+      expect(mockExecute).toHaveBeenCalledWith({
+        sql: expect.stringMatching(/FROM canvas_notes WHERE user_id = \? ORDER BY sort_order ASC, id ASC/),
+        args: [7],
+      });
+      expect(notes).toEqual([{ id: 3, content: '# Hi', color: '#ffcc33', x: 10, y: -20, w: 260, h: 200, sort_order: 2 }]);
+    });
+
+    it('addCanvasNote inserts an empty note on top of the user\'s notes', async () => {
+      mockExecute
+        .mockResolvedValueOnce({ rows: [{ maxOrder: 4 }] })
+        .mockResolvedValueOnce({ rows: [], lastInsertRowid: BigInt(12) });
+      const id = await addCanvasNote(7, '#ffcc33', { x: 1, y: 2, w: 260, h: 200 });
+      expect(id).toBe(12);
+      expect(mockExecute).toHaveBeenLastCalledWith({
+        sql: expect.stringContaining('INSERT INTO canvas_notes'),
+        args: [7, '', '#ffcc33', 1, 2, 260, 200, 5],
+      });
+    });
+
+    it('addCanvasNote starts at sort_order 0 for the first note', async () => {
+      mockExecute
+        .mockResolvedValueOnce({ rows: [{ maxOrder: null }] })
+        .mockResolvedValueOnce({ rows: [], lastInsertRowid: BigInt(1) });
+      await addCanvasNote(7, '#ffcc33', { x: 0, y: 0, w: 260, h: 200 });
+      expect(mockExecute.mock.lastCall?.[0].args[7]).toBe(0);
+    });
+
+    it('updateCanvasNoteContent and updateCanvasNoteGeometry update by id', async () => {
+      mockExecute.mockResolvedValue({ rows: [], rowsAffected: 1 });
+      await updateCanvasNoteContent(3, 'text');
+      expect(mockExecute).toHaveBeenCalledWith({ sql: 'UPDATE canvas_notes SET content = ? WHERE id = ?', args: ['text', 3] });
+      await updateCanvasNoteGeometry(3, { x: 1, y: 2, w: 3, h: 4 });
+      expect(mockExecute).toHaveBeenCalledWith({ sql: 'UPDATE canvas_notes SET x = ?, y = ?, w = ?, h = ? WHERE id = ?', args: [1, 2, 3, 4, 3] });
+    });
+
+    it('bringCanvasNoteToFront uses the max sort_order of the same user\'s notes', async () => {
+      mockExecute.mockResolvedValueOnce({ rows: [], rowsAffected: 1 });
+      await bringCanvasNoteToFront(3);
+      expect(mockExecute).toHaveBeenCalledWith({
+        sql: expect.stringMatching(/UPDATE canvas_notes SET sort_order = \(SELECT COALESCE\(MAX\(sort_order\), 0\) \+ 1 FROM canvas_notes WHERE user_id = \(SELECT user_id FROM canvas_notes WHERE id = \?\)\) WHERE id = \?/),
+        args: [3, 3],
+      });
+    });
+
+    it('deleteCanvasNote deletes by id', async () => {
+      mockExecute.mockResolvedValueOnce({ rows: [], rowsAffected: 1 });
+      await deleteCanvasNote(3);
+      expect(mockExecute).toHaveBeenCalledWith({ sql: 'DELETE FROM canvas_notes WHERE id = ?', args: [3] });
     });
   });
 });

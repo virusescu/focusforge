@@ -89,6 +89,9 @@ Precision focus timer with keyboard-first controls (Space, Escape, Ctrl+Enter). 
 ### Objectives & Categories
 Drag-and-drop prioritized objectives with custom color-coded categories. Inline editing, completion tracking, and kill-rate analytics.
 
+### Buckets Canvas
+An infinite pan/zoom canvas of colored bucket panels, with moves and resizes snapping to a grid (hold Shift to move/resize freely in whole units). Add sticky markdown notes: colored, movable, resizable, with table support. Markdown tables also work in objective details.
+
 ### Analytics View
 21-day focus heatmap with an interactive day-view timeline (00:00–24:00). Sessions rendered as horizontal bars with objective completion overlays. Zoomable and draggable for detailed inspection.
 

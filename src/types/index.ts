@@ -78,6 +78,14 @@ export interface Bucket extends BucketGeometry {
   kind: BucketKind;
 }
 
+// A sticky note on the Buckets canvas; geometry is in world units like buckets
+export interface CanvasNote extends BucketGeometry {
+  id: number;
+  content: string; // markdown
+  color: string;
+  sort_order: number; // stacking among notes (higher = in front); notes are always above buckets
+}
+
 // ─── Game Economy Types ─────────────────────────────────────────
 
 export interface GameSeason {

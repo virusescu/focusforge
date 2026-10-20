@@ -42,24 +42,39 @@ export function recenter(vp: Viewport, viewportWidth: number, viewportHeight: nu
   return { zoom: vp.zoom, panX: viewportWidth / 2, panY: viewportHeight / 2 };
 }
 
-// Grid step (world units) used when Shift is held during a move/resize
+// Grid step (world units) for move/resize. Snapping is the default; holding Shift moves
+// freely in whole units.
 export const SNAP_STEP = 20;
 
-const snapValue = (value: number) => Math.round(value / SNAP_STEP) * SNAP_STEP;
-
-export function movePanel(geom: BucketGeometry, dxScreen: number, dyScreen: number, zoom: number, snap = false): BucketGeometry {
-  const x = geom.x + dxScreen / zoom;
-  const y = geom.y + dyScreen / zoom;
-  return { ...geom, x: snap ? snapValue(x) : x, y: snap ? snapValue(y) : y };
+export interface MinSize {
+  w: number;
+  h: number;
 }
 
-export function resizePanel(geom: BucketGeometry, dxScreen: number, dyScreen: number, zoom: number, snap = false): BucketGeometry {
-  const w = geom.w + dxScreen / zoom;
-  const h = geom.h + dyScreen / zoom;
+export const MIN_PANEL_SIZE: MinSize = { w: MIN_PANEL_W, h: MIN_PANEL_H };
+
+export function snapToGrid(value: number): number {
+  return Math.round(value / SNAP_STEP) * SNAP_STEP;
+}
+
+const place = (value: number, snap: boolean) => (snap ? snapToGrid(value) : Math.round(value));
+
+export function movePanel(geom: BucketGeometry, dxScreen: number, dyScreen: number, zoom: number, snap = false): BucketGeometry {
+  return { ...geom, x: place(geom.x + dxScreen / zoom, snap), y: place(geom.y + dyScreen / zoom, snap) };
+}
+
+export function resizePanel(
+  geom: BucketGeometry,
+  dxScreen: number,
+  dyScreen: number,
+  zoom: number,
+  snap = false,
+  min: MinSize = MIN_PANEL_SIZE,
+): BucketGeometry {
   return {
     ...geom,
-    w: Math.max(MIN_PANEL_W, snap ? snapValue(w) : w),
-    h: Math.max(MIN_PANEL_H, snap ? snapValue(h) : h),
+    w: Math.max(min.w, place(geom.w + dxScreen / zoom, snap)),
+    h: Math.max(min.h, place(geom.h + dyScreen / zoom, snap)),
   };
 }
 

@@ -1,0 +1,138 @@
+.note {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-top-width: 3px;
+  font-family: var(--font-mono);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+  cursor: move;
+  touch-action: none;
+
+  &.dragging {
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+  }
+
+  &.editing {
+    cursor: default;
+  }
+
+  &:hover .controls {
+    opacity: 1;
+  }
+}
+
+.controls {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 2px 4px;
+  background: rgba(13, 13, 13, 0.75);
+  border: 1px solid var(--border);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.colorInput {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 1px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+
+  &::-webkit-color-swatch-wrapper {
+    padding: 0;
+  }
+  &::-webkit-color-swatch {
+    border: none;
+  }
+}
+
+.deleteBtn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+
+  &:hover {
+    color: #ef4444;
+  }
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0.6rem 0.7rem;
+}
+
+// Notes are dragged from anywhere, so their text is not selectable
+.body .markdown,
+.body .markdown * {
+  user-select: none;
+  cursor: inherit;
+}
+
+.body .markdown a,
+.body .markdown input {
+  cursor: pointer;
+}
+
+.empty {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+}
+
+.editor {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.textarea {
+  flex: 1;
+  min-height: 0;
+  background: rgba(0, 0, 0, 0.35);
+  border: none;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  line-height: 1.6;
+  padding: 0.5rem 0.6rem;
+  resize: none;
+  outline: none;
+  white-space: pre-wrap;
+  cursor: text;
+  user-select: text;
+
+  &::placeholder {
+    color: var(--text-muted);
+    opacity: 0.5;
+  }
+}
+
+.resizeHandle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+  touch-action: none;
+  background: linear-gradient(135deg, transparent 50%, var(--text-muted) 50%, var(--text-muted) 60%, transparent 60%, transparent 75%, var(--text-muted) 75%, var(--text-muted) 85%, transparent 85%);
+  opacity: 0.6;
+
+  &:hover {
+    opacity: 1;
+  }
+}
