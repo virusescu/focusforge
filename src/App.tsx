@@ -20,7 +20,7 @@ import { UserProvider } from './contexts/UserContext';
 import { FocusProvider } from './contexts/FocusContext';
 import { GameProvider } from './contexts/GameContext';
 import { AlarmProvider } from './contexts/AlarmContext';
-import { NavigationGuard } from './components/NavigationGuard';
+
 import { SeasonTransitionModal } from './components/SeasonTransitionModal';
 import { VaultPage } from './components/VaultPage';
 import { BucketsPage } from './components/BucketsPage';
@@ -30,12 +30,11 @@ import AlarmOverlay from './components/AlarmOverlay';
 function HudApp() {
   const [view, setView] = useState<'hud' | 'analytics' | 'intel' | 'vault' | 'buckets'>('hud');
   const [analyticsDate, setAnalyticsDate] = useState<Date>(new Date());
-  const [pendingNavigation, setPendingNavigation] = useState<{ target: 'analytics' | 'intel' | 'vault' | 'buckets'; dateStr?: string } | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [detailsPanelOpen, setDetailsPanelOpen] = useState(false);
   const [rightSidebarWidth, setRightSidebarWidth] = useState(350);
   const resizingRef = useRef(false);
-  const { timerStatus, resetTimer, activeObjectiveId } = useFocus();
+  const { activeObjectiveId } = useFocus();
   const { activeAlarm, dismissAlarm } = useAlarms();
   const [availableUpdate, setAvailableUpdate] = useState<Update | null>(null);
 
@@ -60,59 +59,14 @@ function HudApp() {
   }, [activeObjectiveId]);
 
   const handleViewAnalytics = (dateStr?: string) => {
-    if (timerStatus !== 'idle') {
-      setPendingNavigation({ target: 'analytics', dateStr });
-      return;
-    }
     if (dateStr) setAnalyticsDate(new Date(dateStr));
     else setAnalyticsDate(new Date());
     setView('analytics');
   };
 
-  const handleViewIntel = () => {
-    if (timerStatus !== 'idle') {
-      setPendingNavigation({ target: 'intel' });
-      return;
-    }
-    setView('intel');
-  };
-
-  const handleViewVault = () => {
-    if (timerStatus !== 'idle') {
-      setPendingNavigation({ target: 'vault' });
-      return;
-    }
-    setView('vault');
-  };
-
-  const handleViewBuckets = () => {
-    if (timerStatus !== 'idle') {
-      setPendingNavigation({ target: 'buckets' });
-      return;
-    }
-    setView('buckets');
-  };
-
-  const handleConfirmNavigation = () => {
-    if (!pendingNavigation) return;
-    resetTimer();
-    if (pendingNavigation.target === 'analytics') {
-      if (pendingNavigation.dateStr) setAnalyticsDate(new Date(pendingNavigation.dateStr));
-      else setAnalyticsDate(new Date());
-      setView('analytics');
-    } else if (pendingNavigation.target === 'vault') {
-      setView('vault');
-    } else if (pendingNavigation.target === 'buckets') {
-      setView('buckets');
-    } else {
-      setView('intel');
-    }
-    setPendingNavigation(null);
-  };
-
-  const handleCancelNavigation = () => {
-    setPendingNavigation(null);
-  };
+  const handleViewIntel = () => setView('intel');
+  const handleViewVault = () => setView('vault');
+  const handleViewBuckets = () => setView('buckets');
 
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -176,12 +130,7 @@ function HudApp() {
         )}
         <Footer />
 
-        {pendingNavigation && (
-          <NavigationGuard
-            onConfirm={handleConfirmNavigation}
-            onCancel={handleCancelNavigation}
-          />
-        )}
+
       </div>
       <SeasonTransitionModal />
       {isSettingsOpen && (
