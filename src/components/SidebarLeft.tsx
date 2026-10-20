@@ -1,6 +1,6 @@
 import { type FC, useCallback, useState, useRef, useEffect, useMemo } from 'react';
 import styles from './SidebarLeft.module.scss';
-import { Plus, X, Edit3, Check, LayoutGrid, MinusCircle, CopyPlus } from 'lucide-react';
+import { Plus, X, Edit3, Check, LayoutGrid, MinusCircle, CopyPlus, Copy } from 'lucide-react';
 import { useFocus } from '../contexts/FocusContext';
 import { soundEngine, playStartSound } from '../utils/audio';
 import { setStatusHint, clearStatusHint } from '../utils/statusHint';
@@ -21,6 +21,8 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
 import type { StrategicObjective, ObjectiveCategory, Bucket } from '../types';
+import { copyPlain } from '../utils/clipboard';
+import { ContextMenu } from './ContextMenu';
 import { CategoryDotPicker } from './CategoryDotPicker';
 import { CategoryManagerModal } from './CategoryManagerModal';
 import { AlarmsModal } from './AlarmsModal';
@@ -48,6 +50,8 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, isViewed, categori
   const { listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: obj.id, disabled: isEditing });
   const [editText, setEditText] = useState(obj.text);
   const [showPicker, setShowPicker] = useState(false);
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  const closeMenu = useCallback(() => setMenu(null), []);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const category = categories.find(c => c.id === obj.category_id);
@@ -96,6 +100,13 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, isViewed, categori
     onSelect(obj.id);
   };
 
+  const handleContextMenu = (e: React.MouseEvent) => {
+    if (isEditing) return; // keep the native menu (paste, etc.) in the rename box
+    e.preventDefault();
+    soundEngine.playClick();
+    setMenu({ x: e.clientX, y: e.clientY });
+  };
+
   const handleDoubleClick = (e: React.MouseEvent) => {
     if (isEditing) return;
     e.stopPropagation();
@@ -139,6 +150,7 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, isViewed, categori
       title={bucket ? `Bucket: ${bucket.name}` : undefined}
       data-bucket-id={bucket?.id}
       {...listeners}
+      onContextMenu={handleContextMenu}
     >
       <span
         className={styles.categoryBullet}
@@ -194,16 +206,6 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, isViewed, categori
 
       <button
         className={styles.moveBtn}
-        onClick={(e) => { e.stopPropagation(); onDuplicate(obj.id); }}
-        onMouseEnter={() => { onHover(); setStatusHint('DUPLICATE_OBJECTIVE'); }}
-        onMouseLeave={clearStatusHint}
-        title="Duplicate"
-      >
-        <CopyPlus size={12} />
-      </button>
-
-      <button
-        className={styles.moveBtn}
         onClick={(e) => { e.stopPropagation(); onRemoveFromMission(obj.id); }}
         onMouseEnter={() => { onHover(); setStatusHint('REMOVE_FROM_MISSION'); }}
         onMouseLeave={clearStatusHint}
@@ -220,6 +222,18 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, isViewed, categori
       >
         <X size={12} />
       </button>
+
+      {menu && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          onClose={closeMenu}
+          items={[
+            { label: 'Duplicate', icon: <CopyPlus size={12} />, onSelect: () => onDuplicate(obj.id) },
+            { label: 'Copy text', icon: <Copy size={12} />, onSelect: () => { void copyPlain(obj.text); } },
+          ]}
+        />
+      )}
     </div>
   );
 };

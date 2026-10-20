@@ -1,0 +1,33 @@
+.menu {
+  position: fixed;
+  z-index: 20000; // above modals (9999) and the canvas drag layers
+  min-width: 160px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-dark);
+  border: 1px solid var(--border-window);
+  border-radius: 4px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6);
+  font-family: var(--font-mono);
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.7rem;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--primary-muted);
+    color: var(--primary);
+  }
+}

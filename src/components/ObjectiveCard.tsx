@@ -1,12 +1,14 @@
-import { type FC, useState, useRef, useEffect } from 'react';
+import { type FC, useState, useRef, useEffect, useCallback } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { FileText, Target, MinusCircle, CopyPlus, X } from 'lucide-react';
+import { FileText, Target, MinusCircle, CopyPlus, Copy, X } from 'lucide-react';
 import styles from './ObjectiveCard.module.scss';
 import { useFocus } from '../contexts/FocusContext';
 import { soundEngine } from '../utils/audio';
 import { setStatusHint, clearStatusHint } from '../utils/statusHint';
 import { isTypingTarget } from '../utils/canvas';
+import { copyPlain } from '../utils/clipboard';
+import { ContextMenu } from './ContextMenu';
 import { CategoryDotPicker } from './CategoryDotPicker';
 import type { StrategicObjective, ObjectiveCategory } from '../types';
 
@@ -34,6 +36,8 @@ export const ObjectiveCard: FC<ObjectiveCardProps> = ({ obj, containerId, catego
   });
   const [editText, setEditText] = useState(obj.text);
   const [showPicker, setShowPicker] = useState(false);
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  const closeMenu = useCallback(() => setMenu(null), []);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const categoryColor = categories.find(c => c.id === obj.category_id)?.color;
@@ -100,6 +104,13 @@ export const ObjectiveCard: FC<ObjectiveCardProps> = ({ obj, containerId, catego
     setViewedObjective(obj.id);
   };
 
+  const handleContextMenu = (e: React.MouseEvent) => {
+    if (isEditing) return; // keep the native menu (paste, etc.) in the rename box
+    e.preventDefault();
+    soundEngine.playClick();
+    setMenu({ x: e.clientX, y: e.clientY });
+  };
+
   const handleMissionToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
     soundEngine.playClick();
@@ -119,6 +130,7 @@ export const ObjectiveCard: FC<ObjectiveCardProps> = ({ obj, containerId, catego
       className={`${styles.card} ${isViewed ? styles.viewed : ''}`}
       {...listeners}
       onClick={handleClick}
+      onContextMenu={handleContextMenu}
       data-objective-id={obj.id}
     >
       <span
@@ -192,15 +204,6 @@ export const ObjectiveCard: FC<ObjectiveCardProps> = ({ obj, containerId, catego
           </button>
         )}
         <button
-          className={styles.actionBtn}
-          onClick={(e) => { e.stopPropagation(); soundEngine.playClick(); void duplicateObjective(obj.id); }}
-          onMouseEnter={() => setStatusHint('DUPLICATE_OBJECTIVE')}
-          onMouseLeave={clearStatusHint}
-          title="Duplicate"
-        >
-          <CopyPlus size={12} />
-        </button>
-        <button
           className={`${styles.actionBtn} ${styles.deleteBtn}`}
           onClick={handleDelete}
           onMouseEnter={() => setStatusHint('DELETE_OBJECTIVE')}
@@ -210,6 +213,18 @@ export const ObjectiveCard: FC<ObjectiveCardProps> = ({ obj, containerId, catego
           <X size={12} />
         </button>
       </div>
+
+      {menu && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          onClose={closeMenu}
+          items={[
+            { label: 'Duplicate', icon: <CopyPlus size={12} />, onSelect: () => { void duplicateObjective(obj.id); } },
+            { label: 'Copy text', icon: <Copy size={12} />, onSelect: () => { void copyPlain(obj.text); } },
+          ]}
+        />
+      )}
     </div>
   );
 };

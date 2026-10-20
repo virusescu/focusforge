@@ -76,6 +76,12 @@ vi.mock('./ObjectiveDetails', () => ({
 
 vi.mock('@tauri-apps/plugin-shell', () => ({ open: vi.fn() }));
 
+const mockCopyPlain = vi.fn();
+vi.mock('../utils/clipboard', () => ({
+  copyPlain: (text: string) => mockCopyPlain(text),
+  copyRich: vi.fn(),
+}));
+
 const mockAddNote = vi.fn();
 let mockNotes: CanvasNote[] = [];
 vi.mock('../hooks/useCanvasNotes', () => ({
@@ -279,15 +285,33 @@ describe('BucketsPage', () => {
   it('cards have no separate drag handle', () => {
     render(<BucketsPage onBack={vi.fn()} />);
     const card = document.querySelector('[data-objective-id="101"]') as HTMLElement;
-    // Only the action buttons: details, mission toggle, duplicate, delete
-    expect(card.querySelectorAll('button')).toHaveLength(4);
+    // Only the action buttons: details, mission toggle, delete
+    expect(card.querySelectorAll('button')).toHaveLength(3);
   });
 
-  it('the duplicate button on a card duplicates that objective', () => {
+  it('right-clicking a card offers Duplicate, which duplicates that objective', () => {
     render(<BucketsPage onBack={vi.fn()} />);
     const card = document.querySelector('[data-objective-id="101"]') as HTMLElement;
-    fireEvent.click(within(card).getByTitle('Duplicate'));
+    fireEvent.contextMenu(card, { clientX: 50, clientY: 60 });
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Duplicate' }));
     expect(mockDuplicateObjective).toHaveBeenCalledWith(101);
+    expect(screen.queryByRole('menu')).toBeNull();
+  });
+
+  it('right-clicking a card offers Copy text, which copies the objective text', () => {
+    render(<BucketsPage onBack={vi.fn()} />);
+    fireEvent.contextMenu(document.querySelector('[data-objective-id="101"]') as HTMLElement);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy text' }));
+    expect(mockCopyPlain).toHaveBeenCalledWith('Beta');
+  });
+
+  it('Escape closes the card menu without leaving the page', () => {
+    const onBack = vi.fn();
+    render(<BucketsPage onBack={onBack} />);
+    fireEvent.contextMenu(document.querySelector('[data-objective-id="101"]') as HTMLElement);
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(onBack).not.toHaveBeenCalled();
   });
 
   it('the duplicate button on a note duplicates that note', () => {
