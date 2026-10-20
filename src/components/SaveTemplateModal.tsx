@@ -1,4 +1,4 @@
-import { type FC, useId, useMemo, useState } from 'react';
+import { type FC, useId, useMemo, useRef, useState } from 'react';
 import { ModalFrame } from './ModalFrame';
 import form from './TemplateForm.module.scss';
 import { useFocus } from '../contexts/FocusContext';
@@ -22,12 +22,27 @@ export const SaveTemplateModal: FC<SaveTemplateModalProps> = ({ task, onClose })
 
   const details = task.details ?? '';
   const fields = useMemo(() => extractFields(task.text, details), [task.text, details]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const submitted = useRef(false);
   const canSave = name.trim().length > 0;
 
-  const save = () => {
-    if (!canSave) return;
+  // Stays open until the save has gone through, so a failed save loses nothing the user typed
+  const save = async () => {
+    if (!canSave || submitted.current) return;
+    submitted.current = true;
+    setSaving(true);
+    setError(null);
     soundEngine.playClick();
-    void addTemplate({ name: name.trim(), title: task.text, details, color, category_id: task.category_id ?? null });
+    try {
+      await addTemplate({ name: name.trim(), title: task.text, details, color, category_id: task.category_id ?? null });
+    } catch (e) {
+      console.error('Saving the template failed', e);
+      submitted.current = false;
+      setSaving(false);
+      setError('Could not save. Check your connection and try again.');
+      return;
+    }
     onClose();
   };
 
@@ -35,11 +50,11 @@ export const SaveTemplateModal: FC<SaveTemplateModalProps> = ({ task, onClose })
     <ModalFrame
       title="CREATE_TEMPLATE"
       onClose={onClose}
-      onSubmit={save}
+      onSubmit={() => { void save(); }}
       footer={
         <>
           <button className={form.secondaryBtn} onClick={onClose}>CANCEL</button>
-          <button className={form.primaryBtn} onClick={save} disabled={!canSave}>SAVE_TEMPLATE</button>
+          <button className={form.primaryBtn} onClick={() => { void save(); }} disabled={!canSave || saving}>{saving ? 'SAVING...' : 'SAVE_TEMPLATE'}</button>
         </>
       }
     >
@@ -71,6 +86,8 @@ export const SaveTemplateModal: FC<SaveTemplateModalProps> = ({ task, onClose })
           <span className={form.hint}>No fields. Write $name in the title or details to add one.</span>
         )}
       </div>
+
+      {error && <div className={form.error} role="alert">{error}</div>}
     </ModalFrame>
   );
 };

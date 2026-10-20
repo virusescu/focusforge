@@ -9,6 +9,7 @@ import { setStatusHint, clearStatusHint } from '../utils/statusHint';
 import { usePanelDrag } from '../hooks/usePanelDrag';
 import { ObjectiveCard } from './ObjectiveCard';
 import { TemplateButtons } from './TemplateButtons';
+import { ConfirmDialog } from './ConfirmDialog';
 import type { Bucket, StrategicObjective } from '../types';
 
 interface BucketPanelProps {
@@ -41,6 +42,7 @@ export const BucketPanel: FC<BucketPanelProps> = ({ bucket, objectives, zoom, zI
 
   const [isRenaming, setIsRenaming] = useState(false);
   const [nameText, setNameText] = useState(bucket.name);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [newText, setNewText] = useState('');
   const nameInputRef = useRef<HTMLInputElement>(null);
 
@@ -89,9 +91,9 @@ export const BucketPanel: FC<BucketPanelProps> = ({ bucket, objectives, zoom, zI
     updateBucket(bucket.id, bucket.name, e.target.value);
   };
 
-  const handleDelete = () => {
-    if (!window.confirm(`DELETE_BUCKET "${bucket.name}"? Its objectives move to UNSORTED.`)) return;
+  const confirmDelete = () => {
     soundEngine.playClick();
+    setConfirmingDelete(false);
     deleteBucket(bucket.id);
   };
 
@@ -166,7 +168,7 @@ export const BucketPanel: FC<BucketPanelProps> = ({ bucket, objectives, zoom, zI
         {bucket.kind === 'custom' && (
           <button
             className={styles.deleteBtn}
-            onClick={handleDelete}
+            onClick={() => setConfirmingDelete(true)}
             onMouseEnter={() => setStatusHint('DELETE_BUCKET')}
             onMouseLeave={clearStatusHint}
             title="Delete bucket"
@@ -199,26 +201,33 @@ export const BucketPanel: FC<BucketPanelProps> = ({ bucket, objectives, zoom, zI
         {objectives.length === 0 && <div className={styles.empty}>EMPTY</div>}
       </div>
 
-      <TemplateButtons
-        className={styles.templates}
-        defaultBucketId={isMissionPanel ? undefined : bucket.id}
-        // Same as this panel's add box: Mission panel adds to Mission, a bucket panel only to its bucket
-        defaultInMission={isMissionPanel}
-      />
-
+      {/* One footer, one divider: template buttons (if any) above the add box, evenly spaced */}
       <div className={styles.footer}>
-        <input
-          type="text"
-          className={styles.addInput}
-          placeholder="Add Objective..."
-          value={newText}
-          onChange={e => setNewText(e.target.value)}
-          onKeyDown={handleAddKeyDown}
-        />
-        <button className={styles.addBtn} onClick={submitNew} title="Add objective">
-          <Plus size={14} />
-        </button>
+        <TemplateButtons defaultBucketId={isMissionPanel ? undefined : bucket.id} />
+        <div className={styles.addRow}>
+          <input
+            type="text"
+            className={styles.addInput}
+            placeholder="Add Objective..."
+            value={newText}
+            onChange={e => setNewText(e.target.value)}
+            onKeyDown={handleAddKeyDown}
+          />
+          <button className={styles.addBtn} onClick={submitNew} title="Add objective">
+            <Plus size={14} />
+          </button>
+        </div>
       </div>
+
+      {confirmingDelete && (
+        <ConfirmDialog
+          title="DELETE_BUCKET"
+          message={`"${bucket.name}" will be deleted. Its objectives move to UNSORTED.`}
+          confirmLabel="DELETE"
+          onConfirm={confirmDelete}
+          onCancel={() => setConfirmingDelete(false)}
+        />
+      )}
 
       <div
         className={styles.resizeHandle}

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { CreateFromTemplateModal } from './CreateFromTemplateModal';
 import type { Bucket, Template } from '../types';
 
@@ -27,9 +27,9 @@ const BUG: Template = {
   sort_order: 0,
 };
 
-const renderModal = (template: Template = BUG, props: { defaultBucketId?: number; defaultInMission?: boolean } = {}) => {
+const renderModal = (template: Template = BUG, props: { defaultBucketId?: number } = {}) => {
   const onClose = vi.fn();
-  render(<CreateFromTemplateModal template={template} defaultInMission={props.defaultInMission ?? true} defaultBucketId={props.defaultBucketId} onClose={onClose} />);
+  render(<CreateFromTemplateModal template={template} defaultBucketId={props.defaultBucketId} onClose={onClose} />);
   return { onClose };
 };
 
@@ -55,7 +55,7 @@ describe('CreateFromTemplateModal', () => {
     expect(screen.getByLabelText('title')).toHaveFocus();
   });
 
-  it('creates the task with the fields filled into the title and details', () => {
+  it('creates the task with the fields filled into the title and details', async () => {
     const { onClose } = renderModal();
     fill('title', 'Crash on login');
     fill('issueId', 'ABC-7');
@@ -65,7 +65,7 @@ describe('CreateFromTemplateModal', () => {
       inMission: true,
       details: 'Bugfixing for issue id: ABC-7.\nLink: [Jaas Link](http://ea.jaas.com/browse/ABC-7)',
     });
-    expect(onClose).toHaveBeenCalledOnce();
+    await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
   });
 
   it('cannot create while the resulting title is empty', () => {
@@ -120,7 +120,7 @@ describe('CreateFromTemplateModal', () => {
     });
 
     it('defaults to the bucket of the panel it was opened from', () => {
-      renderModal(BUG, { defaultBucketId: 9, defaultInMission: false });
+      renderModal(BUG, { defaultBucketId: 9 });
       expect(screen.getByLabelText('BUCKET')).toHaveValue('9');
     });
 
@@ -180,37 +180,41 @@ describe('CreateFromTemplateModal', () => {
   });
 
   describe('Add to Mission', () => {
-    it('is checked when opened from a surface that adds to Mission, and sent as inMission', () => {
+    it('starts checked and is sent as inMission', () => {
       renderModal();
       expect(screen.getByLabelText('ADD_TO_MISSION')).toBeChecked();
-    });
-
-    it('is unchecked when opened from a bucket panel, and can be toggled', () => {
-      renderModal(BUG, { defaultBucketId: 9, defaultInMission: false });
-      const box = screen.getByLabelText('ADD_TO_MISSION');
-      expect(box).not.toBeChecked();
       fill('title', 'x');
-      fireEvent.click(box);
       create();
       expect(mockAddObjective).toHaveBeenCalledWith('x', null, false, expect.objectContaining({ inMission: true }));
     });
+
+    it('starts checked from a bucket panel too, and can be unchecked', () => {
+      renderModal(BUG, { defaultBucketId: 9 });
+      const box = screen.getByLabelText('ADD_TO_MISSION');
+      expect(box).toBeChecked();
+      fill('title', 'x');
+      fireEvent.click(box);
+      create();
+      expect(mockAddObjective).toHaveBeenCalledWith('x', null, false, expect.objectContaining({ inMission: false }));
+    });
   });
 
-  it('remembers the bucket and category it created with', () => {
+  it('remembers the bucket and category it created with', async () => {
     renderModal();
     fill('title', 'x');
     fireEvent.change(screen.getByLabelText('BUCKET'), { target: { value: '9' } });
     fireEvent.change(screen.getByLabelText('CATEGORY'), { target: { value: '5' } });
     create();
-    expect(localStorage.getItem('last_bucket_id')).toBe('9');
+    await waitFor(() => expect(localStorage.getItem('last_bucket_id')).toBe('9'));
     expect(localStorage.getItem('last_category_id')).toBe('5');
   });
 
-  it('Enter in a field creates and Escape cancels', () => {
+  it('Enter in a field creates and Escape cancels', async () => {
     const { onClose } = renderModal();
     fill('title', 'x');
     fireEvent.keyDown(screen.getByLabelText('title'), { key: 'Enter' });
     expect(mockAddObjective).toHaveBeenCalledOnce();
+    await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
 
     mockAddObjective.mockClear();
     onClose.mockClear();
@@ -219,11 +223,60 @@ describe('CreateFromTemplateModal', () => {
     expect(mockAddObjective).not.toHaveBeenCalled();
   });
 
+  describe('saving', () => {
+    it('stays open with the button grayed out until the save finishes, then closes', async () => {
+      let finish!: () => void;
+      mockAddObjective.mockReturnValue(new Promise<void>(resolve => { finish = resolve; }));
+      const { onClose } = renderModal();
+      fill('title', 'x');
+      create();
+      const saving = screen.getByRole('button', { name: 'SAVING...' });
+      expect(saving).toBeDisabled();
+      expect(onClose).not.toHaveBeenCalled();
+      finish();
+      await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+    });
+
+    it('does not remember the picks until the save succeeds', async () => {
+      let finish!: () => void;
+      mockAddObjective.mockReturnValue(new Promise<void>(resolve => { finish = resolve; }));
+      renderModal();
+      fill('title', 'x');
+      fireEvent.change(screen.getByLabelText('BUCKET'), { target: { value: '9' } });
+      create();
+      expect(localStorage.getItem('last_bucket_id')).toBeNull();
+      finish();
+      await waitFor(() => expect(localStorage.getItem('last_bucket_id')).toBe('9'));
+    });
+
+    it('keeps the dialog and what was typed when the save fails, and lets the user retry', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      mockAddObjective.mockRejectedValueOnce(new Error('offline'));
+      const { onClose } = renderModal();
+      fill('title', 'Crash on login');
+      fill('issueId', 'ABC-7');
+      create();
+      expect(await screen.findByRole('alert')).toHaveTextContent(/could not save/i);
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByLabelText('title')).toHaveValue('Crash on login');
+      expect(screen.getByLabelText('issueId')).toHaveValue('ABC-7');
+      expect(localStorage.getItem('last_bucket_id')).toBeNull();
+
+      const retry = screen.getByRole('button', { name: 'CREATE_TASK' });
+      expect(retry).toBeEnabled();
+      fireEvent.click(retry);
+      await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+      expect(mockAddObjective).toHaveBeenCalledTimes(2);
+      expect(screen.queryByRole('alert')).toBeNull();
+    });
+  });
+
   it('does not create twice on a double submit', () => {
     renderModal();
     fill('title', 'x');
-    create();
-    create();
+    const button = screen.getByRole('button', { name: 'CREATE_TASK' });
+    fireEvent.click(button);
+    fireEvent.click(button);
     expect(mockAddObjective).toHaveBeenCalledTimes(1);
   });
 });

@@ -8,6 +8,7 @@ import { useMarkdownEditor, type MarkdownEditor } from '../hooks/useMarkdownEdit
 import type { MinSize } from '../utils/canvas';
 import { MarkdownView } from './MarkdownView';
 import { MarkdownToolbar } from './MarkdownToolbar';
+import { ConfirmDialog } from './ConfirmDialog';
 import type { BucketGeometry, CanvasNote } from '../types';
 
 // Exported for BucketsPage (placement/clamping); a one-off constant, not worth its own module
@@ -113,6 +114,7 @@ export const CanvasNoteView: FC<CanvasNoteViewProps> = ({
 }) => {
   const rootRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const { geom, isDragging, beginPointerDrag, handlePointerMove, handlePointerUp } = usePanelDrag({
     geometry: { x: note.x, y: note.y, w: note.w, h: note.h },
@@ -150,10 +152,16 @@ export const CanvasNoteView: FC<CanvasNoteViewProps> = ({
     onEndEdit(note.id);
   };
 
-  const handleDelete = () => {
-    if (note.content.trim() && !window.confirm('DELETE_NOTE? Its text will be lost.')) return;
+  const deleteNow = () => {
     soundEngine.playClick();
+    setConfirmingDelete(false);
     onDelete(note.id);
+  };
+
+  // A note with text asks first; an empty one just goes
+  const handleDelete = () => {
+    if (note.content.trim()) setConfirmingDelete(true);
+    else deleteNow();
   };
 
   return (
@@ -211,6 +219,16 @@ export const CanvasNoteView: FC<CanvasNoteViewProps> = ({
             )}
           </div>
         </>
+      )}
+
+      {confirmingDelete && (
+        <ConfirmDialog
+          title="DELETE_NOTE"
+          message="This note and its text will be permanently deleted."
+          confirmLabel="DELETE"
+          onConfirm={deleteNow}
+          onCancel={() => setConfirmingDelete(false)}
+        />
       )}
 
       <div

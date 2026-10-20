@@ -63,6 +63,8 @@ export const ContextMenu: FC<ContextMenuProps> = ({ x, y, items, onClose }) => {
       className={styles.menu}
       style={pos}
       role="menu"
+      // Using the menu must not close the details pane, which closes itself on outside presses
+      data-details-barrier
       onContextMenu={e => e.preventDefault()}
       // React events bubble out of portals: keep clicks here from selecting or dragging the row underneath
       onClick={e => e.stopPropagation()}

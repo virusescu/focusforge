@@ -142,6 +142,21 @@ describe('FocusContext', () => {
     await waitFor(() => expect(result.current.templates.map(t => t.name)).toEqual(['Bug', 'Task']));
   });
 
+  it('a failing templates query does not stop objectives, categories and buckets from loading', async () => {
+    mockGetTemplates.mockRejectedValue(new Error('no such table: templates'));
+    mockGetObjectives.mockResolvedValue([{ id: 1, text: 'Still here', created_at: '2023-01-01' }]);
+    mockGetCategories.mockResolvedValue([{ id: 4, label: 'Hard', color: '#f44', sort_order: 0, coin_bounty: 50 }]);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const { result } = renderHook(() => useFocus(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.objectivePool).toHaveLength(1);
+    expect(result.current.categories).toHaveLength(1);
+    expect(result.current.buckets).toHaveLength(2);
+    expect(result.current.templates).toEqual([]);
+  });
+
   it('addTemplate saves it and shows it in the list', async () => {
     const { result } = renderHook(() => useFocus(), { wrapper });
     await waitFor(() => expect(result.current.loading).toBe(false));

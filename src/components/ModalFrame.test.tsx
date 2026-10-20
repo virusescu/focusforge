@@ -33,6 +33,11 @@ describe('ModalFrame focus containment', () => {
     expect(onSubmit).toHaveBeenCalledOnce();
   });
 
+  it('is a details-pane barrier, so clicking it does not close an open details pane', () => {
+    render(<ModalFrame title="T" onClose={vi.fn()}><p>text</p></ModalFrame>);
+    expect(screen.getByRole('dialog').closest('[data-details-barrier]')).not.toBeNull();
+  });
+
   it('a click on the dialog\'s blank space leaves focus inside it', () => {
     render(<ModalFrame title="T" onClose={vi.fn()}><p data-testid="blank">text</p></ModalFrame>);
     // The overlay and dialog are focusable (tabindex -1), so a click on non-focusable content

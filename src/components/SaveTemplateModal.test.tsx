@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { SaveTemplateModal } from './SaveTemplateModal';
 import type { StrategicObjective } from '../types';
 
@@ -53,7 +53,7 @@ describe('SaveTemplateModal', () => {
     expect(screen.getByLabelText('COLOR')).toHaveValue('#ee682b');
   });
 
-  it('saves the task title, details and category under the chosen name and color', () => {
+  it('saves the task title, details and category under the chosen name and color', async () => {
     const { onClose } = renderModal();
     fireEvent.change(screen.getByLabelText('NAME'), { target: { value: 'Bug' } });
     fireEvent.change(screen.getByLabelText('COLOR'), { target: { value: '#00ff88' } });
@@ -65,13 +65,47 @@ describe('SaveTemplateModal', () => {
       color: '#00ff88',
       category_id: 4,
     });
-    expect(onClose).toHaveBeenCalledOnce();
+    await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
   });
 
-  it('a task without details saves an empty details string', () => {
+  it('stays open with the button grayed out until the save finishes, then closes', async () => {
+    let finish!: () => void;
+    mockAddTemplate.mockReturnValue(new Promise<void>(resolve => { finish = resolve; }));
+    const { onClose } = renderModal();
+    fireEvent.click(screen.getByRole('button', { name: 'SAVE_TEMPLATE' }));
+    expect(screen.getByRole('button', { name: 'SAVING...' })).toBeDisabled();
+    expect(onClose).not.toHaveBeenCalled();
+    finish();
+    await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+  });
+
+  it('keeps the dialog and the typed name when the save fails, and lets the user retry', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockAddTemplate.mockRejectedValueOnce(new Error('offline'));
+    const { onClose } = renderModal();
+    fireEvent.change(screen.getByLabelText('NAME'), { target: { value: 'Bug' } });
+    fireEvent.click(screen.getByRole('button', { name: 'SAVE_TEMPLATE' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/could not save/i);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('NAME')).toHaveValue('Bug');
+
+    fireEvent.click(screen.getByRole('button', { name: 'SAVE_TEMPLATE' }));
+    await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+    expect(mockAddTemplate).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not save twice on a double click', async () => {
+    renderModal();
+    const save = screen.getByRole('button', { name: 'SAVE_TEMPLATE' });
+    fireEvent.click(save);
+    fireEvent.click(save);
+    await waitFor(() => expect(mockAddTemplate).toHaveBeenCalledTimes(1));
+  });
+
+  it('a task without details saves an empty details string', async () => {
     renderModal({ ...TASK, details: null, category_id: null });
     fireEvent.click(screen.getByRole('button', { name: 'SAVE_TEMPLATE' }));
-    expect(mockAddTemplate).toHaveBeenCalledWith(expect.objectContaining({ details: '', category_id: null }));
+    await waitFor(() => expect(mockAddTemplate).toHaveBeenCalledWith(expect.objectContaining({ details: '', category_id: null })));
   });
 
   it('cannot save with an empty name', () => {

@@ -103,6 +103,14 @@
   overflow-wrap: anywhere;
 }
 
+.error {
+  font-size: 0.7rem;
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  background: rgba(239, 68, 68, 0.08);
+  padding: 0.45rem 0.6rem;
+}
+
 .hint {
   font-size: 0.65rem;
   color: var(--text-muted);

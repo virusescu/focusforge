@@ -488,7 +488,7 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenDetails, onViewBuckets
           </div>
         </form>
 
-        <TemplateButtons className={styles.templates} defaultInMission />
+        <TemplateButtons className={styles.templates} />
 
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd} modifiers={[restrictToVerticalAxis, restrictToParentElement]}>
           <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { StrictMode } from 'react';
-import { render, screen, fireEvent, within, act } from '@testing-library/react';
-import type { Bucket, CanvasNote, StrategicObjective } from '../types';
+import { render, screen, fireEvent, within, act, waitFor } from '@testing-library/react';
+import type { Bucket, CanvasNote, StrategicObjective, Template } from '../types';
 import { BucketsPage } from './BucketsPage';
 
 const mockAddObjective = vi.fn();
@@ -11,8 +11,10 @@ const mockBringBucketToFront = vi.fn();
 const mockSetObjectiveMission = vi.fn();
 const mockDuplicateObjective = vi.fn();
 const mockAddTemplate = vi.fn();
+const mockDeleteBucket = vi.fn();
 const mockDuplicateNote = vi.fn();
 let mockViewedId: number | null = null;
+let mockTemplates: Template[] = [];
 
 const BUCKETS: Bucket[] = [
   { id: 1, name: 'Mission', color: '#ee682b', sort_order: 0, kind: 'mission', x: -340, y: 0, w: 300, h: 420 },
@@ -50,13 +52,13 @@ vi.mock('../contexts/FocusContext', () => ({
     updateBucket: vi.fn(),
     updateBucketGeometry: mockUpdateBucketGeometry,
     bringBucketToFront: mockBringBucketToFront,
-    deleteBucket: vi.fn(),
+    deleteBucket: mockDeleteBucket,
     setViewedObjective: vi.fn(),
     addCategory: vi.fn(),
     updateCategory: vi.fn(),
     deleteCategory: vi.fn(),
     reorderCategories: vi.fn(),
-    templates: [],
+    templates: mockTemplates,
     addTemplate: mockAddTemplate,
   }),
 }));
@@ -112,8 +114,10 @@ describe('BucketsPage', () => {
     mockSetObjectiveMission.mockClear();
     mockDuplicateObjective.mockClear();
     mockAddTemplate.mockClear();
+    mockDeleteBucket.mockClear();
     mockDuplicateNote.mockClear();
     mockViewedId = null;
+    mockTemplates = [];
     mockAddNote.mockReset();
     mockNotes = [];
   });
@@ -172,6 +176,56 @@ describe('BucketsPage', () => {
     render(<BucketsPage onBack={vi.fn()} />);
     fireEvent.click(screen.getByText('NEW_PANEL'));
     expect(mockAddBucket).toHaveBeenCalledWith('NEW_BUCKET', expect.stringMatching(/^#/), expect.objectContaining({ w: 300, h: 420 }));
+  });
+
+  describe('deleting a bucket', () => {
+    const workPanel = () => screen.getByText('Work').closest('[data-bucket-id]') as HTMLElement;
+
+    it('asks in an in-app dialog, not a native confirm', () => {
+      const nativeConfirm = vi.spyOn(window, 'confirm');
+      render(<BucketsPage onBack={vi.fn()} />);
+      fireEvent.click(within(workPanel()).getByTitle('Delete bucket'));
+      expect(screen.getByRole('dialog', { name: 'DELETE_BUCKET' })).toBeInTheDocument();
+      expect(screen.getByText(/Work/, { selector: 'p' })).toHaveTextContent(/UNSORTED/);
+      expect(nativeConfirm).not.toHaveBeenCalled();
+      expect(mockDeleteBucket).not.toHaveBeenCalled();
+      nativeConfirm.mockRestore();
+    });
+
+    it('confirming deletes the bucket', () => {
+      render(<BucketsPage onBack={vi.fn()} />);
+      fireEvent.click(within(workPanel()).getByTitle('Delete bucket'));
+      fireEvent.click(screen.getByRole('button', { name: 'DELETE' }));
+      expect(mockDeleteBucket).toHaveBeenCalledWith(9);
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
+    it('cancelling keeps the bucket', () => {
+      render(<BucketsPage onBack={vi.fn()} />);
+      fireEvent.click(within(workPanel()).getByTitle('Delete bucket'));
+      fireEvent.click(screen.getByRole('button', { name: 'CANCEL' }));
+      expect(mockDeleteBucket).not.toHaveBeenCalled();
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
+    it('Escape cancels without leaving the page', () => {
+      const onBack = vi.fn();
+      render(<BucketsPage onBack={onBack} />);
+      fireEvent.click(within(workPanel()).getByTitle('Delete bucket'));
+      fireEvent.keyDown(window, { key: 'Escape' });
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(mockDeleteBucket).not.toHaveBeenCalled();
+      expect(onBack).not.toHaveBeenCalled();
+    });
+  });
+
+  it('keeps the template buttons and the add box in one footer, with one divider above them', () => {
+    mockTemplates = [{ id: 1, name: 'Bug', title: '$t', details: '', color: '#f44', category_id: null, sort_order: 0 }];
+    render(<BucketsPage onBack={vi.fn()} />);
+    const panel = screen.getByText('Work').closest('[data-bucket-id]') as HTMLElement;
+    const footer = within(panel).getByPlaceholderText('Add Objective...').closest('[class*="footer"]') as HTMLElement;
+    expect(footer).not.toBeNull();
+    expect(footer).toContainElement(within(panel).getByRole('button', { name: 'Bug' }));
   });
 
   it('system buckets have no delete button', () => {
@@ -302,14 +356,14 @@ describe('BucketsPage', () => {
     expect(screen.queryByRole('menu')).toBeNull();
   });
 
-  it('right-clicking a card offers Create template from task, which saves a template and leaves the task', () => {
+  it('right-clicking a card offers Create template from task, which saves a template and leaves the task', async () => {
     render(<BucketsPage onBack={vi.fn()} />);
     fireEvent.contextMenu(document.querySelector('[data-objective-id="101"]') as HTMLElement);
     fireEvent.click(screen.getByRole('menuitem', { name: 'Create template from task' }));
     expect(screen.getByRole('dialog', { name: 'CREATE_TEMPLATE' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'SAVE_TEMPLATE' }));
     expect(mockAddTemplate).toHaveBeenCalledWith({ name: 'Beta', title: 'Beta', details: '', color: '#ee682b', category_id: null });
-    expect(screen.queryByRole('dialog')).toBeNull();
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(document.querySelector('[data-objective-id="101"]')).not.toBeNull();
   });
 
@@ -418,6 +472,120 @@ describe('BucketsPage', () => {
     render(<BucketsPage onBack={vi.fn()} />);
     fireEvent.wheel(screen.getByText('note 1'), { deltaY: -500 });
     expect(screen.getByText('100%')).toBeInTheDocument();
+  });
+
+  describe('Shift: zoom and pan from anywhere', () => {
+    const VIEWPORT = JSON.stringify({ panX: 100, panY: 50, zoom: 1 });
+    const world = () => screen.getByTestId('canvas-world');
+    const viewport = () => world().parentElement as HTMLElement;
+    const transform = () => world().style.transform;
+    const press = (el: Element, init: PointerEventInit = {}) =>
+      fireEvent.pointerDown(el, { button: 0, pointerId: 1, clientX: 0, clientY: 0, ...init });
+    const dragTo = (x: number, y: number) =>
+      fireEvent.pointerMove(viewport(), { pointerId: 1, buttons: 1, clientX: x, clientY: y });
+
+    beforeEach(() => localStorage.setItem('bucket_canvas_viewport', VIEWPORT));
+
+    it('Shift+wheel zooms even over a note, which plain wheel leaves to scroll', () => {
+      mockNotes = [NOTE(1)];
+      render(<BucketsPage onBack={vi.fn()} />);
+      fireEvent.wheel(screen.getByText('note 1'), { deltaY: -500 });
+      expect(screen.getByText('100%')).toBeInTheDocument();
+      fireEvent.wheel(screen.getByText('note 1'), { deltaY: -500, shiftKey: true });
+      expect(screen.queryByText('100%')).toBeNull();
+    });
+
+    it('Shift+wheel zooms over a task card', () => {
+      render(<BucketsPage onBack={vi.fn()} />);
+      fireEvent.wheel(document.querySelector('[data-objective-id="101"]') as HTMLElement, { deltaY: -500, shiftKey: true });
+      expect(screen.queryByText('100%')).toBeNull();
+    });
+
+    it('zooms when the browser reports Shift+wheel as a horizontal scroll', () => {
+      mockNotes = [NOTE(1)];
+      render(<BucketsPage onBack={vi.fn()} />);
+      fireEvent.wheel(screen.getByText('note 1'), { deltaX: -500, deltaY: 0, shiftKey: true });
+      expect(screen.queryByText('100%')).toBeNull();
+    });
+
+    it('Shift+wheel in the opposite direction zooms out', () => {
+      mockNotes = [NOTE(1)];
+      render(<BucketsPage onBack={vi.fn()} />);
+      fireEvent.wheel(screen.getByText('note 1'), { deltaY: 500, shiftKey: true });
+      const readout = Number(screen.getByText(/%$/).textContent!.replace('%', ''));
+      expect(readout).toBeLessThan(100);
+    });
+
+    it('Shift+drag from a task card pans the canvas', () => {
+      render(<BucketsPage onBack={vi.fn()} />);
+      press(document.querySelector('[data-objective-id="101"]') as HTMLElement, { shiftKey: true });
+      dragTo(40, 10);
+      expect(transform()).toBe('translate(140px, 60px) scale(1)');
+    });
+
+    it('Shift+drag from a note pans the canvas and leaves the note where it is', () => {
+      mockNotes = [NOTE(1)];
+      render(<BucketsPage onBack={vi.fn()} />);
+      const note = document.querySelector('[data-note-id="1"]') as HTMLElement;
+      const before = { left: note.style.left, top: note.style.top };
+      press(screen.getByText('note 1'), { shiftKey: true });
+      dragTo(60, 20);
+      expect(transform()).toBe('translate(160px, 70px) scale(1)');
+      expect({ left: note.style.left, top: note.style.top }).toEqual(before);
+    });
+
+    it('Shift+drag from a panel header pans the canvas and leaves the panel where it is', () => {
+      render(<BucketsPage onBack={vi.fn()} />);
+      const panel = screen.getByText('Work').closest('[data-bucket-id]') as HTMLElement;
+      const before = { left: panel.style.left, top: panel.style.top };
+      press(screen.getByText('Work').parentElement as HTMLElement, { shiftKey: true });
+      dragTo(30, 30);
+      expect(transform()).toBe('translate(130px, 80px) scale(1)');
+      expect({ left: panel.style.left, top: panel.style.top }).toEqual(before);
+    });
+
+    it('stops panning on release', () => {
+      render(<BucketsPage onBack={vi.fn()} />);
+      press(document.querySelector('[data-objective-id="101"]') as HTMLElement, { shiftKey: true });
+      dragTo(40, 10);
+      fireEvent.pointerUp(viewport(), { pointerId: 1 });
+      dragTo(200, 200);
+      expect(transform()).toBe('translate(140px, 60px) scale(1)');
+    });
+
+    it('without Shift, pressing a card does not pan', () => {
+      render(<BucketsPage onBack={vi.fn()} />);
+      press(document.querySelector('[data-objective-id="101"]') as HTMLElement);
+      dragTo(40, 10);
+      expect(transform()).toBe('translate(100px, 50px) scale(1)');
+    });
+
+    it('Shift on a button still presses the button instead of panning', () => {
+      render(<BucketsPage onBack={vi.fn()} />);
+      const card = document.querySelector('[data-objective-id="101"]') as HTMLElement;
+      press(within(card).getByTitle('Delete'), { shiftKey: true });
+      dragTo(40, 10);
+      expect(transform()).toBe('translate(100px, 50px) scale(1)');
+    });
+
+    it('Shift in a note\'s text box keeps selecting text instead of panning', () => {
+      mockNotes = [NOTE(1)];
+      render(<BucketsPage onBack={vi.fn()} />);
+      const note = document.querySelector('[data-note-id="1"]') as HTMLElement;
+      fireEvent.doubleClick(note);
+      press(within(note).getByRole('textbox'), { shiftKey: true });
+      dragTo(40, 10);
+      expect(transform()).toBe('translate(100px, 50px) scale(1)');
+    });
+
+    it('Shift in a dialog opened from the canvas never pans', () => {
+      render(<BucketsPage onBack={vi.fn()} />);
+      fireEvent.contextMenu(document.querySelector('[data-objective-id="101"]') as HTMLElement);
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Create template from task' }));
+      press(screen.getByRole('dialog', { name: 'CREATE_TEMPLATE' }), { shiftKey: true });
+      dragTo(40, 10);
+      expect(transform()).toBe('translate(100px, 50px) scale(1)');
+    });
   });
 
   it('pointerdown on empty canvas closes the note editor', () => {

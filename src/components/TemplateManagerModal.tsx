@@ -1,4 +1,4 @@
-import { type FC, useId, useMemo, useState } from 'react';
+import { type FC, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { GripVertical, Trash2 } from 'lucide-react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
@@ -21,6 +21,9 @@ interface TemplateRowProps {
 
 const toInput = (t: TemplateInput): TemplateInput => ({ name: t.name, title: t.title, details: t.details, color: t.color, category_id: t.category_id });
 
+const sameInput = (a: TemplateInput, b: TemplateInput) =>
+  a.name === b.name && a.title === b.title && a.details === b.details && a.color === b.color && a.category_id === b.category_id;
+
 const TemplateRow: FC<TemplateRowProps> = ({ template, categories, onUpdate, onDelete }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: template.id });
   const id = useId();
@@ -28,27 +31,37 @@ const TemplateRow: FC<TemplateRowProps> = ({ template, categories, onUpdate, onD
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const fields = useMemo(() => extractFields(draft.title, draft.details), [draft.title, draft.details]);
 
-  // Saves only what changed; text fields call this on blur, color and category straight away
+  // Saves only what changed. Spaces around the name are a typo, so it is always trimmed (in the box too);
+  // an emptied name goes back to the saved one instead of being saved blank.
   const commit = (next: TemplateInput) => {
-    const saved = toInput(template);
-    if (next.name === saved.name && next.title === saved.title && next.details === saved.details
-      && next.color === saved.color && next.category_id === saved.category_id) return;
-    onUpdate(template.id, next);
+    const name = next.name.trim() || template.name;
+    if (name !== next.name) setDraft(prev => ({ ...prev, name }));
+    const normalized = { ...next, name };
+    if (sameInput(normalized, toInput(template))) return;
+    onUpdate(template.id, normalized);
   };
+
+  // The color picker fires "input" continuously while it is being dragged and "change" once when it is
+  // dismissed. React's onChange covers the first (the swatch follows along); only the second saves.
+  const colorRef = useRef<HTMLInputElement>(null);
+  const latest = useRef({ draft, template, onUpdate });
+  useEffect(() => { latest.current = { draft, template, onUpdate }; });
+  useEffect(() => {
+    const el = colorRef.current;
+    if (!el) return;
+    const handlePickerClosed = () => {
+      const { draft: d, template: t, onUpdate: update } = latest.current;
+      const next = { ...d, name: d.name.trim() || t.name, color: el.value };
+      if (!sameInput(next, toInput(t))) update(t.id, next);
+    };
+    el.addEventListener('change', handlePickerClosed);
+    return () => el.removeEventListener('change', handlePickerClosed);
+  }, []);
 
   const change = (patch: Partial<TemplateInput>, saveNow = false) => {
     const next = { ...draft, ...patch };
     setDraft(next);
     if (saveNow) commit(next);
-  };
-
-  const commitName = () => {
-    const name = draft.name.trim();
-    if (!name) {
-      setDraft(prev => ({ ...prev, name: template.name }));
-      return;
-    }
-    commit({ ...draft, name });
   };
 
   const style: React.CSSProperties = {
@@ -71,19 +84,20 @@ const TemplateRow: FC<TemplateRowProps> = ({ template, categories, onUpdate, onD
           <GripVertical size={14} />
         </button>
         <input
+          ref={colorRef}
           id={`${id}-color`}
           aria-label="COLOR"
           type="color"
           className={form.colorInput}
           value={draft.color}
-          onChange={e => change({ color: e.target.value }, true)}
+          onChange={e => change({ color: e.target.value })}
         />
         <input
           aria-label="NAME"
           className={form.input}
           value={draft.name}
           onChange={e => change({ name: e.target.value })}
-          onBlur={commitName}
+          onBlur={() => commit(draft)}
           onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
         />
         <button className={styles.deleteBtn} onClick={() => setConfirmingDelete(true)} title="Delete template">

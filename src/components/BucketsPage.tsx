@@ -127,13 +127,15 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
     const el = viewportRef.current;
     if (!el) return;
     const handleWheel = (e: WheelEvent) => {
-      // Let scrollable panel lists and the details drawer scroll; Ctrl+wheel always zooms
-      if (!e.ctrlKey && (e.target as Element).closest?.('[data-canvas-scroll]')) return;
+      // Let scrollable panel lists and the details drawer scroll; Ctrl+wheel and Shift+wheel always zoom
+      if (!e.ctrlKey && !e.shiftKey && (e.target as Element).closest?.('[data-canvas-scroll]')) return;
       e.preventDefault();
       const rect = el.getBoundingClientRect();
       const sx = e.clientX - rect.left;
       const sy = e.clientY - rect.top;
-      const factor = wheelZoomFactor(e.deltaY);
+      // Chromium turns Shift+wheel into a horizontal scroll (deltaX); zoom by whichever axis moved
+      const delta = e.shiftKey && e.deltaY === 0 ? e.deltaX : e.deltaY;
+      const factor = wheelZoomFactor(delta);
       setVp(v => zoomAt(v, sx, sy, factor));
     };
     el.addEventListener('wheel', handleWheel, { passive: false });
@@ -165,13 +167,30 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [detailsOpen, showCategoryManager, onBack]);
 
-  const handleViewportPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    const isBackground = e.target === e.currentTarget || (e.target as HTMLElement).dataset.testid === 'canvas-world';
-    if (!(isBackground && e.button === 0) && e.button !== 1) return;
+  const startPan = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.currentTarget.setPointerCapture?.(e.pointerId);
     panRef.current = { startX: e.clientX, startY: e.clientY, panX: vp.panX, panY: vp.panY };
     setIsPanning(true);
+  };
+
+  const handleViewportPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    const isBackground = e.target === e.currentTarget || (e.target as HTMLElement).dataset.testid === 'canvas-world';
+    if (!(isBackground && e.button === 0) && e.button !== 1) return;
+    startPan(e);
+  };
+
+  // Shift held *before* the press pans the canvas from anywhere (cards, panels, notes) and stops the press
+  // from starting their own drag. Capture phase, so it runs before those handlers. Real controls, text boxes,
+  // the details drawer and portalled dialogs (React events bubble out of portals, the DOM check filters them) keep
+  // their normal behaviour. Shift pressed *during* a panel/note drag still means "move freely, no snapping".
+  const handleViewportPointerDownCapture = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!e.shiftKey || e.button !== 0) return;
+    const target = e.target as Element;
+    if (!e.currentTarget.contains(target)) return;
+    if (isTypingTarget(target) || target.closest('button, a, input, select, textarea, label, [data-no-pan]')) return;
+    e.stopPropagation();
+    startPan(e);
   };
 
   const handleViewportPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -345,6 +364,7 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
             backgroundPosition: `${vp.panX}px ${vp.panY}px`,
             backgroundSize: `${gridSize}px ${gridSize}px`,
           }}
+          onPointerDownCapture={handleViewportPointerDownCapture}
           onPointerDown={handleViewportPointerDown}
           onPointerMove={handleViewportPointerMove}
           onPointerUp={handleViewportPointerUp}
@@ -387,7 +407,7 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
           </div>
 
           {detailsOpen && (
-            <div className={styles.detailsDrawer} data-details-barrier data-canvas-scroll onPointerDown={e => e.stopPropagation()}>
+            <div className={styles.detailsDrawer} data-details-barrier data-canvas-scroll data-no-pan onPointerDown={e => e.stopPropagation()}>
               <ObjectiveDetails onClose={closeDetails} />
             </div>
           )}

@@ -201,7 +201,11 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
         getGlobalStats(authUser.id),
         getObjectives(authUser.id),
         getCategories(authUser.id),
-        getTemplates(authUser.id)
+        // Templates are optional extras: if their query fails, everything else must still load
+        getTemplates(authUser.id).catch((e: unknown) => {
+          console.error('Failed to load templates', e);
+          return [] as Template[];
+        }),
       ]);
       setRecentSessions(sessions);
       setDailyStats(stats);

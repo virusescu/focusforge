@@ -8,13 +8,11 @@ import type { Template } from '../types';
 interface TemplateButtonsProps {
   // Set on a bucket panel so the dialog starts on that bucket
   defaultBucketId?: number;
-  // Whether the dialog's "Add to Mission" starts checked (same as the add box beside these buttons)
-  defaultInMission: boolean;
   className?: string;
 }
 
 // One button per template, in the user's order, under an add box
-export const TemplateButtons: FC<TemplateButtonsProps> = ({ defaultBucketId, defaultInMission, className }) => {
+export const TemplateButtons: FC<TemplateButtonsProps> = ({ defaultBucketId, className }) => {
   const { templates } = useFocus();
   const [active, setActive] = useState<Template | null>(null);
   const close = useCallback(() => setActive(null), []);
@@ -40,7 +38,6 @@ export const TemplateButtons: FC<TemplateButtonsProps> = ({ defaultBucketId, def
         <CreateFromTemplateModal
           template={active}
           defaultBucketId={defaultBucketId}
-          defaultInMission={defaultInMission}
           onClose={close}
         />
       )}

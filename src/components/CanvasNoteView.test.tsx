@@ -128,22 +128,46 @@ describe('CanvasNoteView', () => {
     expect(handlers.onGeometryChange).toHaveBeenCalledWith(5, { x: 100, y: 40, w: 160, h: 100 });
   });
 
-  it('delete asks for confirmation when the note has content', () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+  it('delete asks for confirmation in an in-app dialog when the note has content', () => {
+    const nativeConfirm = vi.spyOn(window, 'confirm');
     render(<Harness />);
     fireEvent.click(within(noteEl()).getByTitle('Delete note'));
-    expect(confirm).toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: 'DELETE_NOTE' })).toBeInTheDocument();
+    expect(nativeConfirm).not.toHaveBeenCalled();
     expect(handlers.onDelete).not.toHaveBeenCalled();
-    confirm.mockRestore();
+    nativeConfirm.mockRestore();
+  });
+
+  it('confirming in the dialog deletes the note', () => {
+    render(<Harness />);
+    fireEvent.click(within(noteEl()).getByTitle('Delete note'));
+    fireEvent.click(screen.getByRole('button', { name: 'DELETE' }));
+    expect(handlers.onDelete).toHaveBeenCalledWith(5);
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('cancelling the dialog keeps the note', () => {
+    render(<Harness />);
+    fireEvent.click(within(noteEl()).getByTitle('Delete note'));
+    fireEvent.click(screen.getByRole('button', { name: 'CANCEL' }));
+    expect(handlers.onDelete).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(noteEl()).toBeInTheDocument();
+  });
+
+  it('Escape in the dialog cancels', () => {
+    render(<Harness />);
+    fireEvent.click(within(noteEl()).getByTitle('Delete note'));
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(handlers.onDelete).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('an empty note is deleted without confirmation', () => {
-    const confirm = vi.spyOn(window, 'confirm');
     render(<Harness note={{ ...NOTE, content: '  ' }} />);
     fireEvent.click(within(noteEl()).getByTitle('Delete note'));
-    expect(confirm).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).toBeNull();
     expect(handlers.onDelete).toHaveBeenCalledWith(5);
-    confirm.mockRestore();
   });
 
   it('changing the color reports it', () => {

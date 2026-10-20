@@ -65,6 +65,25 @@ describe('TemplateManagerModal', () => {
     expect(mockUpdate).toHaveBeenCalledWith(1, { name: 'Defect', title: '$title', details: 'Issue $issueId', color: '#ff4444', category_id: 4 });
   });
 
+  it('trims spaces around a name, in the saved value and in the box', () => {
+    render(<TemplateManagerModal onClose={vi.fn()} />);
+    const name = within(row('Bug')).getByLabelText('NAME') as HTMLInputElement;
+    fireEvent.change(name, { target: { value: '  Defect ' } });
+    fireEvent.blur(name);
+    expect(mockUpdate).toHaveBeenCalledWith(1, expect.objectContaining({ name: 'Defect' }));
+    expect(name.value).toBe('Defect');
+  });
+
+  it('a trailing space left in the name does not overwrite the saved name when another field is edited', () => {
+    render(<TemplateManagerModal onClose={vi.fn()} />);
+    const r = row('Bug');
+    fireEvent.change(within(r).getByLabelText('NAME'), { target: { value: 'Bug ' } });
+    const title = within(r).getByLabelText('TITLE');
+    fireEvent.change(title, { target: { value: '$title!' } });
+    fireEvent.blur(title);
+    expect(mockUpdate).toHaveBeenLastCalledWith(1, expect.objectContaining({ name: 'Bug', title: '$title!' }));
+  });
+
   it('does not save when nothing changed on blur', () => {
     render(<TemplateManagerModal onClose={vi.fn()} />);
     fireEvent.blur(within(row('Bug')).getByLabelText('NAME'));
@@ -96,10 +115,18 @@ describe('TemplateManagerModal', () => {
     expect(mockUpdate).toHaveBeenCalledWith(1, expect.objectContaining({ details: 'Line one\nLine two $x' }));
   });
 
-  it('saves a color change immediately', () => {
+  it('saves the color once, when the picker closes, not on every drag step', () => {
     render(<TemplateManagerModal onClose={vi.fn()} />);
-    fireEvent.change(within(row('Bug')).getByLabelText('COLOR'), { target: { value: '#00ff88' } });
-    expect(mockUpdate).toHaveBeenCalledWith(1, expect.objectContaining({ color: '#00ff88' }));
+    const color = within(row('Bug')).getByLabelText('COLOR') as HTMLInputElement;
+    // The browser fires "input" continuously while dragging inside the picker...
+    fireEvent.input(color, { target: { value: '#112233' } });
+    fireEvent.input(color, { target: { value: '#223344' } });
+    expect(mockUpdate).not.toHaveBeenCalled();
+    expect(color.value).toBe('#223344'); // ...and the swatch follows along
+    // ...and "change" once when it is dismissed
+    fireEvent.change(color, { target: { value: '#334455' } });
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
+    expect(mockUpdate).toHaveBeenCalledWith(1, expect.objectContaining({ color: '#334455' }));
   });
 
   it('saves a category change immediately, including back to none', () => {

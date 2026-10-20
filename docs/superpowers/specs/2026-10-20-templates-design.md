@@ -103,11 +103,13 @@ Example. Template **Bug**:
   - The user can always change it.
 - Category picker: includes "no category". Preselected to the template's own category if it has one,
   otherwise to the last category used for creating a task, otherwise none.
-- Add to Mission is checked by default (the add box adds to Mission today). The Mission panel's buttons
-  open it checked.
+- Add to Mission is checked by default, everywhere (decided by the user after review), and can be unchecked.
 - The new task gets: title and details with values substituted, the chosen category, the chosen
   bucket, and the Mission flag per the checkbox.
 - A template with no fields still opens the popup (for bucket and category) — it is never created silently.
+- The popup stays open until the save succeeds; the button is grayed and reads SAVING... meanwhile. On
+  failure it stays open with everything typed intact and an error, so the user can retry. The remembered
+  bucket/category are stored only after a successful create.
 - If a remembered bucket or category was deleted since, the picker falls back as if nothing were
   remembered.
 
@@ -194,7 +196,7 @@ The remembered bucket and category are two `localStorage` keys, not database col
    used when the template has none. (This is the one place "remember my last pick" and "template
    default" could disagree.)
 5. A lone `$` or `$` followed by a digit stays literal.
-6. The Add to Mission checkbox is checked by default.
+6. The Add to Mission checkbox is checked by default, on every surface.
 7. Template order is changed only in the manager, not by dragging the buttons.
 8. Opened from a Canvas bucket panel, the popup preselects that panel's bucket instead of the remembered one.
 9. The template color defaults to the source task's category color.

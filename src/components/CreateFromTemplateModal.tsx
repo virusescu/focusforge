@@ -11,12 +11,10 @@ interface CreateFromTemplateModalProps {
   template: Template;
   // Bucket to preselect (the panel it was opened from); otherwise the last bucket used
   defaultBucketId?: number;
-  // Whether "Add to Mission" starts checked (follows the add box of the surface it was opened from)
-  defaultInMission: boolean;
   onClose: () => void;
 }
 
-export const CreateFromTemplateModal: FC<CreateFromTemplateModalProps> = ({ template, defaultBucketId, defaultInMission, onClose }) => {
+export const CreateFromTemplateModal: FC<CreateFromTemplateModalProps> = ({ template, defaultBucketId, onClose }) => {
   const { buckets, categories, addObjective } = useFocus();
   const id = useId();
   const fields = useMemo(() => extractFields(template.title, template.details), [template.title, template.details]);
@@ -27,23 +25,36 @@ export const CreateFromTemplateModal: FC<CreateFromTemplateModalProps> = ({ temp
     firstValidBucketId([defaultBucketId, loadLastPicks().bucketId], buckets));
   const [categoryId, setCategoryId] = useState<number | null>(() =>
     firstValidCategoryId([template.category_id, loadLastPicks().categoryId], categories));
-  const [inMission, setInMission] = useState(defaultInMission);
+  const [inMission, setInMission] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const submitted = useRef(false);
 
   const title = fillTemplate(template.title, values).trim();
   const canCreate = title.length > 0;
 
-  const create = () => {
+  // The dialog stays open until the save has gone through, so a failed save loses nothing the user typed
+  const create = async () => {
     if (!canCreate || submitted.current) return;
     submitted.current = true;
-    const filledDetails = fillTemplate(template.details, values);
+    setSaving(true);
+    setError(null);
     soundEngine.playClick();
+    const filledDetails = fillTemplate(template.details, values);
+    try {
+      await addObjective(title, categoryId, false, {
+        bucketId,
+        inMission,
+        details: filledDetails.trim() ? filledDetails : null,
+      });
+    } catch (e) {
+      console.error('Creating a task from a template failed', e);
+      submitted.current = false;
+      setSaving(false);
+      setError('Could not save. Check your connection and try again.');
+      return;
+    }
     saveLastPicks({ bucketId, categoryId });
-    void addObjective(title, categoryId, false, {
-      bucketId,
-      inMission,
-      details: filledDetails.trim() ? filledDetails : null,
-    });
     onClose();
   };
 
@@ -51,11 +62,11 @@ export const CreateFromTemplateModal: FC<CreateFromTemplateModalProps> = ({ temp
     <ModalFrame
       title={template.name}
       onClose={onClose}
-      onSubmit={create}
+      onSubmit={() => { void create(); }}
       footer={
         <>
           <button className={form.secondaryBtn} onClick={onClose}>CANCEL</button>
-          <button className={form.primaryBtn} onClick={create} disabled={!canCreate}>CREATE_TASK</button>
+          <button className={form.primaryBtn} onClick={() => { void create(); }} disabled={!canCreate || saving}>{saving ? 'SAVING...' : 'CREATE_TASK'}</button>
         </>
       }
     >
@@ -103,6 +114,8 @@ export const CreateFromTemplateModal: FC<CreateFromTemplateModalProps> = ({ temp
         <input type="checkbox" checked={inMission} onChange={e => setInMission(e.target.checked)} />
         <span>ADD_TO_MISSION</span>
       </label>
+
+      {error && <div className={form.error} role="alert">{error}</div>}
     </ModalFrame>
   );
 };

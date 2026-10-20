@@ -13,7 +13,10 @@ export function extractFields(title: string, details: string): string[] {
   return fields;
 }
 
+// Own properties only: `$constructor` or `$toString` must not pick up Object.prototype members
+const has = (values: Record<string, string>, name: string) => Object.prototype.hasOwnProperty.call(values, name);
+
 // One pass: values are inserted verbatim and never re-expanded. A missing value becomes ''.
 export function fillTemplate(text: string, values: Record<string, string>): string {
-  return text.replace(TOKEN, (_match, name: string | undefined) => (name === undefined ? '$' : values[name] ?? ''));
+  return text.replace(TOKEN, (_match, name: string | undefined) => (name === undefined ? '$' : has(values, name) ? values[name] : ''));
 }

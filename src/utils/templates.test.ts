@@ -63,6 +63,11 @@ describe('fillTemplate', () => {
     expect(fillTemplate('[$x]', {})).toBe('[]');
   });
 
+  it('treats names like Object.prototype members as ordinary fields', () => {
+    expect(fillTemplate('Fix $constructor $toString $__proto__', {})).toBe('Fix   ');
+    expect(fillTemplate('Fix $constructor', { constructor: 'ok' })).toBe('Fix ok');
+  });
+
   it('leaves text without placeholders unchanged', () => {
     expect(fillTemplate('plain **text**\nline 2', {})).toBe('plain **text**\nline 2');
   });

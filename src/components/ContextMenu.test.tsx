@@ -54,6 +54,11 @@ describe('ContextMenu', () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
+  it('is a details-pane barrier, so using it does not close an open details pane', () => {
+    setup();
+    expect(screen.getByRole('menu').closest('[data-details-barrier]')).not.toBeNull();
+  });
+
   it('is rendered in document.body, outside its React parent', () => {
     setup();
     expect(screen.getByRole('menu').parentElement).toBe(document.body);

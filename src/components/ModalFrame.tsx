@@ -50,6 +50,8 @@ export const ModalFrame: FC<ModalFrameProps> = ({ title, onClose, children, foot
   return createPortal(
     <div
       ref={overlayRef}
+      // Mouse presses here must not count as "outside" the details pane, which closes itself on those
+      data-details-barrier
       // Focusable so a click on blank space keeps focus in the dialog instead of dropping it to <body>
       tabIndex={-1}
       className={styles.overlay}
