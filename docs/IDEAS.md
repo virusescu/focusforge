@@ -50,3 +50,39 @@ All core systems are implemented and shipping:
 - **Kill Rate Breakdown**: Kill Rate metric split by category: "3 hard / 5 normal / 2 easy neutralized."
 - **Pattern Tracking**: Track category completion ratios to surface patterns like "you avoid hard tasks on Fridays."
 
+---
+
+## Ideas Backlog (Oct 2026)
+
+Small, practical ideas. Nothing here is started. Keep each one simple.
+
+### 4. Quick Capture Hotkey (wanted)
+*Goal: add a task from anywhere on the machine without opening the app.*
+
+- **Trigger**: a system-wide shortcut (e.g. `Ctrl+Shift+Alt+T`) via `tauri-plugin-global-shortcut`. Configurable in Settings. Registration can fail if another app owns the combo, so show an in-app message.
+- **Popup**: a second small borderless, centered, always-on-top Tauri window (about 480x140), hidden at startup and styled like the HUD. The shortcut shows it and focuses the text box. Enter saves, Esc or clicking away hides it. Optional bucket and category pickers.
+- **Saving**: the popup does not touch the database. It emits an event to the main window, which already holds the login and Turso connection, and adds the task through the normal code path.
+- **Caveats**: only works while the app is running. Closing the app entirely means no listener, so this probably needs a tray icon where closing the window hides it (a behaviour change, to be decided). Focus and always-on-top behaviour need checking on a real desktop. Needs a Tauri permission entry and docs/tests. Estimate: about half a day.
+
+### 5. Collapsible Regions in the Details Pane (wanted)
+*Goal: fold long task details without any new syntax to learn.*
+
+- **Design**: a chevron next to each `#`, `##` and `###` heading hides everything under it until the next heading of the same or higher level.
+- **Where**: lives in `MarkdownView`, so Canvas notes get it for free. Checkboxes and `[c]` copy buttons must keep working.
+- **State**: everything starts expanded. Remember collapsed sections per task on this machine.
+- **Estimate**: small to medium, a few hours with tests.
+
+### 6. Command Palette (`Ctrl+K`)
+Type to jump to any task, note or bucket, or run an action such as "new Bug from template". Cheap, since everything it needs already exists.
+
+### 7. Time per Task
+Show focus time per task on the card and in Analytics. Only works if sessions record the active task, so check that first.
+
+### 8. Recurring Templates
+"Create Weekly review every Monday". Builds on templates, with scheduling ideas borrowed from alarms.
+
+### 9. End-of-Day Wrap-up
+A short summary when the day ends (what was finished, how long was focused) that offers to move stale tasks forward.
+
+### Housekeeping Under Consideration
+- Remove some of the trackers and clean up history after a season ends. Undecided. Removing history is hard to undo, so decide after seeing what feels like noise over a full season.
