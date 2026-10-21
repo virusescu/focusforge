@@ -1,5 +1,5 @@
-import { type FC, type RefObject, useRef, useEffect, useState } from 'react';
-import { Trash2, Copy, CopyPlus, Check } from 'lucide-react';
+import { type FC, type RefObject, useCallback, useRef, useEffect, useState } from 'react';
+import { Trash2, Copy, CopyPlus, Palette } from 'lucide-react';
 import styles from './CanvasNoteView.module.scss';
 import { soundEngine } from '../utils/audio';
 import { copyRich } from '../utils/clipboard';
@@ -9,6 +9,7 @@ import type { MinSize } from '../utils/canvas';
 import { MarkdownView } from './MarkdownView';
 import { MarkdownToolbar } from './MarkdownToolbar';
 import { ConfirmDialog } from './ConfirmDialog';
+import { ContextMenu } from './ContextMenu';
 import type { BucketGeometry, CanvasNote } from '../types';
 
 // Exported for BucketsPage (placement/clamping); a one-off constant, not worth its own module
@@ -78,43 +79,16 @@ const NoteEditor: FC<NoteEditorProps> = ({ initialText, containerRef, onSave, on
   );
 };
 
-// ─── CopyNoteButton ──────────────────────────────────────────────────────────────
-interface CopyNoteButtonProps {
-  bodyRef: React.RefObject<HTMLDivElement | null>;
-}
-
-const CopyNoteButton: FC<CopyNoteButtonProps> = ({ bodyRef }) => {
-  const [copied, setCopied] = useState(false);
-
-  const handleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const el = bodyRef.current;
-    const html = el?.innerHTML ?? '';
-    const plain = el?.innerText ?? '';
-    copyRich(html, plain);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
-
-  return (
-    <button
-      className={styles.copyNoteBtn}
-      onClick={handleClick}
-      aria-label="copy note"
-      title="Copy note"
-    >
-      {copied ? <Check size={12} /> : <Copy size={12} />}
-    </button>
-  );
-};
-
 export const CanvasNoteView: FC<CanvasNoteViewProps> = ({
   note, zoom, zIndex, isEditing,
   onStartEdit, onEndEdit, onContentChange, onColorChange, onGeometryChange, onBringToFront, onDuplicate, onDelete,
 }) => {
   const rootRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
+  const colorInputRef = useRef<HTMLInputElement>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  const closeMenu = useCallback(() => setMenu(null), []);
 
   const { geom, isDragging, beginPointerDrag, handlePointerMove, handlePointerUp } = usePanelDrag({
     geometry: { x: note.x, y: note.y, w: note.w, h: note.h },
@@ -152,6 +126,13 @@ export const CanvasNoteView: FC<CanvasNoteViewProps> = ({
     onEndEdit(note.id);
   };
 
+  const handleContextMenu = (e: React.MouseEvent) => {
+    if (isEditing) return; // keep the native menu (paste, etc.) in the editor
+    e.preventDefault();
+    soundEngine.playClick();
+    setMenu({ x: e.clientX, y: e.clientY });
+  };
+
   const deleteNow = () => {
     soundEngine.playClick();
     setConfirmingDelete(false);
@@ -185,32 +166,21 @@ export const CanvasNoteView: FC<CanvasNoteViewProps> = ({
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
       onDoubleClick={handleDoubleClick}
+      onContextMenu={handleContextMenu}
     >
       {isEditing ? (
         <NoteEditor initialText={note.content} containerRef={rootRef} onSave={handleSave} onCancel={handleCancel} />
       ) : (
         <>
-          <div className={styles.controls}>
-            <input
-              type="color"
-              className={styles.colorInput}
-              value={note.color}
-              onChange={e => onColorChange(note.id, e.target.value)}
-              title="Note color"
-            />
-            <CopyNoteButton bodyRef={bodyRef} />
-            <button
-              className={styles.copyNoteBtn}
-              onClick={() => { soundEngine.playClick(); onDuplicate(note.id); }}
-              aria-label="duplicate note"
-              title="Duplicate note"
-            >
-              <CopyPlus size={12} />
-            </button>
-            <button className={styles.deleteBtn} onClick={handleDelete} title="Delete note">
-              <Trash2 size={12} />
-            </button>
-          </div>
+          <input
+            ref={colorInputRef}
+            type="color"
+            className={styles.colorInput}
+            value={note.color}
+            onChange={e => onColorChange(note.id, e.target.value)}
+            aria-label="Note color"
+            tabIndex={-1}
+          />
           <div ref={bodyRef} className={styles.body} data-canvas-scroll>
             {note.content ? (
               <MarkdownView source={note.content} onChange={next => onContentChange(note.id, next)} className={styles.markdown} />
@@ -219,6 +189,21 @@ export const CanvasNoteView: FC<CanvasNoteViewProps> = ({
             )}
           </div>
         </>
+      )}
+
+      {menu && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          onClose={closeMenu}
+          items={[
+            // The rendered note: rich text for editors that take it, plain text elsewhere
+            { label: 'Copy', icon: <Copy size={12} />, onSelect: () => { void copyRich(bodyRef.current?.innerHTML ?? '', bodyRef.current?.innerText ?? note.content); } },
+            { label: 'Duplicate', icon: <CopyPlus size={12} />, onSelect: () => onDuplicate(note.id) },
+            { label: 'Change color', icon: <Palette size={12} />, onSelect: () => colorInputRef.current?.click() },
+            { label: 'Delete', icon: <Trash2 size={12} />, onSelect: handleDelete },
+          ]}
+        />
       )}
 
       {confirmingDelete && (

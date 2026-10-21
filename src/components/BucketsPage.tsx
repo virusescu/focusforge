@@ -22,6 +22,7 @@ import {
   loadViewport,
   saveViewport,
   recenter,
+  centerOn,
   screenToWorld,
   wheelZoomFactor,
   zoomAt,
@@ -41,6 +42,10 @@ const DEFAULT_BUCKET_W = 300;
 const DEFAULT_BUCKET_H = 420;
 const GRID_SIZE = 24;
 const SAVE_DELAY_MS = 300;
+// Details drawer: dragged by its left edge; the canvas keeps at least DRAWER_MIN_CANVAS_W visible
+const DRAWER_DEFAULT_W = 420;
+const DRAWER_MIN_W = 280;
+const DRAWER_MIN_CANVAS_W = 160;
 const DEFAULT_NOTE_COLOR = '#ffcc33';
 const DEFAULT_NOTE_W = 260;
 const DEFAULT_NOTE_H = 200;
@@ -53,6 +58,18 @@ interface DragData {
   objectiveId: number;
   containerId: string;
 }
+
+// The nearest ancestor (below `root`) that is marked scrollable and currently overflows
+const scrollableAncestor = (from: Element, root: Element): Element | null => {
+  for (let el: Element | null = from; el && el !== root; el = el.parentElement) {
+    if (el.hasAttribute('data-canvas-scroll') && el.scrollHeight > el.clientHeight) return el;
+  }
+  return null;
+};
+
+// Presses on real controls never start a canvas pan; a plain press on a task card does not either (it drags the card)
+const PAN_CONTROLS = 'button, a, input, select, textarea, label, [data-no-pan]';
+const PAN_CONTROLS_AND_CARDS = `${PAN_CONTROLS}, [data-objective-id]`;
 
 const bucketIdOf = (containerId: string): number => Number(containerId.slice('bucket-'.length));
 
@@ -94,6 +111,10 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
   const panRef = useRef<{ startX: number; startY: number; panX: number; panY: number } | null>(null);
   const [isPanning, setIsPanning] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [drawerWidth, setDrawerWidth] = useState(DRAWER_DEFAULT_W);
+  // Bucket of the task last selected on this visit (Space centers on it)
+  const lastPickedBucketIdRef = useRef<number | null>(null);
+  const drawerResizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [dragged, setDragged] = useState<StrategicObjective | null>(null);
   const isDraggingRef = useRef(false);
@@ -102,6 +123,11 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
   const [isFirstVisit] = useState(() => localStorage.getItem(VIEWPORT_STORAGE_KEY) === null);
 
   const getRect = () => viewportRef.current?.getBoundingClientRect() ?? { left: 0, top: 0, width: 0, height: 0 };
+  // The part of the viewport not covered by the details drawer: recentering aims at its middle
+  const getVisibleSize = () => {
+    const rect = getRect();
+    return { width: rect.width - (detailsOpen ? Math.min(drawerWidth, rect.width) : 0), height: rect.height };
+  };
 
   // First visit (nothing stored): put the origin in the middle once layout is known
   useEffect(() => {
@@ -127,8 +153,19 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
     const el = viewportRef.current;
     if (!el) return;
     const handleWheel = (e: WheelEvent) => {
-      // Let scrollable panel lists and the details drawer scroll; Ctrl+wheel and Shift+wheel always zoom
-      if (!e.ctrlKey && !e.shiftKey && (e.target as Element).closest?.('[data-canvas-scroll]')) return;
+      const target = e.target as Element;
+      if (e.shiftKey && !e.ctrlKey) {
+        // Shift+wheel over a list that has a scrollbar scrolls it (Chromium reports it as deltaX)
+        const scroller = scrollableAncestor(target, el);
+        if (scroller) {
+          e.preventDefault();
+          scroller.scrollTop += e.deltaY || e.deltaX;
+          return;
+        }
+      } else if (!e.ctrlKey && target.closest?.('[data-no-pan], textarea')) {
+        // The details drawer and a note's text box keep their own plain-wheel scrolling
+        return;
+      }
       e.preventDefault();
       const rect = el.getBoundingClientRect();
       const sx = e.clientX - rect.left;
@@ -142,22 +179,51 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
     return () => el.removeEventListener('wheel', handleWheel);
   }, []);
 
-  const closeDetails = useCallback(() => setDetailsOpen(false), []);
+  // The drawer closes with its X button or Escape (not by pressing elsewhere); closing also deselects the task
+  const closeDetails = useCallback(() => {
+    setDetailsOpen(false);
+    setViewedObjective(null);
+  }, [setViewedObjective]);
+
+  const handleDrawerResizeStart = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    drawerResizeRef.current = { startX: e.clientX, startWidth: drawerWidth };
+  };
+
+  const handleDrawerResizeMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const drag = drawerResizeRef.current;
+    if (!drag) return;
+    const max = Math.max(DRAWER_MIN_W, (viewportRef.current?.clientWidth ?? 0) - DRAWER_MIN_CANVAS_W);
+    setDrawerWidth(Math.min(max, Math.max(DRAWER_MIN_W, drag.startWidth + drag.startX - e.clientX)));
+  };
+
+  const handleDrawerResizeEnd = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!drawerResizeRef.current) return;
+    e.currentTarget.releasePointerCapture?.(e.pointerId);
+    drawerResizeRef.current = null;
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (isTypingTarget(e.target)) return;
       if (e.key === ' ') {
         e.preventDefault();
-        const rect = getRect();
-        setVp(v => recenter(v, rect.width, rect.height));
+        const full = getRect();
+        const rect = { width: full.width - (detailsOpen ? Math.min(drawerWidth, full.width) : 0), height: full.height };
+        // The bucket of the task selected last on this visit, else the Mission panel; the origin if neither exists
+        const target = buckets.find(b => b.id === lastPickedBucketIdRef.current) ?? buckets.find(b => b.kind === 'mission');
+        setVp(v => target
+          ? centerOn(v, target.x + target.w / 2, target.y + target.h / 2, rect.width, rect.height)
+          : recenter(v, rect.width, rect.height));
       } else if (e.key === 'Escape') {
         // dnd-kit cancels an active drag on Escape; don't also leave the page
         if (isDraggingRef.current) return;
         if (showCategoryManager) {
           setShowCategoryManager(false);
         } else if (detailsOpen) {
-          setDetailsOpen(false);
+          closeDetails();
         } else {
           onBack();
         }
@@ -165,7 +231,7 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [detailsOpen, showCategoryManager, onBack]);
+  }, [detailsOpen, drawerWidth, showCategoryManager, onBack, closeDetails, buckets]);
 
   const startPan = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -175,7 +241,10 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
   };
 
   const handleViewportPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    const isBackground = e.target === e.currentTarget || (e.target as HTMLElement).dataset.testid === 'canvas-world';
+    const target = e.target as HTMLElement;
+    // Empty space inside a panel pans too (task cards, controls and the drawer keep their own behaviour)
+    const isEmptyPanelSpace = !!target.closest('[data-bucket-id]') && !target.closest(PAN_CONTROLS_AND_CARDS);
+    const isBackground = e.target === e.currentTarget || target.dataset.testid === 'canvas-world' || isEmptyPanelSpace;
     if (!(isBackground && e.button === 0) && e.button !== 1) return;
     startPan(e);
   };
@@ -188,7 +257,7 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
     if (!e.shiftKey || e.button !== 0) return;
     const target = e.target as Element;
     if (!e.currentTarget.contains(target)) return;
-    if (isTypingTarget(target) || target.closest('button, a, input, select, textarea, label, [data-no-pan]')) return;
+    if (isTypingTarget(target) || target.closest(PAN_CONTROLS)) return;
     e.stopPropagation();
     startPan(e);
   };
@@ -208,7 +277,7 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
 
   const handleRecenter = () => {
     soundEngine.playClick();
-    const rect = getRect();
+    const rect = getVisibleSize();
     setVp(v => recenter(v, rect.width, rect.height));
   };
 
@@ -242,9 +311,10 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
   const handleEndNoteEdit = useCallback((id: number) => setEditingNoteId(cur => (cur === id ? null : cur)), []);
 
   const handleOpenDetails = useCallback((id: number) => {
+    lastPickedBucketIdRef.current = objectivePool.find(o => o.id === id)?.bucket_id ?? null;
     setViewedObjective(id);
     setDetailsOpen(true);
-  }, [setViewedObjective]);
+  }, [setViewedObjective, objectivePool]);
 
   const handleManageCategories = useCallback(() => setShowCategoryManager(true), []);
 
@@ -344,7 +414,7 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
             <span>NEW_NOTE</span>
           </button>
           <span className={styles.zoomReadout}>{Math.round(vp.zoom * 100)}%</span>
-          <button className={styles.toolBtn} onClick={handleRecenter} title="Recenter (Space)">
+          <button className={styles.toolBtn} onClick={handleRecenter} title="Recenter on the origin">
             <span>⌖ ORIGIN</span>
           </button>
         </div>
@@ -407,8 +477,23 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
           </div>
 
           {detailsOpen && (
-            <div className={styles.detailsDrawer} data-details-barrier data-canvas-scroll data-no-pan onPointerDown={e => e.stopPropagation()}>
-              <ObjectiveDetails onClose={closeDetails} />
+            <div
+              className={styles.detailsDrawer}
+              style={{ width: drawerWidth }}
+              data-details-drawer
+              data-details-barrier
+              data-no-pan
+              onPointerDown={e => e.stopPropagation()}
+            >
+              <div
+                className={styles.drawerResizeHandle}
+                onPointerDown={handleDrawerResizeStart}
+                onPointerMove={handleDrawerResizeMove}
+                onPointerUp={handleDrawerResizeEnd}
+                onPointerCancel={handleDrawerResizeEnd}
+                title="Resize"
+              />
+              <ObjectiveDetails onClose={closeDetails} closeOnOutsidePress={false} />
             </div>
           )}
         </div>

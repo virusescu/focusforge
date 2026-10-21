@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { CreateFromTemplateModal } from './CreateFromTemplateModal';
 import type { Bucket, Template } from '../types';
 
@@ -35,6 +35,11 @@ const renderModal = (template: Template = BUG, props: { defaultBucketId?: number
 
 const fill = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } });
 const create = () => fireEvent.click(screen.getByRole('button', { name: 'CREATE_TASK' }));
+
+const pickBucket = (name: string) => {
+  fireEvent.click(screen.getByLabelText('BUCKET'));
+  fireEvent.click(screen.getByRole('option', { name }));
+};
 
 describe('CreateFromTemplateModal', () => {
   beforeEach(() => {
@@ -115,33 +120,51 @@ describe('CreateFromTemplateModal', () => {
   describe('bucket picker', () => {
     it('lists task-holding buckets only, not the Mission pseudo-bucket', () => {
       renderModal();
-      const options = Array.from((screen.getByLabelText('BUCKET') as HTMLSelectElement).options).map(o => o.text);
-      expect(options).toEqual(['Unsorted', 'Work']);
+      fireEvent.click(screen.getByLabelText('BUCKET'));
+      expect(within(screen.getByRole('listbox')).getAllByRole('option').map(o => o.textContent)).toEqual(['Unsorted', 'Work']);
     });
 
     it('defaults to the bucket of the panel it was opened from', () => {
       renderModal(BUG, { defaultBucketId: 9 });
-      expect(screen.getByLabelText('BUCKET')).toHaveValue('9');
+      expect(screen.getByLabelText('BUCKET')).toHaveTextContent('Work');
     });
 
     it('otherwise defaults to the last bucket used', () => {
       localStorage.setItem('last_bucket_id', '9');
       renderModal();
-      expect(screen.getByLabelText('BUCKET')).toHaveValue('9');
+      expect(screen.getByLabelText('BUCKET')).toHaveTextContent('Work');
     });
 
     it('falls back to Unsorted when the remembered bucket was deleted', () => {
       localStorage.setItem('last_bucket_id', '77');
       renderModal();
-      expect(screen.getByLabelText('BUCKET')).toHaveValue('2');
+      expect(screen.getByLabelText('BUCKET')).toHaveTextContent('Unsorted');
     });
 
     it('creates in the chosen bucket', () => {
       renderModal();
       fill('title', 'x');
-      fireEvent.change(screen.getByLabelText('BUCKET'), { target: { value: '9' } });
+      pickBucket('Work');
       create();
       expect(mockAddObjective).toHaveBeenCalledWith('x', null, false, expect.objectContaining({ bucketId: 9 }));
+    });
+
+    it('shows each bucket\'s color beside its name', () => {
+      renderModal();
+      fireEvent.click(screen.getByLabelText('BUCKET'));
+      for (const option of within(screen.getByRole('listbox')).getAllByRole('option')) {
+        expect(option.querySelector('span')?.getAttribute('style') ?? '').toMatch(/background-color/);
+      }
+    });
+
+    it('Escape closes just the list, then the dialog', () => {
+      const { onClose } = renderModal();
+      fireEvent.click(screen.getByLabelText('BUCKET'));
+      fireEvent.keyDown(screen.getByRole('listbox'), { key: 'Escape' });
+      expect(screen.queryByRole('listbox')).toBeNull();
+      expect(onClose).not.toHaveBeenCalled();
+      fireEvent.keyDown(window, { key: 'Escape' });
+      expect(onClose).toHaveBeenCalledOnce();
     });
   });
 
@@ -202,7 +225,7 @@ describe('CreateFromTemplateModal', () => {
   it('remembers the bucket and category it created with', async () => {
     renderModal();
     fill('title', 'x');
-    fireEvent.change(screen.getByLabelText('BUCKET'), { target: { value: '9' } });
+    pickBucket('Work');
     fireEvent.change(screen.getByLabelText('CATEGORY'), { target: { value: '5' } });
     create();
     await waitFor(() => expect(localStorage.getItem('last_bucket_id')).toBe('9'));
@@ -242,7 +265,7 @@ describe('CreateFromTemplateModal', () => {
       mockAddObjective.mockReturnValue(new Promise<void>(resolve => { finish = resolve; }));
       renderModal();
       fill('title', 'x');
-      fireEvent.change(screen.getByLabelText('BUCKET'), { target: { value: '9' } });
+      pickBucket('Work');
       create();
       expect(localStorage.getItem('last_bucket_id')).toBeNull();
       finish();

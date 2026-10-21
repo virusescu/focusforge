@@ -3,15 +3,21 @@ import { Plus } from 'lucide-react';
 import styles from './CategoryDotPicker.module.scss';
 import type { ObjectiveCategory } from '../types';
 import { soundEngine } from '../utils/audio';
+import { useEscapeToClose } from '../hooks/useEscapeToClose';
+
+const noop = () => {};
 
 interface Props {
   categories: ObjectiveCategory[];
   selectedCategoryId: number | null;
   onSelect: (categoryId: number | null) => void;
   onManage: () => void;
+  onClose?: () => void; // Escape closes the picker when given
 }
 
-export const CategoryDotPicker: FC<Props> = ({ categories, selectedCategoryId, onSelect, onManage }) => {
+export const CategoryDotPicker: FC<Props> = ({ categories, selectedCategoryId, onSelect, onManage, onClose }) => {
+  useEscapeToClose(onClose !== undefined, onClose ?? noop);
+
   const handleDotClick = (e: React.MouseEvent, categoryId: number) => {
     e.stopPropagation();
     soundEngine.playClick();

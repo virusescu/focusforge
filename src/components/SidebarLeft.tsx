@@ -1,6 +1,6 @@
 import { type FC, useCallback, useState, useRef, useEffect, useMemo } from 'react';
 import styles from './SidebarLeft.module.scss';
-import { Plus, X, Edit3, Check, LayoutGrid, MinusCircle, CopyPlus, Copy, BookmarkPlus } from 'lucide-react';
+import { Check, Crosshair, LayoutGrid, MinusCircle, CopyPlus, Copy, BookmarkPlus, Pencil, Trash2 } from 'lucide-react';
 import { useFocus } from '../contexts/FocusContext';
 import { soundEngine, playStartSound } from '../utils/audio';
 import { setStatusHint, clearStatusHint } from '../utils/statusHint';
@@ -22,10 +22,12 @@ import { CSS } from '@dnd-kit/utilities';
 import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
 import type { StrategicObjective, ObjectiveCategory, Bucket } from '../types';
 import { copyPlain } from '../utils/clipboard';
+import { readableOn } from '../utils/color';
 import { firstValidBucketId, firstValidCategoryId, loadLastPicks, saveLastPicks } from '../utils/lastPicks';
 import { ContextMenu } from './ContextMenu';
 import { SaveTemplateModal } from './SaveTemplateModal';
 import { TemplateButtons } from './TemplateButtons';
+import { BucketSelect } from './BucketSelect';
 import { CategoryDotPicker } from './CategoryDotPicker';
 import { CategoryManagerModal } from './CategoryManagerModal';
 import { AlarmsModal } from './AlarmsModal';
@@ -37,7 +39,7 @@ interface SortableItemProps {
   categories: ObjectiveCategory[];
   onSelect: (id: number) => void;
   onActivate: (id: number) => void;
-  onDelete: (e: React.MouseEvent, id: number) => void;
+  onDelete: (id: number) => void;
   onUpdate: (id: number, text: string) => void;
   onCategoryChange: (id: number, categoryId: number | null) => void;
   onManageCategories: () => void;
@@ -73,12 +75,13 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, isViewed, categori
     transition,
     opacity: isDragging ? 0.4 : 1,
     zIndex: isDragging ? 999 : undefined,
-    borderLeft: bucket ? `3px solid ${bucket.color}` : undefined,
+    // The row carries its bucket's color: a 2px border all around (always) and a dark shade as background
+    borderColor: bucket?.color,
+    ...(bucket ? { background: `color-mix(in srgb, ${bucket.color} 22%, var(--bg-dark))` } : {}),
   };
 
-  const handleEdit = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    soundEngine.playClick();
+  const startRename = () => {
+    soundEngine.playEditStart();
     setIsEditing(true);
   };
 
@@ -174,7 +177,8 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, isViewed, categori
               onCategoryChange(obj.id, catId);
               setShowPicker(false);
             }}
-            onManage={onManageCategories}
+            onManage={() => { setShowPicker(false); onManageCategories(); }}
+            onClose={() => setShowPicker(false)}
           />
         </div>
       )}
@@ -194,39 +198,23 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, isViewed, categori
           </button>
         </div>
       ) : (
-        <>
-          <div className={styles.objectiveText}>
-            <span className={styles.objectiveTextContent}>{obj.text}</span>
-          </div>
-          <button
-            className={styles.editBtn}
-            onClick={handleEdit}
-            onMouseEnter={() => { onHover(); setStatusHint('EDIT_OBJECTIVE'); }}
-            onMouseLeave={clearStatusHint}
-          >
-            <Edit3 size={12} />
-          </button>
-        </>
+        <div className={styles.objectiveText}>
+          <span className={styles.objectiveTextContent}>{obj.text}</span>
+        </div>
       )}
 
-      <button
-        className={styles.moveBtn}
-        onClick={(e) => { e.stopPropagation(); onRemoveFromMission(obj.id); }}
-        onMouseEnter={() => { onHover(); setStatusHint('REMOVE_FROM_MISSION'); }}
-        onMouseLeave={clearStatusHint}
-        title="Remove from Mission"
+      {/* Always rendered: CSS opens it (width transition) while the row is active */}
+      <div
+        className={styles.activeTab}
+        style={{ backgroundColor: bucket?.color ?? 'var(--primary)', color: bucket ? readableOn(bucket.color) : '#111111' }}
+        aria-hidden={!isActive}
+        data-testid="active-tab"
       >
-        <MinusCircle size={12} />
-      </button>
-
-      <button
-        className={styles.deleteBtn}
-        onClick={(e) => onDelete(e, obj.id)}
-        onMouseEnter={() => { onHover(); setStatusHint('DELETE_OBJECTIVE'); }}
-        onMouseLeave={clearStatusHint}
-      >
-        <X size={12} />
-      </button>
+        <div className={styles.activeTabInner} role={isActive ? 'img' : undefined} aria-label={isActive ? 'Active objective' : undefined}>
+          <Crosshair size={16} className={styles.activeRing} />
+          <span className={styles.activeDot} />
+        </div>
+      </div>
 
       {menu && (
         <ContextMenu
@@ -234,9 +222,12 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, isViewed, categori
           y={menu.y}
           onClose={closeMenu}
           items={[
+            { label: 'Rename', icon: <Pencil size={12} />, onSelect: startRename },
+            { label: 'Remove from Mission', icon: <MinusCircle size={12} />, onSelect: () => onRemoveFromMission(obj.id) },
             { label: 'Duplicate', icon: <CopyPlus size={12} />, onSelect: () => onDuplicate(obj.id) },
             { label: 'Copy text', icon: <Copy size={12} />, onSelect: () => { void copyPlain(obj.text); } },
             { label: 'Create template from task', icon: <BookmarkPlus size={12} />, onSelect: () => setSavingTemplate(true) },
+            { label: 'Delete', icon: <Trash2 size={12} />, onSelect: () => onDelete(obj.id) },
           ]}
         />
       )}
@@ -346,8 +337,7 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenDetails, onViewBuckets
     updateObjectiveCategory(id, categoryId);
   };
 
-  const handleDeleteObjective = (e: React.MouseEvent, id: number) => {
-    e.stopPropagation();
+  const handleDeleteObjective = (id: number) => {
     soundEngine.playClick();
     deleteObjective(id);
   };
@@ -459,7 +449,8 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenDetails, onViewBuckets
                   setCategoryChoice(catId);
                   setShowNewCategoryPicker(false);
                 }}
-                onManage={() => setShowCategoryManager(true)}
+                onManage={() => { setShowNewCategoryPicker(false); setShowCategoryManager(true); }}
+                onClose={() => setShowNewCategoryPicker(false)}
               />
             )}
             <input
@@ -471,20 +462,16 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenDetails, onViewBuckets
               onMouseEnter={handleHover}
               onKeyDown={handleInputKeyDown}
             />
-            <select
+            <BucketSelect
               className={styles.bucketSelect}
-              value={newBucketId ?? ''}
-              onChange={e => setBucketChoice(Number(e.target.value))}
+              buckets={holdingBuckets}
+              value={newBucketId}
+              onChange={setBucketChoice}
               onMouseEnter={() => setStatusHint('SET_BUCKET')}
               onMouseLeave={clearStatusHint}
-              aria-label="Bucket for new objective"
+              ariaLabel="Bucket for new objective"
               title="Bucket for the new objective"
-            >
-              {holdingBuckets.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
-            <button type="submit" className={styles.addBtn} onMouseEnter={handleHover}>
-              <Plus size={14} />
-            </button>
+            />
           </div>
         </form>
 

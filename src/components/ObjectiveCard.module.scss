@@ -24,9 +24,15 @@
     }
   }
 
-  &.viewed {
-    border-color: rgba(255, 255, 255, 0.3);
-    background: rgba(255, 255, 255, 0.05);
+  // Selected: bold text. A card without a bucket tint (inside its own bucket) also gets a lighter 2px border
+  &.viewed .text {
+    font-weight: bold;
+  }
+
+  &.viewed:not([data-tinted]) {
+    border-width: 2px;
+    border-color: rgba(255, 255, 255, 0.5);
+    padding: calc(0.5rem - 1px);
   }
 }
 
@@ -70,38 +76,4 @@
   font-size: 0.75rem;
   padding: 2px 4px;
   outline: none;
-}
-
-.actions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  flex-shrink: 0;
-}
-
-.actionBtn {
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 2px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0.3;
-  transition: all 0.2s ease;
-
-  &:hover {
-    color: var(--primary);
-    opacity: 1 !important;
-  }
-}
-
-.actionActive {
-  color: var(--primary);
-  opacity: 1;
-}
-
-.deleteBtn:hover {
-  color: #ef4444;
 }

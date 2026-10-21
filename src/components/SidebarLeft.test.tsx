@@ -1,10 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within, cleanup } from '@testing-library/react';
 import { SidebarLeft } from './SidebarLeft';
 import type { Bucket, Template } from '../types';
 
 const mockAddObjective = vi.fn();
 let mockTemplates: Template[] = [];
+let mockActiveId: number | null = null;
+const mockDeleteObjective = vi.fn();
+const mockSetObjectiveMission = vi.fn();
+const MISSION_OBJ = { id: 7, text: 'Ship it', created_at: '2026-10-13T00:00:00Z', is_mission: 1, bucket_id: 2, bucket_sort_order: 0, sort_order: 0, category_id: null };
 
 const bucket = (id: number, name: string, kind: Bucket['kind']): Bucket => ({ id, name, color: '#fff', sort_order: id, kind, x: 0, y: 0, w: 1, h: 1 });
 const BUCKETS = [bucket(1, 'Mission', 'mission'), bucket(2, 'Unsorted', 'unsorted'), bucket(9, 'Work', 'custom')];
@@ -16,18 +20,18 @@ const CATEGORIES = [
 vi.mock('../contexts/FocusContext', () => ({
   useFocus: () => ({
     objectivePool: [],
-    missionObjectives: [],
-    activeObjectiveId: null,
+    missionObjectives: [MISSION_OBJ],
+    activeObjectiveId: mockActiveId,
     viewedObjectiveId: null,
     addObjective: mockAddObjective,
-    deleteObjective: vi.fn(),
+    deleteObjective: mockDeleteObjective,
     duplicateObjective: vi.fn(),
     updateObjective: vi.fn(),
     updateObjectiveCategory: vi.fn(),
     setActiveObjective: vi.fn(),
     setViewedObjective: vi.fn(),
     reorderObjectives: vi.fn(),
-    setObjectiveMission: vi.fn(),
+    setObjectiveMission: mockSetObjectiveMission,
     categories: CATEGORIES,
     addCategory: vi.fn(),
     updateCategory: vi.fn(),
@@ -46,7 +50,11 @@ vi.mock('./AlarmsModal', () => ({ AlarmsModal: () => null }));
 
 const renderSidebar = () => render(<SidebarLeft onOpenDetails={vi.fn()} onViewBuckets={vi.fn()} />);
 const input = () => screen.getByPlaceholderText('Add Objective...');
-const bucketSelect = () => screen.getByLabelText('Bucket for new objective') as HTMLSelectElement;
+const bucketSelect = () => screen.getByLabelText('Bucket for new objective');
+const pickBucket = (name: string) => {
+  fireEvent.click(bucketSelect());
+  fireEvent.click(screen.getByRole('option', { name }));
+};
 const add = (text: string, init: KeyboardEventInit = { key: 'Enter' }) => {
   fireEvent.change(input(), { target: { value: text } });
   fireEvent.keyDown(input(), init);
@@ -62,31 +70,32 @@ describe('SidebarLeft add box', () => {
 
   it('offers the buckets that can hold tasks, starting on Unsorted', () => {
     renderSidebar();
-    expect(Array.from(bucketSelect().options).map(o => o.text)).toEqual(['Unsorted', 'Work']);
-    expect(bucketSelect()).toHaveValue('2');
+    expect(bucketSelect()).toHaveTextContent('Unsorted');
+    fireEvent.click(bucketSelect());
+    expect(screen.getAllByRole('option').map(o => o.textContent)).toEqual(['Unsorted', 'Work']);
   });
 
   it('adds into the chosen bucket and defaults to the first category', async () => {
     renderSidebar();
-    fireEvent.change(bucketSelect(), { target: { value: '9' } });
+    pickBucket('Work');
     add('Write report');
     await waitFor(() => expect(mockAddObjective).toHaveBeenCalledWith('Write report', 4, false, { bucketId: 9 }));
   });
 
   it('Shift+Enter still adds to the top, in the chosen bucket', async () => {
     renderSidebar();
-    fireEvent.change(bucketSelect(), { target: { value: '9' } });
+    pickBucket('Work');
     add('Urgent', { key: 'Enter', shiftKey: true });
     await waitFor(() => expect(mockAddObjective).toHaveBeenCalledWith('Urgent', 4, true, { bucketId: 9 }));
   });
 
   it('keeps the bucket after an add and remembers it for next time', async () => {
     renderSidebar();
-    fireEvent.change(bucketSelect(), { target: { value: '9' } });
+    pickBucket('Work');
     add('One');
     await waitFor(() => expect(mockAddObjective).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(localStorage.getItem('last_bucket_id')).toBe('9'));
-    expect(bucketSelect()).toHaveValue('9');
+    expect(bucketSelect()).toHaveTextContent('Work');
     expect(input()).toHaveValue('');
     add('Two');
     await waitFor(() => expect(mockAddObjective).toHaveBeenLastCalledWith('Two', 4, false, { bucketId: 9 }));
@@ -96,7 +105,7 @@ describe('SidebarLeft add box', () => {
     localStorage.setItem('last_bucket_id', '9');
     localStorage.setItem('last_category_id', '5');
     renderSidebar();
-    expect(bucketSelect()).toHaveValue('9');
+    expect(bucketSelect()).toHaveTextContent('Work');
     add('Remembered');
     await waitFor(() => expect(mockAddObjective).toHaveBeenCalledWith('Remembered', 5, false, { bucketId: 9 }));
   });
@@ -105,7 +114,7 @@ describe('SidebarLeft add box', () => {
     localStorage.setItem('last_bucket_id', '77');
     localStorage.setItem('last_category_id', '99');
     renderSidebar();
-    expect(bucketSelect()).toHaveValue('2');
+    expect(bucketSelect()).toHaveTextContent('Unsorted');
     add('Fallback');
     await waitFor(() => expect(mockAddObjective).toHaveBeenCalledWith('Fallback', 4, false, { bucketId: 2 }));
   });
@@ -124,5 +133,88 @@ describe('SidebarLeft add box', () => {
     renderSidebar();
     fireEvent.click(screen.getByRole('button', { name: 'Bug' }));
     expect(screen.getByLabelText('ADD_TO_MISSION')).toBeChecked();
+  });
+});
+
+describe('SidebarLeft task rows', () => {
+  const row = () => screen.getByText('Ship it').closest('[data-bucket-id]') as HTMLElement;
+
+  beforeEach(() => {
+    mockActiveId = null;
+    mockDeleteObjective.mockClear();
+    mockSetObjectiveMission.mockClear();
+  });
+
+  it('has no buttons; rename, remove-from-mission and delete are in the right-click menu', () => {
+    renderSidebar();
+    expect(row().querySelectorAll('button')).toHaveLength(0);
+    fireEvent.contextMenu(row());
+    expect(screen.getAllByRole('menuitem').map(i => i.textContent)).toEqual([
+      'Rename', 'Remove from Mission', 'Duplicate', 'Copy text', 'Create template from task', 'Delete',
+    ]);
+  });
+
+  it('Rename in the menu starts inline rename', () => {
+    renderSidebar();
+    const el = row();
+    fireEvent.contextMenu(el);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }));
+    expect(within(el).getByDisplayValue('Ship it')).toBeInTheDocument();
+  });
+
+  it('shows the active tab only on the active row, in the bucket color', () => {
+    renderSidebar();
+    expect(row().className).not.toMatch(/activeObjective/);
+    expect(screen.queryByRole('img', { name: 'Active objective' })).toBeNull();
+    cleanup();
+    mockActiveId = 7;
+    renderSidebar();
+    expect(row().className).toMatch(/activeObjective/);
+    expect(within(row()).getByRole('img', { name: 'Active objective' })).toBeInTheDocument();
+    const tab = within(row()).getByTestId('active-tab');
+    expect(tab.style.backgroundColor).toMatch(/rgb\(255, 255, 255\)|#fff/i);
+    expect(tab.style.color).toMatch(/rgb\(17, 17, 17\)|#111111/i);
+  });
+
+  it('keeps the bucket-colored border on every row', () => {
+    renderSidebar();
+    expect(row().style.borderColor).toMatch(/rgb\(255, 255, 255\)|#fff/i);
+  });
+
+  it('tints the row with its bucket color', () => {
+    renderSidebar();
+    expect(row().style.background).toContain('color-mix');
+  });
+
+  it('Remove from Mission in the menu takes the task off the list without deleting it', () => {
+    renderSidebar();
+    fireEvent.contextMenu(row());
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Remove from Mission' }));
+    expect(mockSetObjectiveMission).toHaveBeenCalledWith(7, false);
+    expect(mockDeleteObjective).not.toHaveBeenCalled();
+  });
+
+  it('Delete in the menu deletes the task', () => {
+    renderSidebar();
+    fireEvent.contextMenu(row());
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete' }));
+    expect(mockDeleteObjective).toHaveBeenCalledWith(7);
+  });
+
+  it('Escape closes the category picker without reaching the page', () => {
+    const pageKey = vi.fn();
+    window.addEventListener('keydown', pageKey);
+    renderSidebar();
+    fireEvent.click(row().querySelector('span') as HTMLElement); // category bullet
+    expect(screen.getByTitle('Manage Categories')).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByTitle('Manage Categories')).toBeNull();
+    expect(pageKey).not.toHaveBeenCalled();
+    window.removeEventListener('keydown', pageKey);
+  });
+
+  it('has no Add button beside the add box', () => {
+    renderSidebar();
+    expect(input().parentElement?.querySelector('button[type="submit"]')).toBeNull();
   });
 });

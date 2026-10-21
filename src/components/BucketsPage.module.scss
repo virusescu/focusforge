@@ -128,7 +128,6 @@
   right: 0;
   top: 0;
   bottom: 0;
-  width: 420px;
   max-width: 100%;
   padding: 12px;
   background: var(--bg-card);
@@ -140,6 +139,21 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+}
+
+.drawerResizeHandle {
+  position: absolute;
+  left: -3px;
+  top: 0;
+  bottom: 0;
+  width: 7px;
+  cursor: col-resize;
+  touch-action: none;
+  z-index: 1;
+
+  &:hover {
+    background: var(--primary-muted);
+  }
 }
 
 .dragOverlay {

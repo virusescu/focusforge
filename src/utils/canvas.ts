@@ -37,9 +37,14 @@ export function zoomAt(vp: Viewport, sx: number, sy: number, factor: number): Vi
   return { zoom, panX: sx - world.x * zoom, panY: sy - world.y * zoom };
 }
 
+// Puts the world point at the viewport center, keeping the zoom.
+export function centerOn(vp: Viewport, worldX: number, worldY: number, viewportWidth: number, viewportHeight: number): Viewport {
+  return { zoom: vp.zoom, panX: viewportWidth / 2 - worldX * vp.zoom, panY: viewportHeight / 2 - worldY * vp.zoom };
+}
+
 // Puts world (0,0) at the viewport center, keeping the zoom.
 export function recenter(vp: Viewport, viewportWidth: number, viewportHeight: number): Viewport {
-  return { zoom: vp.zoom, panX: viewportWidth / 2, panY: viewportHeight / 2 };
+  return centerOn(vp, 0, 0, viewportWidth, viewportHeight);
 }
 
 // Grid step (world units) for move/resize. Snapping is the default; holding Shift moves

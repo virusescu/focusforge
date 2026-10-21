@@ -1,4 +1,5 @@
 import { type FC, useId, useMemo, useRef, useState } from 'react';
+import { BucketSelect } from './BucketSelect';
 import { ModalFrame } from './ModalFrame';
 import form from './TemplateForm.module.scss';
 import { useFocus } from '../contexts/FocusContext';
@@ -87,14 +88,13 @@ export const CreateFromTemplateModal: FC<CreateFromTemplateModalProps> = ({ temp
       <div className={form.row}>
         <div className={form.field}>
           <label htmlFor={`${id}-bucket`}>BUCKET</label>
-          <select
+          <BucketSelect
             id={`${id}-bucket`}
             className={form.select}
-            value={bucketId ?? ''}
-            onChange={e => setBucketId(Number(e.target.value))}
-          >
-            {holdingBuckets.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </select>
+            buckets={holdingBuckets}
+            value={bucketId}
+            onChange={setBucketId}
+          />
         </div>
         <div className={form.field}>
           <label htmlFor={`${id}-category`}>CATEGORY</label>

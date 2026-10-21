@@ -1,7 +1,7 @@
 import { type FC, useState, useRef, useEffect, useCallback } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { FileText, Target, MinusCircle, CopyPlus, Copy, BookmarkPlus, X } from 'lucide-react';
+import { FileText, Target, MinusCircle, CopyPlus, Copy, BookmarkPlus, Pencil, Trash2 } from 'lucide-react';
 import styles from './ObjectiveCard.module.scss';
 import { useFocus } from '../contexts/FocusContext';
 import { soundEngine } from '../utils/audio';
@@ -25,7 +25,7 @@ interface ObjectiveCardProps {
 }
 
 export const ObjectiveCard: FC<ObjectiveCardProps> = ({ obj, containerId, categories, isViewed, inMissionPanel, onOpenDetails, onManageCategories, zoom = 1 }) => {
-  const { buckets, updateObjective, deleteObjective, duplicateObjective, updateObjectiveCategory, setObjectiveMission, setViewedObjective } = useFocus();
+  const { buckets, updateObjective, deleteObjective, duplicateObjective, updateObjectiveCategory, setObjectiveMission } = useFocus();
   // The same objective can appear in the Mission panel and in its bucket, so the id includes the container
   const [isEditing, setIsEditing] = useState(false);
   // The whole card is the drag source (the sensor's 5px threshold keeps clicks and double-clicks
@@ -73,14 +73,20 @@ export const ObjectiveCard: FC<ObjectiveCardProps> = ({ obj, containerId, catego
     transform: CSS.Transform.toString(transform ? { ...transform, x: transform.x / zoom, y: transform.y / zoom } : null),
     transition,
     opacity: isDragging ? 0.4 : 1,
-    borderLeft: bucketColor ? `3px solid ${bucketColor}` : undefined,
+    // In the Mission panel the card carries its bucket's color: a border in that color and a dark shade as background
+    ...(bucketColor ? { borderColor: bucketColor } : {}),
+    ...(bucketColor ? { background: `color-mix(in srgb, ${bucketColor} 22%, var(--bg-dark))` } : {}),
+  };
+
+  const startRename = () => {
+    soundEngine.playEditStart();
+    setEditText(obj.text);
+    setIsEditing(true);
   };
 
   const startEditing = (e: React.MouseEvent) => {
     e.stopPropagation();
-    soundEngine.playEditStart();
-    setEditText(obj.text);
-    setIsEditing(true);
+    startRename();
   };
 
   const handleSave = () => {
@@ -104,7 +110,7 @@ export const ObjectiveCard: FC<ObjectiveCardProps> = ({ obj, containerId, catego
   const handleClick = () => {
     if (isEditing) return;
     soundEngine.playClick();
-    setViewedObjective(obj.id);
+    onOpenDetails(obj.id);
   };
 
   const handleContextMenu = (e: React.MouseEvent) => {
@@ -114,14 +120,12 @@ export const ObjectiveCard: FC<ObjectiveCardProps> = ({ obj, containerId, catego
     setMenu({ x: e.clientX, y: e.clientY });
   };
 
-  const handleMissionToggle = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleMissionToggle = () => {
     soundEngine.playClick();
     setObjectiveMission(obj.id, inMissionPanel ? false : !isMission);
   };
 
-  const handleDelete = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleDelete = () => {
     soundEngine.playClick();
     deleteObjective(obj.id);
   };
@@ -135,6 +139,7 @@ export const ObjectiveCard: FC<ObjectiveCardProps> = ({ obj, containerId, catego
       onClick={handleClick}
       onContextMenu={handleContextMenu}
       data-objective-id={obj.id}
+      data-tinted={bucketColor ? '' : undefined}
     >
       <span
         className={styles.categoryBullet}
@@ -153,7 +158,8 @@ export const ObjectiveCard: FC<ObjectiveCardProps> = ({ obj, containerId, catego
               updateObjectiveCategory(obj.id, catId);
               setShowPicker(false);
             }}
-            onManage={onManageCategories}
+            onManage={() => { setShowPicker(false); onManageCategories(); }}
+            onClose={() => setShowPicker(false)}
           />
         </div>
       )}
@@ -175,57 +181,21 @@ export const ObjectiveCard: FC<ObjectiveCardProps> = ({ obj, containerId, catego
         </span>
       )}
 
-      <div className={styles.actions}>
-        <button
-          className={styles.actionBtn}
-          onClick={(e) => { e.stopPropagation(); soundEngine.playClick(); onOpenDetails(obj.id); }}
-          onMouseEnter={() => setStatusHint('OPEN_DETAILS')}
-          onMouseLeave={clearStatusHint}
-          title="Details"
-        >
-          <FileText size={12} />
-        </button>
-        {inMissionPanel ? (
-          <button
-            className={styles.actionBtn}
-            onClick={handleMissionToggle}
-            onMouseEnter={() => setStatusHint('REMOVE_FROM_MISSION')}
-            onMouseLeave={clearStatusHint}
-            title="Remove from Mission"
-          >
-            <MinusCircle size={12} />
-          </button>
-        ) : (
-          <button
-            className={`${styles.actionBtn} ${isMission ? styles.actionActive : ''}`}
-            onClick={handleMissionToggle}
-            onMouseEnter={() => setStatusHint(isMission ? 'REMOVE_FROM_MISSION' : 'ADD_TO_MISSION')}
-            onMouseLeave={clearStatusHint}
-            title={isMission ? 'Remove from Mission' : 'Add to Mission'}
-          >
-            <Target size={12} />
-          </button>
-        )}
-        <button
-          className={`${styles.actionBtn} ${styles.deleteBtn}`}
-          onClick={handleDelete}
-          onMouseEnter={() => setStatusHint('DELETE_OBJECTIVE')}
-          onMouseLeave={clearStatusHint}
-          title="Delete"
-        >
-          <X size={12} />
-        </button>
-      </div>
-
       {menu && (
         <ContextMenu
           x={menu.x}
           y={menu.y}
           onClose={closeMenu}
           items={[
+            { label: 'Rename', icon: <Pencil size={12} />, onSelect: startRename },
+            { label: 'Details', icon: <FileText size={12} />, onSelect: () => onOpenDetails(obj.id) },
+            inMissionPanel || isMission
+              ? { label: 'Remove from Mission', icon: <MinusCircle size={12} />, onSelect: handleMissionToggle }
+              : { label: 'Add to Mission', icon: <Target size={12} />, onSelect: handleMissionToggle },
             { label: 'Duplicate', icon: <CopyPlus size={12} />, onSelect: () => { void duplicateObjective(obj.id); } },
             { label: 'Copy text', icon: <Copy size={12} />, onSelect: () => { void copyPlain(obj.text); } },
             { label: 'Create template from task', icon: <BookmarkPlus size={12} />, onSelect: () => setSavingTemplate(true) },
+            { label: 'Delete', icon: <Trash2 size={12} />, onSelect: handleDelete },
           ]}
         />
       )}

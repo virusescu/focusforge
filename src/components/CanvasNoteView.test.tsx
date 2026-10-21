@@ -38,6 +38,10 @@ function Harness({ note = NOTE, startEditing = false }: { note?: CanvasNote; sta
 }
 
 const noteEl = () => document.querySelector('[data-note-id="5"]') as HTMLElement;
+const chooseFromMenu = (name: string) => {
+  fireEvent.contextMenu(noteEl());
+  fireEvent.click(screen.getByRole('menuitem', { name }));
+};
 
 describe('CanvasNoteView', () => {
   beforeEach(() => {
@@ -131,7 +135,7 @@ describe('CanvasNoteView', () => {
   it('delete asks for confirmation in an in-app dialog when the note has content', () => {
     const nativeConfirm = vi.spyOn(window, 'confirm');
     render(<Harness />);
-    fireEvent.click(within(noteEl()).getByTitle('Delete note'));
+    chooseFromMenu('Delete');
     expect(screen.getByRole('dialog', { name: 'DELETE_NOTE' })).toBeInTheDocument();
     expect(nativeConfirm).not.toHaveBeenCalled();
     expect(handlers.onDelete).not.toHaveBeenCalled();
@@ -140,7 +144,7 @@ describe('CanvasNoteView', () => {
 
   it('confirming in the dialog deletes the note', () => {
     render(<Harness />);
-    fireEvent.click(within(noteEl()).getByTitle('Delete note'));
+    chooseFromMenu('Delete');
     fireEvent.click(screen.getByRole('button', { name: 'DELETE' }));
     expect(handlers.onDelete).toHaveBeenCalledWith(5);
     expect(screen.queryByRole('dialog')).toBeNull();
@@ -148,7 +152,7 @@ describe('CanvasNoteView', () => {
 
   it('cancelling the dialog keeps the note', () => {
     render(<Harness />);
-    fireEvent.click(within(noteEl()).getByTitle('Delete note'));
+    chooseFromMenu('Delete');
     fireEvent.click(screen.getByRole('button', { name: 'CANCEL' }));
     expect(handlers.onDelete).not.toHaveBeenCalled();
     expect(screen.queryByRole('dialog')).toBeNull();
@@ -157,7 +161,7 @@ describe('CanvasNoteView', () => {
 
   it('Escape in the dialog cancels', () => {
     render(<Harness />);
-    fireEvent.click(within(noteEl()).getByTitle('Delete note'));
+    chooseFromMenu('Delete');
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(handlers.onDelete).not.toHaveBeenCalled();
     expect(screen.queryByRole('dialog')).toBeNull();
@@ -165,14 +169,14 @@ describe('CanvasNoteView', () => {
 
   it('an empty note is deleted without confirmation', () => {
     render(<Harness note={{ ...NOTE, content: '  ' }} />);
-    fireEvent.click(within(noteEl()).getByTitle('Delete note'));
+    chooseFromMenu('Delete');
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(handlers.onDelete).toHaveBeenCalledWith(5);
   });
 
   it('changing the color reports it', () => {
     render(<Harness />);
-    fireEvent.change(within(noteEl()).getByTitle('Note color'), { target: { value: '#3388ff' } });
+    fireEvent.change(within(noteEl()).getByLabelText('Note color'), { target: { value: '#3388ff' } });
     expect(handlers.onColorChange).toHaveBeenCalledWith(5, '#3388ff');
   });
 
@@ -190,31 +194,38 @@ describe('CanvasNoteView', () => {
     expect(within(noteEl()).queryByRole('textbox')).toBeNull();
   });
 
-  it('note card in view mode shows a copy button', () => {
+  it('has no hover buttons: everything lives in the right-click menu', () => {
     render(<Harness />);
-    expect(within(noteEl()).getByRole('button', { name: /copy note/i })).toBeInTheDocument();
+    expect(within(noteEl()).queryAllByRole('button')).toHaveLength(0);
+    fireEvent.contextMenu(noteEl());
+    expect(screen.getAllByRole('menuitem').map(i => i.textContent)).toEqual(['Copy', 'Duplicate', 'Change color', 'Delete']);
   });
 
-  it('copy button is not visible when note is in edit mode', () => {
-    render(<Harness startEditing />);
-    expect(within(noteEl()).queryByRole('button', { name: /copy note/i })).toBeNull();
+  it('Copy in the menu copies the note content to the clipboard', () => {
+    render(<Harness />);
+    chooseFromMenu('Copy');
+    expect(copyRich).toHaveBeenCalledOnce();
+    expect(vi.mocked(copyRich).mock.calls[0][0]).toContain('Title');
   });
 
-  it('duplicate button reports the note and does not enter edit mode', () => {
+  it('Duplicate in the menu reports the note and does not enter edit mode', () => {
     render(<Harness />);
-    fireEvent.click(within(noteEl()).getByRole('button', { name: /duplicate note/i }));
+    chooseFromMenu('Duplicate');
     expect(handlers.onDuplicate).toHaveBeenCalledWith(5);
     expect(within(noteEl()).queryByRole('textbox')).toBeNull();
+    expect(screen.queryByRole('menu')).toBeNull();
   });
 
-  it('duplicate button is hidden while editing', () => {
-    render(<Harness startEditing />);
-    expect(within(noteEl()).queryByRole('button', { name: /duplicate note/i })).toBeNull();
-  });
-
-  it('clicking copy button calls copyRich', () => {
+  it('Change color opens the color picker', () => {
     render(<Harness />);
-    fireEvent.click(within(noteEl()).getByRole('button', { name: /copy note/i }));
-    expect(copyRich).toHaveBeenCalledOnce();
+    const click = vi.spyOn(within(noteEl()).getByLabelText('Note color'), 'click');
+    chooseFromMenu('Change color');
+    expect(click).toHaveBeenCalledOnce();
+  });
+
+  it('right-click while editing keeps the native menu', () => {
+    render(<Harness startEditing />);
+    fireEvent.contextMenu(within(noteEl()).getByRole('textbox'));
+    expect(screen.queryByRole('menu')).toBeNull();
   });
 });

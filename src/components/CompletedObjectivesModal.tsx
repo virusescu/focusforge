@@ -46,6 +46,8 @@ export const CompletedObjectivesModal: FC<Props> = ({ objectives, categories, on
         e.stopPropagation();
         if (editingId !== null) {
           setEditingId(null);
+        } else if (pickerOpenId !== null) {
+          setPickerOpenId(null);
         } else {
           handleClose();
         }
@@ -53,7 +55,7 @@ export const CompletedObjectivesModal: FC<Props> = ({ objectives, categories, on
     };
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [editingId, handleClose]);
+  }, [editingId, pickerOpenId, handleClose]);
 
   const handleStartEdit = (obj: StrategicObjective) => {
     soundEngine.playClick();

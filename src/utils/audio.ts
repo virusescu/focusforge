@@ -476,6 +476,27 @@ export const soundEngine = new SoundEngine();
 export const playNeutralizeChime = () => soundEngine.playNeutralizeChime();
 export const playBoom = () => soundEngine.playBoom();
 
+// The two long file sounds (activating a task, completing one) share one channel: starting either cuts
+// off whichever is still playing, so they never pile up.
+let longSound: HTMLAudioElement | null = null;
+
+async function playLongSound(audio: HTMLAudioElement): Promise<void> {
+  if (longSound) {
+    longSound.pause();
+    longSound.currentTime = 0;
+  }
+  longSound = audio;
+  audio.addEventListener('ended', () => { if (longSound === audio) longSound = null; });
+  try {
+    await audio.play();
+  } catch (e) {
+    // Cut off by the next long sound before it began: not an error, and no fallback sound
+    if (e instanceof DOMException && e.name === 'AbortError') return;
+    if (longSound === audio) longSound = null;
+    throw e;
+  }
+}
+
 export async function playObjectiveComplete(): Promise<void> {
   try {
     const count = await probeSoundCount('objective-complete');
@@ -484,7 +505,7 @@ export async function playObjectiveComplete(): Promise<void> {
     const audio = new Audio(`/sounds/objective-complete-${soundIndex}.mp3`);
     audio.volume = 0.8 + Math.random() * 0.15;
     audio.playbackRate = 0.95 + Math.random() * 0.1;
-    await audio.play();
+    await playLongSound(audio);
   } catch (e) {
     console.error('Failed to play reward sound:', e);
     soundEngine.playBoom();
@@ -540,7 +561,7 @@ export function playStartSound(): void {
   const audio = preloadedStartAudio.cloneNode(true) as HTMLAudioElement;
   audio.volume = 0.8 + Math.random() * 0.15;
   audio.playbackRate = 0.95 + Math.random() * 0.1;
-  audio.play().catch(() => soundEngine.playStart());
+  playLongSound(audio).catch(() => soundEngine.playStart());
 }
 
 export async function playChargeClickWithFile(step: number): Promise<void> {

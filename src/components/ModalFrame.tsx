@@ -29,6 +29,8 @@ export const ModalFrame: FC<ModalFrameProps> = ({ title, onClose, children, foot
     // Capture + stop: Escape closes only this dialog, not Settings, the canvas page or the session
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
+      // A drop-down list opened from the dialog closes itself first (its own Escape handler runs next)
+      if (document.querySelector('[data-handles-escape]')) return;
       e.preventDefault();
       e.stopPropagation();
       onClose();

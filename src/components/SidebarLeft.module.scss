@@ -1,3 +1,5 @@
+$active-tab-width: 32px;
+
 .sidebar {
   display: flex;
   flex-direction: column;
@@ -79,36 +81,19 @@
   }
 
   .bucketSelect {
-    flex: 0 1 96px;
+    flex: 0 1 108px;
     min-width: 0;
     background: var(--bg-dark);
     border: 1px solid var(--border);
     color: var(--text-secondary);
     font-family: var(--font-mono);
     font-size: 0.65rem;
-    padding: 0.4rem 0.2rem;
+    padding: 0.4rem 0.6rem; // matches the rows of the drop-down list
     outline: none;
     cursor: pointer;
 
     &:focus {
       border-color: var(--primary);
-    }
-  }
-
-  .addBtn {
-    background: transparent;
-    border: 1px solid var(--primary);
-    color: var(--primary);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0 0.5rem;
-    cursor: pointer;
-    transition: all 0.2s ease;
-
-    &:hover {
-      background: var(--primary-muted);
-      box-shadow: 0 0 10px var(--primary-glow);
     }
   }
 }
@@ -136,11 +121,13 @@
 }
 
 .objectiveItem {
+  position: relative; // anchors the active tab to the row's right edge
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   padding: 0.5rem;
   font-size: 0.75rem;
+  // The bucket color is set inline
   border: 1px solid var(--border);
   background: rgba(var(--primary-rgb), 0.05);
   cursor: grab;
@@ -149,29 +136,28 @@
   &:active {
     cursor: grabbing;
   }
-  transition: all 0.2s ease;
+  transition: all 0.25s ease;
   font-family: var(--font-mono);
 
   &:hover {
     border-color: var(--primary);
     background: rgba(var(--primary-rgb), 0.1);
+  }
 
-    .deleteBtn, .editBtn {
-      opacity: 0.6;
+  // Active (the main target): a 2px border (the padding keeps the row size); the right padding makes room for the tab
+  &.activeObjective {
+    border-width: 2px;
+    padding: calc(0.5rem - 1px);
+    padding-right: calc(#{$active-tab-width} + 0.5rem);
+
+    .activeTab {
+      width: $active-tab-width;
     }
   }
 
-  &.viewedObjective {
-    border-color: rgba(255, 255, 255, 0.3);
-    background: rgba(255, 255, 255, 0.03);
-  }
-
-  &.activeObjective {
-    border-color: var(--primary);
-    box-shadow: inset 0 0 10px var(--primary-glow);
+  // Selected (details open): bold text; the border and tint stay as they are
+  &.viewedObjective .objectiveTextContent {
     font-weight: bold;
-    color: var(--primary);
-    animation: activePulse 3s infinite ease-in-out;
   }
 
   &.stale {
@@ -198,10 +184,54 @@
   }
 }
 
-@keyframes activePulse {
-  0% { background-color: rgba(0, 0, 0, 0.8); }
-  50% { background-color: rgba(40, 40, 40, 0.8); }
-  100% { background-color: rgba(0, 0, 0, 0.8); }
+// The tab is always in the row, closed (zero width) until the row is active. It is pinned to the row's right
+// edge (inside the border), so the width transition makes it grow out of that edge on activation and
+// retract into it on deactivation.
+.activeTab {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 0;
+  overflow: hidden;
+  transition: width 0.25s ease;
+}
+
+// Anchored to the right edge at full width, so the icon is revealed (not squeezed) as the tab opens
+.activeTabInner {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: $active-tab-width;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.activeRing {
+  animation: activeSpin 4s linear infinite;
+}
+
+.activeDot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: activeDot 1.4s ease-in-out infinite;
+}
+
+@keyframes activeSpin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes activeDot {
+  0%, 100% { transform: scale(0.7); opacity: 0.6; }
+  50% { transform: scale(1.5); opacity: 1; }
 }
 
 .categoryBullet {
@@ -263,26 +293,6 @@
   margin-top: 2px;
 }
 
-.deleteBtn {
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 2px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0.4;
-  transition: all 0.2s ease;
-  flex-shrink: 0;
-  margin-top: 2px;
-
-  &:hover {
-    color: #ef4444;
-    opacity: 1 !important;
-  }
-}
-
 .emptyPool {
   font-size: 0.65rem;
   color: var(--text-muted);
@@ -317,27 +327,6 @@
   color: var(--text-muted);
   border-left: 2px solid var(--border);
 }
-
-.editBtn {
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 2px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0.4;
-  transition: all 0.2s ease;
-  flex-shrink: 0;
-  margin-top: 2px;
-
-  &:hover {
-    color: var(--primary);
-    opacity: 1 !important;
-  }
-}
-
 .editInput {
   flex: 1;
   background: var(--bg-dark);
@@ -401,27 +390,5 @@
     background: var(--btn-color);
     color: #000000;
     box-shadow: 0 0 20px var(--btn-color);
-  }
-}
-
-.moveBtn {
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 2px 4px;
-  font-size: 0.75rem;
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-  transition: color 0.15s;
-  opacity: 0;
-
-  .objectiveItem:hover & {
-    opacity: 1;
-  }
-
-  &:hover {
-    color: var(--primary);
   }
 }

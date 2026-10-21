@@ -60,7 +60,7 @@ describe('TemplateButtons', () => {
   it('passes the panel\'s bucket and Mission default to the dialog', () => {
     render(<TemplateButtons defaultBucketId={9} />);
     fireEvent.click(screen.getByRole('button', { name: 'Bug' }));
-    expect(screen.getByLabelText('BUCKET')).toHaveValue('9');
+    expect(screen.getByLabelText('BUCKET')).toHaveTextContent('Work');
     expect(screen.getByLabelText('ADD_TO_MISSION')).toBeChecked();
   });
 

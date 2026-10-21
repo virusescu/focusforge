@@ -10,9 +10,11 @@ import { MarkdownToolbar } from './MarkdownToolbar';
 
 interface Props {
   onClose: () => void;
+  // Pressing elsewhere closes the panel (the HUD sidebar); the canvas drawer stays open until closed explicitly
+  closeOnOutsidePress?: boolean;
 }
 
-export const ObjectiveDetails: FC<Props> = ({ onClose }) => {
+export const ObjectiveDetails: FC<Props> = ({ onClose, closeOnOutsidePress = true }) => {
   const { viewedObjectiveId, objectivePool, buckets, updateObjectiveDetails } = useFocus();
   const activeObjective = objectivePool.find(o => o.id === viewedObjectiveId) ?? null;
   const activeBucket = activeObjective ? buckets.find(b => b.id === activeObjective.bucket_id) : undefined;
@@ -36,6 +38,7 @@ export const ObjectiveDetails: FC<Props> = ({ onClose }) => {
   const { setText, textareaRef } = editor;
 
   useEffect(() => {
+    if (!closeOnOutsidePress) return;
     const handleMouseDown = (e: MouseEvent) => {
       if (asideRef.current?.contains(e.target as Node)) return;
       const target = e.target as Element;
@@ -44,7 +47,7 @@ export const ObjectiveDetails: FC<Props> = ({ onClose }) => {
     };
     document.addEventListener('mousedown', handleMouseDown);
     return () => document.removeEventListener('mousedown', handleMouseDown);
-  }, [onClose]);
+  }, [onClose, closeOnOutsidePress]);
 
   useEffect(() => {
     if (!viewedObjectiveId) {

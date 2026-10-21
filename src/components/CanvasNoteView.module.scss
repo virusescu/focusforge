@@ -16,70 +16,19 @@
   &.editing {
     cursor: default;
   }
-
-  &:hover .controls {
-    opacity: 1;
-  }
 }
 
-.controls {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 2px 4px;
-  background: rgba(13, 13, 13, 0.75);
-  border: 1px solid var(--border);
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-
+// Opened from the right-click menu (Change color); never shown or clicked directly
 .colorInput {
-  width: 16px;
-  height: 16px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
   padding: 0;
-  border: 1px solid var(--border);
-  background: transparent;
-  cursor: pointer;
-
-  &::-webkit-color-swatch-wrapper {
-    padding: 0;
-  }
-  &::-webkit-color-swatch {
-    border: none;
-  }
-}
-
-.deleteBtn {
-  background: transparent;
   border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 0;
-  display: flex;
-  align-items: center;
-
-  &:hover {
-    color: #ef4444;
-  }
-}
-
-.copyNoteBtn {
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  transition: color 0.15s;
-
-  &:hover {
-    color: var(--primary);
-  }
+  opacity: 0;
+  pointer-events: none;
 }
 
 .body {

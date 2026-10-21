@@ -154,23 +154,6 @@
   }
 }
 
-.addBtn {
-  background: transparent;
-  border: 1px solid var(--primary);
-  color: var(--primary);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 0.5rem;
-  transition: all 0.2s ease;
-
-  &:hover {
-    background: var(--primary-muted);
-    box-shadow: 0 0 10px var(--primary-glow);
-  }
-}
-
 .resizeHandle {
   position: absolute;
   right: 0;

@@ -20,6 +20,8 @@
         "fullscreen": false,
         "decorations": false,
         "transparent": true,
+        "shadow": false,
+        "maximizable": true,
         "closable": true,
         "minimizable": true,
         "devtools": true

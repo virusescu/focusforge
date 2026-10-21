@@ -1,7 +1,7 @@
 import { type FC, useState, useRef, useEffect } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { Plus, Trash2 } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import styles from './BucketPanel.module.scss';
 import { useFocus } from '../contexts/FocusContext';
 import { soundEngine } from '../utils/audio';
@@ -213,9 +213,6 @@ export const BucketPanel: FC<BucketPanelProps> = ({ bucket, objectives, zoom, zI
             onChange={e => setNewText(e.target.value)}
             onKeyDown={handleAddKeyDown}
           />
-          <button className={styles.addBtn} onClick={submitNew} title="Add objective">
-            <Plus size={14} />
-          </button>
         </div>
       </div>
 
