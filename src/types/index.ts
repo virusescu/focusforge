@@ -80,6 +80,7 @@ export interface Bucket extends BucketGeometry {
   color: string;
   sort_order: number;
   kind: BucketKind;
+  tab_order?: number | null; // position in the focus (Tab) order; null/absent = not placed yet, goes after the placed ones
 }
 
 // A sticky note on the Buckets canvas; geometry is in world units like buckets

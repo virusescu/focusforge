@@ -282,6 +282,27 @@ describe('BucketsPage', () => {
       expect(onBack).toHaveBeenCalledOnce();
     });
 
+    it("Escape typed in a panel's add box clears the focus and leaves the box", () => {
+      const onBack = vi.fn();
+      render(<BucketsPage onBack={onBack} />);
+      fireEvent.doubleClick(screen.getByText('Work'));
+      const input = within(panel(9)).getByPlaceholderText('Add Objective...');
+      input.focus();
+      fireEvent.change(input, { target: { value: 'half typed' } });
+      fireEvent.keyDown(input, { key: 'Escape' });
+      for (const id of [1, 2, 9]) expect(dimmed(id)).toBe(false);
+      expect(input).not.toHaveFocus();
+      expect(input).toHaveValue('half typed');
+      expect(onBack).not.toHaveBeenCalled();
+    });
+
+    it('Escape typed in an add box with nothing focused does nothing', () => {
+      const onBack = vi.fn();
+      render(<BucketsPage onBack={onBack} />);
+      fireEvent.keyDown(screen.getAllByPlaceholderText('Add Objective...')[0], { key: 'Escape' });
+      expect(onBack).not.toHaveBeenCalled();
+    });
+
     it('Tab typed in an input is left alone', () => {
       render(<BucketsPage onBack={vi.fn()} />);
       fireEvent.doubleClick(screen.getByText('Work'));

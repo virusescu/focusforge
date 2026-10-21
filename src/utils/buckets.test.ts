@@ -10,6 +10,17 @@ describe('focusOrder', () => {
     expect(focusOrder(all).map(b => b.id)).toEqual([1, 3, 2, 9, 12]);
   });
 
+  it('follows the order the user set; panels not placed yet come after, in the default order', () => {
+    const all = [
+      { ...bucket(1, 'mission'), tab_order: 2 },
+      { ...bucket(9, 'custom'), tab_order: 0 },
+      { ...bucket(2, 'unsorted'), tab_order: 1 },
+      bucket(3, 'deadlines'),
+      bucket(12, 'custom'),
+    ];
+    expect(focusOrder(all).map(b => b.id)).toEqual([9, 2, 1, 3, 12]);
+  });
+
   it('does not change the list it is given', () => {
     const all = [bucket(9, 'custom'), bucket(1, 'mission')];
     focusOrder(all);

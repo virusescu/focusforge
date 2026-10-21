@@ -37,6 +37,7 @@ const mockMoveObjectiveToBucket = vi.fn();
 const mockSetObjectiveMission = vi.fn();
 const mockDuplicateObjective = vi.fn();
 const mockUpdateObjectiveDeadline = vi.fn();
+const mockReorderBucketTabs = vi.fn();
 const mockReorderCategories = vi.fn();
 const mockGetCategories = vi.fn();
 const mockGetTemplates = vi.fn();
@@ -88,6 +89,7 @@ vi.mock('../db', () => ({
   setObjectiveMission: (id: number, m: number) => mockSetObjectiveMission(id, m),
   updateObjectiveDetails: vi.fn().mockResolvedValue(undefined),
   updateObjectiveDeadline: (id: number, d: string | null) => mockUpdateObjectiveDeadline(id, d),
+  reorderBucketTabs: (ids: number[]) => mockReorderBucketTabs(ids),
 }));
 
 // Mock UserContext
@@ -128,6 +130,7 @@ describe('FocusContext', () => {
     mockSetObjectiveMission.mockResolvedValue(undefined);
     mockDuplicateObjective.mockResolvedValue(5);
     mockUpdateObjectiveDeadline.mockResolvedValue(undefined);
+    mockReorderBucketTabs.mockResolvedValue(undefined);
     mockReorderCategories.mockResolvedValue(undefined);
     mockGetCategories.mockResolvedValue([]);
     mockGetTemplates.mockResolvedValue([]);
@@ -464,6 +467,15 @@ describe('FocusContext', () => {
     mockUpdateObjectiveDeadline.mockRejectedValueOnce(new Error('offline'));
     await act(async () => { await result.current.setObjectiveDeadline(4, '2026-12-24T10:00:00.000Z'); });
     expect(result.current.deadlineObjectives).toEqual([]);
+  });
+
+  it('reorderBucketTabs sets tab_order optimistically and saves', async () => {
+    const { result } = renderHook(() => useFocus(), { wrapper });
+    await waitFor(() => expect(result.current.buckets).toHaveLength(2));
+    await act(async () => { await result.current.reorderBucketTabs([9, 2]); });
+    expect(mockReorderBucketTabs).toHaveBeenCalledWith([9, 2]);
+    expect(result.current.buckets.find(b => b.id === 9)?.tab_order).toBe(0);
+    expect(result.current.buckets.find(b => b.id === 2)?.tab_order).toBe(1);
   });
 
   it('addObjective with bucket options passes them to the DB', async () => {

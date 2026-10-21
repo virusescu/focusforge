@@ -37,6 +37,7 @@ import {
   updateBucket as dbUpdateBucket,
   updateBucketGeometry as dbUpdateBucketGeometry,
   bringBucketToFront as dbBringBucketToFront,
+  reorderBucketTabs as dbReorderBucketTabs,
   deleteBucket as dbDeleteBucket,
   moveObjectiveToBucket as dbMoveObjectiveToBucket,
   reorderBucketObjectives as dbReorderBucketObjectives
@@ -88,6 +89,7 @@ interface FocusContextType {
   updateBucket: (id: number, name: string, color: string) => Promise<void>;
   updateBucketGeometry: (id: number, geometry: BucketGeometry) => Promise<void>;
   bringBucketToFront: (id: number) => Promise<void>;
+  reorderBucketTabs: (orderedIds: number[]) => Promise<void>; // the canvas focus (Tab) order
   deleteBucket: (id: number) => Promise<void>;
   addCategory: (label: string, color: string, coinBounty?: number) => Promise<void>;
   updateCategory: (id: number, label: string, color: string, coinBounty?: number) => Promise<void>;
@@ -404,6 +406,18 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [buckets, refreshData]);
 
+  // Optimistic like the other reorders; a failed write reloads from the DB
+  const reorderBucketTabs = useCallback(async (orderedIds: number[]) => {
+    const orderById = new Map(orderedIds.map((id, index) => [id, index]));
+    setBuckets(prev => prev.map(b => orderById.has(b.id) ? { ...b, tab_order: orderById.get(b.id)! } : b));
+    try {
+      await dbReorderBucketTabs(orderedIds);
+    } catch (error) {
+      console.error('[FocusContext] Bucket tab order failed, reverting UI:', error);
+      await refreshData();
+    }
+  }, [refreshData]);
+
   const deleteBucket = useCallback(async (id: number) => {
     await dbDeleteBucket(id);
     await refreshData();
@@ -623,6 +637,7 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
       updateBucket,
       updateBucketGeometry,
       bringBucketToFront,
+      reorderBucketTabs,
       deleteBucket,
       addCategory,
       updateCategory,

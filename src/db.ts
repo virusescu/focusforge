@@ -75,6 +75,7 @@ export async function initDb() {
       h REAL NOT NULL DEFAULT 420,
       sort_order INTEGER NOT NULL DEFAULT 0,
       kind TEXT NOT NULL DEFAULT 'custom',
+      tab_order INTEGER,
       FOREIGN KEY (user_id) REFERENCES users(id)
     )
   `);
@@ -286,6 +287,13 @@ export async function initDb() {
 
   try {
     await database.execute(`ALTER TABLE objectives ADD COLUMN bucket_sort_order INTEGER`);
+  } catch {
+    // Column already exists — no action needed
+  }
+
+  // Position of a bucket in the canvas focus (Tab) order
+  try {
+    await database.execute(`ALTER TABLE buckets ADD COLUMN tab_order INTEGER`);
   } catch {
     // Column already exists — no action needed
   }
@@ -802,7 +810,19 @@ export async function getBuckets(userId: number): Promise<Bucket[]> {
     h: Number(row.h),
     sort_order: Number(row.sort_order),
     kind: row.kind as BucketKind,
+    tab_order: row.tab_order == null ? null : Number(row.tab_order),
   }));
+}
+
+// Saves the focus (Tab) order: the given buckets get positions 0..n in that order
+export async function reorderBucketTabs(orderedIds: number[]): Promise<void> {
+  const database = getDb();
+  for (let i = 0; i < orderedIds.length; i++) {
+    await database.execute({
+      sql: 'UPDATE buckets SET tab_order = ? WHERE id = ?',
+      args: [i, orderedIds[i]],
+    });
+  }
 }
 
 export async function addBucket(userId: number, name: string, color: string, geometry: BucketGeometry): Promise<number> {

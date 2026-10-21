@@ -12,7 +12,7 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
-import { ArrowLeft, Plus, StickyNote } from 'lucide-react';
+import { ArrowLeft, ListOrdered, Plus, StickyNote } from 'lucide-react';
 import styles from './BucketsPage.module.scss';
 import { useFocus } from '../contexts/FocusContext';
 import { soundEngine } from '../utils/audio';
@@ -36,6 +36,7 @@ import { BucketPanel } from './BucketPanel';
 import { ObjectiveDetails } from './ObjectiveDetails';
 import { CategoryManagerModal } from './CategoryManagerModal';
 import { CanvasNoteView } from './CanvasNoteView';
+import { TabOrderModal } from './TabOrderModal';
 import { useCanvasNotes } from '../hooks/useCanvasNotes';
 import { focusOrder } from '../utils/buckets';
 import type { StrategicObjective } from '../types';
@@ -125,6 +126,7 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
   const focusedBucket = buckets.find(b => b.id === focusedBucketId) ?? null;
   const drawerResizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const [showTabOrder, setShowTabOrder] = useState(false);
   const [dragged, setDragged] = useState<StrategicObjective | null>(null);
   const isDraggingRef = useRef(false);
   // Read before any effect runs: StrictMode's simulated unmount saves the viewport, which
@@ -242,6 +244,12 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Escape in a panel's add box still clears the focus (the box keeps its text, but loses the cursor)
+      if (e.key === 'Escape' && focusedBucket && e.target instanceof HTMLInputElement && e.target.closest('[data-bucket-id]')) {
+        e.target.blur();
+        setFocusedBucketId(null);
+        return;
+      }
       if (isTypingTarget(e.target)) return;
       const full = getRect();
       const rect = { width: full.width - (detailsOpen ? Math.min(drawerWidth, full.width) : 0), height: full.height };
@@ -251,7 +259,7 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
         const target = buckets.find(b => b.id === lastPickedBucketIdRef.current) ?? buckets.find(b => b.kind === 'mission');
         if (target) flyTo(target.x + target.w / 2, target.y + target.h / 2, rect.width, rect.height);
         else flyTo(0, 0, rect.width, rect.height);
-      } else if (e.key === 'Tab' && focusedBucket && !showCategoryManager) {
+      } else if (e.key === 'Tab' && focusedBucket && !showCategoryManager && !showTabOrder) {
         // With a panel focused, Tab (Shift+Tab: backwards) focuses the next one and flies to it
         e.preventDefault();
         const order = focusOrder(buckets);
@@ -276,7 +284,7 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [detailsOpen, drawerWidth, showCategoryManager, onBack, closeDetails, buckets, flyTo, focusedBucket]);
+  }, [detailsOpen, drawerWidth, showCategoryManager, showTabOrder, onBack, closeDetails, buckets, flyTo, focusedBucket]);
 
   const startPan = (e: React.PointerEvent<HTMLDivElement>) => {
     cancelFly();
@@ -471,6 +479,10 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
             <Plus size={14} />
             <span>NEW_PANEL</span>
           </button>
+          <button className={styles.toolBtn} onClick={() => { soundEngine.playClick(); setShowTabOrder(true); }} title="Set the order Tab walks the panels in">
+            <ListOrdered size={14} />
+            <span>TAB_ORDER</span>
+          </button>
           <button className={styles.toolBtn} onClick={handleNewNote}>
             <StickyNote size={14} />
             <span>NEW_NOTE</span>
@@ -571,6 +583,8 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
           )}
         </DragOverlay>
       </DndContext>
+
+      {showTabOrder && <TabOrderModal onClose={() => setShowTabOrder(false)} />}
 
       {showCategoryManager && (
         <CategoryManagerModal

@@ -12,7 +12,7 @@ vi.mock('@libsql/client', () => ({
   }),
 }));
 
-import { initDbClient, saveFocusSession, getRecentSessions, deleteFocusSession, getObjectives, addObjective, duplicateObjective, reorderCategories, deleteCategory, getTemplates, addTemplate, updateTemplate, deleteTemplate, reorderTemplates, deleteObjective, completeObjective, getKillRate, getAllSessions, getFragmentationStats, getAlarms, addAlarm, toggleAlarm, deleteAlarm, ensureSystemBuckets, updateObjectiveDeadline, getBuckets, deleteBucket, moveObjectiveToBucket, reorderBucketObjectives, bringBucketToFront, getCanvasNotes, addCanvasNote, updateCanvasNoteContent, updateCanvasNoteGeometry, bringCanvasNoteToFront, deleteCanvasNote } from './db';
+import { initDbClient, saveFocusSession, getRecentSessions, deleteFocusSession, getObjectives, addObjective, duplicateObjective, reorderCategories, deleteCategory, getTemplates, addTemplate, updateTemplate, deleteTemplate, reorderTemplates, deleteObjective, completeObjective, getKillRate, getAllSessions, getFragmentationStats, getAlarms, addAlarm, toggleAlarm, deleteAlarm, ensureSystemBuckets, updateObjectiveDeadline, reorderBucketTabs, getBuckets, deleteBucket, moveObjectiveToBucket, reorderBucketObjectives, bringBucketToFront, getCanvasNotes, addCanvasNote, updateCanvasNoteContent, updateCanvasNoteGeometry, bringCanvasNoteToFront, deleteCanvasNote } from './db';
 
 describe('db utility functions', () => {
   beforeEach(() => {
@@ -579,7 +579,17 @@ describe('db utility functions', () => {
 
       const buckets = await getBuckets(7);
 
-      expect(buckets).toEqual([{ id: 2, name: 'Unsorted', color: '#888888', x: 360, y: 0, w: 300, h: 420, sort_order: 1, kind: 'unsorted' }]);
+      expect(buckets).toEqual([{ id: 2, name: 'Unsorted', color: '#888888', x: 360, y: 0, w: 300, h: 420, sort_order: 1, kind: 'unsorted', tab_order: null }]);
+    });
+  });
+
+  describe('Bucket tab order', () => {
+    it('reorderBucketTabs writes positions 0..n in the given order', async () => {
+      mockExecute.mockResolvedValue({ rows: [], rowsAffected: 1 });
+      await reorderBucketTabs([9, 1, 2]);
+      expect(mockExecute).toHaveBeenCalledTimes(3);
+      expect(mockExecute).toHaveBeenNthCalledWith(1, { sql: 'UPDATE buckets SET tab_order = ? WHERE id = ?', args: [0, 9] });
+      expect(mockExecute).toHaveBeenNthCalledWith(3, { sql: 'UPDATE buckets SET tab_order = ? WHERE id = ?', args: [2, 2] });
     });
   });
 
