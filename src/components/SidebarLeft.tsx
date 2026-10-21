@@ -26,6 +26,7 @@ import { readableOn } from '../utils/color';
 import { isHoldingBucket } from '../utils/buckets';
 import { firstValidBucketId, firstValidCategoryId, loadLastPicks, saveLastPicks } from '../utils/lastPicks';
 import { ContextMenu } from './ContextMenu';
+import { moveToBucketItem } from './bucketMoveItem';
 import { SaveTemplateModal } from './SaveTemplateModal';
 import { TemplateButtons } from './TemplateButtons';
 import { BucketSelect } from './BucketSelect';
@@ -48,10 +49,12 @@ interface SortableItemProps {
   onHover: () => void;
   onRemoveFromMission: (id: number) => void;
   onDuplicate: (id: number) => void;
+  holdingBuckets: Bucket[]; // the buckets a task can be moved to
+  onMoveToBucket: (id: number, bucketId: number) => void;
   bucket?: Bucket; // the objective's bucket, shown as a colored left stripe
 }
 
-const SortableItem: FC<SortableItemProps> = ({ obj, isActive, isViewed, categories, onSelect, onActivate, onDelete, onUpdate, onCategoryChange, onManageCategories, onHover, onRemoveFromMission, onDuplicate, bucket }) => {
+const SortableItem: FC<SortableItemProps> = ({ obj, isActive, isViewed, categories, onSelect, onActivate, onDelete, onUpdate, onCategoryChange, onManageCategories, onHover, onRemoveFromMission, onDuplicate, holdingBuckets, onMoveToBucket, bucket }) => {
   const [isEditing, setIsEditing] = useState(false);
   // The whole row is the drag source; disabled while renaming so the input's text can be selected
   const { listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: obj.id, disabled: isEditing });
@@ -215,7 +218,7 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, isViewed, categori
         data-testid="active-tab"
       >
         <div className={styles.activeTabInner} role={isActive ? 'img' : undefined} aria-label={isActive ? 'Active objective' : undefined}>
-          <Crosshair size={16} className={styles.activeRing} />
+          <Crosshair size={24} className={styles.activeRing} />
           <span className={styles.activeDot} />
         </div>
       </div>
@@ -227,6 +230,7 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, isViewed, categori
           onClose={closeMenu}
           items={[
             { label: 'Rename', icon: <Pencil size={12} />, onSelect: startRename },
+            moveToBucketItem(holdingBuckets, obj.bucket_id, bucketId => onMoveToBucket(obj.id, bucketId)),
             { label: 'Remove from Mission', icon: <MinusCircle size={12} />, onSelect: () => onRemoveFromMission(obj.id) },
             { label: 'Duplicate', icon: <CopyPlus size={12} />, onSelect: () => onDuplicate(obj.id) },
             { label: 'Copy text', icon: <Copy size={12} />, onSelect: () => { void copyPlain(obj.text); } },
@@ -254,6 +258,7 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenDetails, onViewBuckets
     addObjective,
     deleteObjective,
     duplicateObjective,
+    moveObjectiveToBucket,
     updateObjective,
     updateObjectiveCategory,
     setActiveObjective,
@@ -353,6 +358,11 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenDetails, onViewBuckets
   const handleRemoveFromMission = (id: number) => {
     soundEngine.playClick();
     setObjectiveMission(id, false);
+  };
+
+  const handleMoveToBucket = (id: number, bucketId: number) => {
+    soundEngine.playClick();
+    void moveObjectiveToBucket(id, bucketId);
   };
 
   const handleDuplicate = (id: number) => {
@@ -501,6 +511,8 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenDetails, onViewBuckets
                     onHover={handleHover}
                     onRemoveFromMission={handleRemoveFromMission}
                     onDuplicate={handleDuplicate}
+                    holdingBuckets={holdingBuckets}
+                    onMoveToBucket={handleMoveToBucket}
                     bucket={bucketById.get(obj.bucket_id ?? -1)}
                   />
                 ))}

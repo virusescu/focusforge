@@ -9,6 +9,7 @@ let mockActiveId: number | null = null;
 let mockDeadline: string | null = null;
 const mockDeleteObjective = vi.fn();
 const mockSetObjectiveMission = vi.fn();
+const mockMoveObjectiveToBucket = vi.fn();
 const MISSION_OBJ = { id: 7, text: 'Ship it', created_at: '2026-10-13T00:00:00Z', is_mission: 1, bucket_id: 2, bucket_sort_order: 0, sort_order: 0, category_id: null };
 
 const bucket = (id: number, name: string, kind: Bucket['kind']): Bucket => ({ id, name, color: '#fff', sort_order: id, kind, x: 0, y: 0, w: 1, h: 1 });
@@ -27,6 +28,7 @@ vi.mock('../contexts/FocusContext', () => ({
     addObjective: mockAddObjective,
     deleteObjective: mockDeleteObjective,
     duplicateObjective: vi.fn(),
+    moveObjectiveToBucket: mockMoveObjectiveToBucket,
     updateObjective: vi.fn(),
     updateObjectiveCategory: vi.fn(),
     setActiveObjective: vi.fn(),
@@ -164,8 +166,18 @@ describe('SidebarLeft task rows', () => {
     expect(row().querySelectorAll('button')).toHaveLength(0);
     fireEvent.contextMenu(row());
     expect(screen.getAllByRole('menuitem').map(i => i.textContent)).toEqual([
-      'Rename', 'Remove from Mission', 'Duplicate', 'Copy text', 'Create template from task', 'Delete',
+      'Rename', 'Move to bucket', 'Remove from Mission', 'Duplicate', 'Copy text', 'Create template from task', 'Delete',
     ]);
+  });
+
+  it('Move to bucket offers Unsorted and the other task buckets (never Mission) and moves the task', () => {
+    renderSidebar();
+    fireEvent.contextMenu(row());
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Move to bucket' }));
+    const list = within(screen.getAllByRole('menu')[1]);
+    expect(list.getAllByRole('menuitem').map(i => i.textContent)).toEqual(['Unsorted', 'Work']);
+    fireEvent.click(list.getByRole('menuitem', { name: 'Work' }));
+    expect(mockMoveObjectiveToBucket).toHaveBeenCalledWith(7, 9);
   });
 
   it('Rename in the menu starts inline rename', () => {

@@ -153,6 +153,8 @@ export const BucketPanel: FC<BucketPanelProps> = ({ bucket, objectives, zoom, zI
         // Opaque so stacked panels don't show through each other
         background: `color-mix(in srgb, ${bucket.color} 10%, var(--bg-dark))`,
         borderColor: bucket.color,
+        // Outlines inside the panel (hover, selected, focused field) use this instead of the orange accent
+        ['--bucket-color' as string]: bucket.color,
       }}
     >
       <div

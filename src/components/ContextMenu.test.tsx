@@ -15,6 +15,64 @@ const setup = () => {
   return { onClose, onA, onB, onRowClick };
 };
 
+describe('ContextMenu submenus', () => {
+  const setupSub = () => {
+    const onClose = vi.fn();
+    const onPick = vi.fn();
+    render(
+      <ContextMenu
+        x={10}
+        y={20}
+        onClose={onClose}
+        items={[
+          { label: 'Plain', onSelect: vi.fn() },
+          { label: 'Move', submenu: [{ label: 'One', onSelect: onPick }, { label: 'Two', checked: true, onSelect: vi.fn() }] },
+        ]}
+      />,
+    );
+    return { onClose, onPick };
+  };
+
+  it('keeps the nested list closed until its item is hovered or clicked', () => {
+    setupSub();
+    expect(screen.queryByRole('menuitem', { name: 'One' })).toBeNull();
+    fireEvent.mouseEnter(screen.getByRole('menuitem', { name: 'Move' }).parentElement as HTMLElement);
+    expect(screen.getByRole('menuitem', { name: 'One' })).toBeInTheDocument();
+  });
+
+  it('opens on click too, and a click on the item again closes it', () => {
+    setupSub();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Move' }));
+    expect(screen.getByRole('menuitem', { name: 'One' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Move' }));
+    expect(screen.queryByRole('menuitem', { name: 'One' })).toBeNull();
+  });
+
+  it('hovering another item closes the nested list', () => {
+    setupSub();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Move' }));
+    fireEvent.mouseEnter(screen.getByRole('menuitem', { name: 'Plain' }));
+    expect(screen.queryByRole('menuitem', { name: 'One' })).toBeNull();
+  });
+
+  it('picking a nested item runs it and closes the whole menu; the checked one shows a check', () => {
+    const { onClose, onPick } = setupSub();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Move' }));
+    expect(screen.getByRole('menuitem', { name: 'Two' }).querySelector('svg')).not.toBeNull();
+    expect(screen.getByRole('menuitem', { name: 'One' }).querySelector('svg')).toBeNull();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'One' }));
+    expect(onPick).toHaveBeenCalledOnce();
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('a press inside the nested list is not an outside press', () => {
+    const { onClose } = setupSub();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Move' }));
+    fireEvent.pointerDown(screen.getByRole('menuitem', { name: 'One' }));
+    expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
 describe('ContextMenu', () => {
   it('renders its items in a menu', () => {
     setup();

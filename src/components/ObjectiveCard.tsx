@@ -9,6 +9,8 @@ import { setStatusHint, clearStatusHint } from '../utils/statusHint';
 import { isTypingTarget } from '../utils/canvas';
 import { copyPlain } from '../utils/clipboard';
 import { ContextMenu } from './ContextMenu';
+import { moveToBucketItem } from './bucketMoveItem';
+import { isHoldingBucket } from '../utils/buckets';
 import { SaveTemplateModal } from './SaveTemplateModal';
 import { CategoryDotPicker } from './CategoryDotPicker';
 import { DeadlineBadge } from './DeadlineBadge';
@@ -27,7 +29,7 @@ interface ObjectiveCardProps {
 }
 
 export const ObjectiveCard: FC<ObjectiveCardProps> = ({ obj, containerId, categories, isViewed, inMissionPanel, inDeadlinesPanel = false, onOpenDetails, onManageCategories, zoom = 1 }) => {
-  const { buckets, updateObjective, deleteObjective, duplicateObjective, updateObjectiveCategory, setObjectiveMission } = useFocus();
+  const { buckets, updateObjective, deleteObjective, duplicateObjective, updateObjectiveCategory, setObjectiveMission, moveObjectiveToBucket } = useFocus();
   // The same objective can appear in the Mission panel and in its bucket, so the id includes the container
   const [isEditing, setIsEditing] = useState(false);
   // The whole card is the drag source (the sensor's 5px threshold keeps clicks and double-clicks
@@ -190,6 +192,7 @@ export const ObjectiveCard: FC<ObjectiveCardProps> = ({ obj, containerId, catego
           items={[
             { label: 'Rename', icon: <Pencil size={12} />, onSelect: startRename },
             { label: 'Details', icon: <FileText size={12} />, onSelect: () => onOpenDetails(obj.id) },
+            moveToBucketItem(buckets.filter(isHoldingBucket), obj.bucket_id, bucketId => { soundEngine.playClick(); void moveObjectiveToBucket(obj.id, bucketId); }),
             inMissionPanel || isMission
               ? { label: 'Remove from Mission', icon: <MinusCircle size={12} />, onSelect: handleMissionToggle }
               : { label: 'Add to Mission', icon: <Target size={12} />, onSelect: handleMissionToggle },

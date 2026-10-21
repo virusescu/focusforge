@@ -1,11 +1,14 @@
-import { type FC, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { type CSSProperties, type FC, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { Check, ChevronRight } from 'lucide-react';
 import styles from './ContextMenu.module.scss';
 
 export interface ContextMenuItem {
   label: string;
   icon?: ReactNode;
-  onSelect: () => void;
+  onSelect?: () => void;
+  submenu?: ContextMenuItem[]; // a nested list that opens beside the item on hover or click
+  checked?: boolean;           // marks the current choice in a list
 }
 
 interface ContextMenuProps {
@@ -17,10 +20,38 @@ interface ContextMenuProps {
 
 const EDGE_MARGIN = 6;
 
+// The nested list: beside its item, flipped to the left or nudged up when it would run off the window
+const Submenu: FC<{ items: ContextMenuItem[]; onPick: (item: ContextMenuItem) => void }> = ({ items, onPick }) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const [placement, setPlacement] = useState<CSSProperties | null>(null);
+
+  useLayoutEffect(() => {
+    const rect = ref.current?.getBoundingClientRect();
+    if (!rect) return;
+    const flip = rect.right > window.innerWidth - EDGE_MARGIN;
+    const up = Math.max(0, rect.bottom - (window.innerHeight - EDGE_MARGIN));
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPlacement({ ...(flip ? { left: 'auto', right: '100%', marginLeft: 0, marginRight: 2 } : {}), top: -up });
+  }, []);
+
+  return (
+    <div ref={ref} className={styles.submenu} role="menu" style={{ ...placement, visibility: placement ? 'visible' : 'hidden' }}>
+      {items.map(item => (
+        <button key={item.label} className={styles.item} role="menuitem" onClick={() => onPick(item)}>
+          {item.icon}
+          <span>{item.label}</span>
+          {item.checked && <Check size={12} className={styles.trailing} />}
+        </button>
+      ))}
+    </div>
+  );
+};
+
 // Rendered in a portal: the canvas world is CSS-scaled, which would break `position: fixed` and offset the menu.
 export const ContextMenu: FC<ContextMenuProps> = ({ x, y, items, onClose }) => {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ left: x, top: y });
+  const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
 
   // Keep the menu inside the window
   useLayoutEffect(() => {
@@ -57,6 +88,11 @@ export const ContextMenu: FC<ContextMenuProps> = ({ x, y, items, onClose }) => {
     };
   }, [onClose]);
 
+  const pick = (item: ContextMenuItem) => {
+    item.onSelect?.();
+    onClose();
+  };
+
   return createPortal(
     <div
       ref={ref}
@@ -71,12 +107,28 @@ export const ContextMenu: FC<ContextMenuProps> = ({ x, y, items, onClose }) => {
       onDoubleClick={e => e.stopPropagation()}
       onPointerDown={e => e.stopPropagation()}
     >
-      {items.map(item => (
+      {items.map(item => item.submenu ? (
+        <div key={item.label} className={styles.group} onMouseEnter={() => setOpenSubmenu(item.label)}>
+          <button
+            className={styles.item}
+            role="menuitem"
+            aria-haspopup="menu"
+            aria-expanded={openSubmenu === item.label}
+            onClick={() => setOpenSubmenu(open => (open === item.label ? null : item.label))}
+          >
+            {item.icon}
+            <span>{item.label}</span>
+            <ChevronRight size={12} className={styles.trailing} />
+          </button>
+          {openSubmenu === item.label && <Submenu items={item.submenu} onPick={pick} />}
+        </div>
+      ) : (
         <button
           key={item.label}
           className={styles.item}
           role="menuitem"
-          onClick={() => { item.onSelect(); onClose(); }}
+          onMouseEnter={() => setOpenSubmenu(null)}
+          onClick={() => pick(item)}
         >
           {item.icon}
           <span>{item.label}</span>

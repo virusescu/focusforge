@@ -49,7 +49,7 @@
   flex: 1;
   min-width: 0;
   background: var(--bg-dark);
-  border: 1px solid var(--primary);
+  border: 1px solid var(--bucket-color, var(--primary));
   color: var(--text-primary);
   font-family: var(--font-mono);
   font-size: 0.7rem;
@@ -156,8 +156,8 @@
   outline: none;
 
   &:focus {
-    border-color: var(--primary);
-    box-shadow: 0 0 5px var(--primary-glow);
+    border-color: var(--bucket-color, var(--primary));
+    box-shadow: 0 0 5px color-mix(in srgb, var(--bucket-color, var(--primary)) 50%, transparent);
   }
 }
 

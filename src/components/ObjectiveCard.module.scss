@@ -21,8 +21,9 @@
     cursor: pointer;
   }
 
+  // Highlight, selection and the rename box use the panel's color (BucketPanel sets --bucket-color)
   &:hover {
-    border-color: var(--primary);
+    border-color: var(--bucket-color, var(--primary));
     background: rgba(26, 26, 26, 0.95);
 
     .actionBtn {
@@ -37,7 +38,7 @@
 
   &.viewed:not([data-tinted]) {
     border-width: 2px;
-    border-color: rgba(255, 255, 255, 0.5);
+    border-color: var(--bucket-color, rgba(255, 255, 255, 0.5));
     padding: calc(0.5rem - 1px);
   }
 }
@@ -81,7 +82,7 @@
   flex: 1;
   min-width: 0;
   background: var(--bg-dark);
-  border: 1px solid var(--primary);
+  border: 1px solid var(--bucket-color, var(--primary));
   color: var(--text-primary);
   font-family: var(--font-mono);
   font-size: 0.85rem;

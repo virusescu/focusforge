@@ -14,6 +14,7 @@ const mockAddTemplate = vi.fn();
 const mockDeleteBucket = vi.fn();
 const mockDuplicateNote = vi.fn();
 const mockSetViewedObjective = vi.fn();
+const mockMoveObjectiveToBucket = vi.fn();
 const mockDeleteObjective = vi.fn();
 let mockViewedId: number | null = null;
 let mockTemplates: Template[] = [];
@@ -47,7 +48,7 @@ vi.mock('../contexts/FocusContext', () => ({
     duplicateObjective: mockDuplicateObjective,
     updateObjectiveCategory: vi.fn(),
     setObjectiveMission: mockSetObjectiveMission,
-    moveObjectiveToBucket: vi.fn(),
+    moveObjectiveToBucket: mockMoveObjectiveToBucket,
     reorderBucketObjectives: vi.fn(),
     reorderObjectives: vi.fn(),
     addBucket: mockAddBucket,
@@ -569,8 +570,30 @@ describe('BucketsPage', () => {
     render(<BucketsPage onBack={vi.fn()} />);
     fireEvent.contextMenu(document.querySelector('[data-objective-id="101"]') as HTMLElement);
     expect(screen.getAllByRole('menuitem').map(i => i.textContent)).toEqual([
-      'Rename', 'Details', 'Add to Mission', 'Duplicate', 'Copy text', 'Create template from task', 'Delete',
+      'Rename', 'Details', 'Move to bucket', 'Add to Mission', 'Duplicate', 'Copy text', 'Create template from task', 'Delete',
     ]);
+  });
+
+  it('Move to bucket lists Unsorted first, marks the current bucket and moves the task', () => {
+    render(<BucketsPage onBack={vi.fn()} />);
+    fireEvent.contextMenu(document.querySelector('[data-objective-id="101"]') as HTMLElement); // Beta, in Work
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Move to bucket' }));
+    const list = within(screen.getAllByRole('menu')[1]);
+    expect(list.getAllByRole('menuitem').map(i => i.textContent)).toEqual(['Unsorted', 'Work']);
+    expect(list.getByRole('menuitem', { name: 'Work' }).querySelector('svg')).not.toBeNull();
+    fireEvent.click(list.getByRole('menuitem', { name: 'Work' }));      // already there: nothing happens
+    expect(mockMoveObjectiveToBucket).not.toHaveBeenCalled();
+    fireEvent.contextMenu(document.querySelector('[data-objective-id="101"]') as HTMLElement);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Move to bucket' }));
+    fireEvent.click(within(screen.getAllByRole('menu')[1]).getByRole('menuitem', { name: 'Unsorted' }));
+    expect(mockMoveObjectiveToBucket).toHaveBeenCalledWith(101, 2);
+    expect(screen.queryByRole('menu')).toBeNull();
+  });
+
+  it('panels color their hover, selection and focus outlines through --bucket-color', () => {
+    render(<BucketsPage onBack={vi.fn()} />);
+    const work = document.querySelector('[data-bucket-id="9"]') as HTMLElement;
+    expect(work.style.getPropertyValue('--bucket-color')).toMatch(/#3388ff|rgb\(51, 136, 255\)/i);
   });
 
   it('a card in the Mission panel offers Remove from Mission', () => {

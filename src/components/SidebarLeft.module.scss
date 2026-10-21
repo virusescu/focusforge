@@ -200,8 +200,9 @@ $active-tab-width: 32px;
 // Anchored to the right edge at full width, so the icon is revealed (not squeezed) as the tab opens
 .activeTabInner {
   position: absolute;
+  // Nudged 1px right so the ring and the dot sit optically centered in the tab
   top: 0;
-  right: 0;
+  right: -1px;
   bottom: 0;
   width: $active-tab-width;
   display: flex;
