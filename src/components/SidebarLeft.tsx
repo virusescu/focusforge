@@ -208,7 +208,7 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, isViewed, categori
         </div>
       )}
 
-      {obj.deadline_at && <DeadlineBadge deadline={obj.deadline_at} />}
+      {obj.deadline_at && <DeadlineBadge deadline={obj.deadline_at} className={styles.deadline} />}
 
       {/* Always rendered: CSS opens it (width transition) while the row is active */}
       <div

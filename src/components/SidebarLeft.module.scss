@@ -184,6 +184,11 @@ $active-tab-width: 32px;
   }
 }
 
+// Lines the deadline icon up with the first line of the task text
+.deadline {
+  margin-top: 2px;
+}
+
 // The tab is always in the row, closed (zero width) until the row is active. It is pinned to the row's right
 // edge (inside the border), so the width transition makes it grow out of that edge on activation and
 // retract into it on deactivation.
