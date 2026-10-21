@@ -123,6 +123,7 @@ export async function initDb() {
       last_interacted_at TEXT DEFAULT CURRENT_TIMESTAMP,
       bucket_id INTEGER REFERENCES buckets(id),
       bucket_sort_order INTEGER,
+      deadline_at TEXT,
       FOREIGN KEY (user_id) REFERENCES users(id)
     )
   `);
@@ -289,6 +290,13 @@ export async function initDb() {
     // Column already exists — no action needed
   }
 
+  // Optional deadline (ISO, UTC)
+  try {
+    await database.execute(`ALTER TABLE objectives ADD COLUMN deadline_at TEXT`);
+  } catch {
+    // Column already exists — no action needed
+  }
+
   // One Mission and one Unsorted bucket per user. Merge duplicates left by an earlier
   // check-then-insert race (keep the lowest id), then enforce it with a unique index.
   try {
@@ -312,6 +320,13 @@ export async function initDb() {
     await database.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_buckets_user_system ON buckets(user_id, kind) WHERE kind IN ('mission', 'unsorted')`);
   } catch (e) {
     console.error('Failed to enforce unique system buckets', e);
+  }
+
+  // The Deadlines panel is a system bucket too (a separate index: the one above predates it)
+  try {
+    await database.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_buckets_user_deadlines ON buckets(user_id, kind) WHERE kind = 'deadlines'`);
+  } catch (e) {
+    console.error('Failed to enforce a unique Deadlines bucket', e);
   }
 
   // Migrate prestige titles to 12 titles with even 5k spacing
@@ -719,7 +734,11 @@ export async function reorderTemplates(orderedIds: number[]): Promise<void> {
 export const SYSTEM_BUCKET_DEFAULTS = {
   mission: { name: 'Mission', color: '#00ff88', x: 0, y: 0, w: 320, h: 480 },
   unsorted: { name: 'Unsorted', color: '#888888', x: 360, y: 0, w: 300, h: 420 },
-} as const satisfies Record<'mission' | 'unsorted', { name: string; color: string } & BucketGeometry>;
+  deadlines: { name: 'Deadlines', color: '#ff5555', x: 700, y: 0, w: 300, h: 420 },
+} as const satisfies Record<'mission' | 'unsorted' | 'deadlines', { name: string; color: string } & BucketGeometry>;
+
+const SYSTEM_BUCKET_KINDS = ['mission', 'unsorted', 'deadlines'] as const;
+const SYSTEM_BUCKET_SORT_ORDER = { mission: 0, unsorted: 1, deadlines: 2 } as const;
 
 async function getUnsortedBucketId(userId: number): Promise<number> {
   const database = getDb();
@@ -745,17 +764,17 @@ export function ensureSystemBuckets(userId: number): Promise<void> {
 async function runEnsureSystemBuckets(userId: number): Promise<void> {
   const database = getDb();
   const existing = await database.execute({
-    sql: "SELECT kind FROM buckets WHERE user_id = ? AND kind IN ('mission', 'unsorted')",
+    sql: "SELECT kind FROM buckets WHERE user_id = ? AND kind IN ('mission', 'unsorted', 'deadlines')",
     args: [userId],
   });
   const kinds = new Set(existing.rows.map(r => r.kind as string));
-  for (const kind of ['mission', 'unsorted'] as const) {
+  for (const kind of SYSTEM_BUCKET_KINDS) {
     if (kinds.has(kind)) continue;
     const d = SYSTEM_BUCKET_DEFAULTS[kind];
     await database.execute({
       // OR IGNORE: the unique index on (user_id, kind) wins any race with another client
       sql: 'INSERT OR IGNORE INTO buckets (user_id, name, color, x, y, w, h, sort_order, kind) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      args: [userId, d.name, d.color, d.x, d.y, d.w, d.h, kind === 'mission' ? 0 : 1, kind],
+      args: [userId, d.name, d.color, d.x, d.y, d.w, d.h, SYSTEM_BUCKET_SORT_ORDER[kind], kind],
     });
   }
   // Backfill: objectives without a bucket (pre-bucket data) land in Unsorted
@@ -928,8 +947,9 @@ export async function moveObjectiveToBucket(id: number, bucketId: number): Promi
   });
   if (bucketResult.rows.length === 0) return;
   const { user_id, kind } = bucketResult.rows[0];
-  // Mission membership is is_mission, never a bucket
+  // Mission membership is is_mission, never a bucket; the Deadlines panel just lists tasks that have a deadline
   if (kind === 'mission') throw new Error('Cannot move objective into mission bucket');
+  if (kind === 'deadlines') throw new Error('Cannot move objective into deadlines bucket');
 
   const maxResult = await database.execute({
     sql: 'SELECT MAX(bucket_sort_order) as maxOrder FROM objectives WHERE user_id = ? AND bucket_id = ? AND completed_at IS NULL',
@@ -973,6 +993,7 @@ export async function getObjectives(userId: number): Promise<StrategicObjective[
     last_interacted_at: (row.last_interacted_at as string) || (row.created_at as string),
     bucket_id: (row.bucket_id as number | null) ?? null,
     bucket_sort_order: (row.bucket_sort_order as number | null) ?? null,
+    deadline_at: (row.deadline_at as string | null) ?? null,
   }));
 }
 
@@ -1023,12 +1044,12 @@ export async function addObjective(
   return Number(result.lastInsertRowid) ?? 0;
 }
 
-// Copies text, category, details, mission flag and bucket; the copy sits directly after the
+// Copies text, category, details, deadline, mission flag and bucket; the copy sits directly after the
 // original in both the Mission list and its bucket. Returns the new id, or null if `id` is gone.
 export async function duplicateObjective(id: number): Promise<number | null> {
   const database = getDb();
   const found = await database.execute({
-    sql: 'SELECT user_id, text, sort_order, category_id, is_mission, details, bucket_id, bucket_sort_order FROM objectives WHERE id = ?',
+    sql: 'SELECT user_id, text, sort_order, category_id, is_mission, details, bucket_id, bucket_sort_order, deadline_at FROM objectives WHERE id = ?',
     args: [id],
   });
   const row = found.rows[0];
@@ -1060,8 +1081,8 @@ export async function duplicateObjective(id: number): Promise<number | null> {
   }
 
   const result = await database.execute({
-    sql: 'INSERT INTO objectives (user_id, text, sort_order, category_id, is_mission, details, bucket_id, bucket_sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    args: [userId, row.text as string, sortOrder, (row.category_id as number | null) ?? null, isMission, (row.details as string | null) ?? null, bucketId, bucketSortOrder],
+    sql: 'INSERT INTO objectives (user_id, text, sort_order, category_id, is_mission, details, bucket_id, bucket_sort_order, deadline_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    args: [userId, row.text as string, sortOrder, (row.category_id as number | null) ?? null, isMission, (row.details as string | null) ?? null, bucketId, bucketSortOrder, (row.deadline_at as string | null) ?? null],
   });
   return Number(result.lastInsertRowid);
 }
@@ -1099,6 +1120,15 @@ export async function updateObjectiveDetails(id: number, details: string | null)
   await database.execute({
     sql: 'UPDATE objectives SET details = ? WHERE id = ?',
     args: [details, id],
+  });
+}
+
+// `deadline` is an ISO string (UTC), or null to remove the deadline
+export async function updateObjectiveDeadline(id: number, deadline: string | null): Promise<void> {
+  const database = getDb();
+  await database.execute({
+    sql: 'UPDATE objectives SET deadline_at = ? WHERE id = ?',
+    args: [deadline, id],
   });
 }
 

@@ -42,6 +42,23 @@ export function centerOn(vp: Viewport, worldX: number, worldY: number, viewportW
   return { zoom: vp.zoom, panX: viewportWidth / 2 - worldX * vp.zoom, panY: viewportHeight / 2 - worldY * vp.zoom };
 }
 
+// Slow at both ends, fast in the middle
+export function easeInOutCubic(t: number): number {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+// The view `t` (0..1) of the way from one viewport to another: panX, panY and zoom are each interpolated directly
+// with the same t. That keeps the destination's position on screen (pan + world position * zoom) linear in t, so
+// it glides straight to its place however the zoom changes.
+export function viewAt(from: Viewport, to: Viewport, t: number): Viewport {
+  if (t >= 1) return to;
+  return {
+    zoom: from.zoom + (to.zoom - from.zoom) * t,
+    panX: from.panX + (to.panX - from.panX) * t,
+    panY: from.panY + (to.panY - from.panY) * t,
+  };
+}
+
 // Puts world (0,0) at the viewport center, keeping the zoom.
 export function recenter(vp: Viewport, viewportWidth: number, viewportHeight: number): Viewport {
   return centerOn(vp, 0, 0, viewportWidth, viewportHeight);

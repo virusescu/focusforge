@@ -4,6 +4,7 @@ import { soundEngine, playObjectiveComplete } from '../utils/audio';
 import { useTimer } from '../hooks/useTimer';
 import { useUser } from './UserContext';
 import { useAuth } from './AuthContext';
+import { isHoldingBucket } from '../utils/buckets';
 import {
   getRecentSessions,
   getDailyFocusStats,
@@ -29,6 +30,7 @@ import {
   deleteCategory as dbDeleteCategory,
   updateObjectiveCategory as dbUpdateObjectiveCategory,
   updateObjectiveDetails as dbUpdateObjectiveDetails,
+  updateObjectiveDeadline as dbUpdateObjectiveDeadline,
   updateObjectiveInteractionTime as dbUpdateObjectiveInteractionTime,
   getBuckets,
   addBucket as dbAddBucket,
@@ -70,11 +72,13 @@ interface FocusContextType {
   updateObjective: (id: number, text: string) => Promise<void>;
   updateObjectiveCategory: (id: number, categoryId: number | null) => Promise<void>;
   updateObjectiveDetails: (id: number, details: string | null) => Promise<void>;
+  setObjectiveDeadline: (id: number, deadline: string | null) => Promise<void>; // ISO (UTC) or null to remove
   setActiveObjective: (id: number | null) => void;
   setViewedObjective: (id: number | null) => void;
   neutralizeObjective: (id: number) => Promise<void>;
   reorderObjectives: (orderedIds: number[]) => Promise<void>;
   missionObjectives: StrategicObjective[];
+  deadlineObjectives: StrategicObjective[]; // every open objective with a deadline, in no particular order
   buckets: Bucket[];
   objectivesByBucket: Map<number, StrategicObjective[]>; // key bucket id; sorted by bucket_sort_order, then id
   setObjectiveMission: (id: number, inMission: boolean) => Promise<void>;
@@ -134,10 +138,14 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
     () => objectivePool.filter(o => o.is_mission === 1),
     [objectivePool]
   );
+  const deadlineObjectives = useMemo(
+    () => objectivePool.filter(o => !!o.deadline_at),
+    [objectivePool]
+  );
   const objectivesByBucket = useMemo(() => {
     const map = new Map<number, StrategicObjective[]>();
     for (const b of buckets) {
-      if (b.kind !== 'mission') map.set(b.id, []);
+      if (isHoldingBucket(b)) map.set(b.id, []);
     }
     const unsortedId = buckets.find(b => b.kind === 'unsorted')?.id;
     for (const o of objectivePool) {
@@ -427,6 +435,19 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [refreshData]);
 
+  const setObjectiveDeadline = useCallback(async (id: number, deadline: string | null) => {
+    // Optimistic
+    setObjectivePool(prev => prev.map(o => o.id === id ? { ...o, deadline_at: deadline, last_interacted_at: new Date().toISOString() } : o));
+
+    try {
+      await dbUpdateObjectiveDeadline(id, deadline);
+      await dbUpdateObjectiveInteractionTime(id);
+    } catch (e) {
+      console.error('Deadline update failed', e);
+      await refreshData();
+    }
+  }, [refreshData]);
+
   const addCategory = useCallback(async (label: string, color: string, coinBounty?: number) => {
     if (!authUser) return;
     await dbAddCategory(authUser.id, label, color, coinBounty);
@@ -586,11 +607,13 @@ export const FocusProvider = ({ children }: { children: ReactNode }) => {
       updateObjective,
       updateObjectiveCategory,
       updateObjectiveDetails,
+      setObjectiveDeadline,
       setActiveObjective,
       setViewedObjective,
       neutralizeObjective,
       reorderObjectives,
       missionObjectives,
+      deadlineObjectives,
       buckets,
       objectivesByBucket,
       setObjectiveMission,

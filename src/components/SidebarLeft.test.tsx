@@ -6,6 +6,7 @@ import type { Bucket, Template } from '../types';
 const mockAddObjective = vi.fn();
 let mockTemplates: Template[] = [];
 let mockActiveId: number | null = null;
+let mockDeadline: string | null = null;
 const mockDeleteObjective = vi.fn();
 const mockSetObjectiveMission = vi.fn();
 const MISSION_OBJ = { id: 7, text: 'Ship it', created_at: '2026-10-13T00:00:00Z', is_mission: 1, bucket_id: 2, bucket_sort_order: 0, sort_order: 0, category_id: null };
@@ -20,7 +21,7 @@ const CATEGORIES = [
 vi.mock('../contexts/FocusContext', () => ({
   useFocus: () => ({
     objectivePool: [],
-    missionObjectives: [MISSION_OBJ],
+    missionObjectives: [{ ...MISSION_OBJ, deadline_at: mockDeadline }],
     activeObjectiveId: mockActiveId,
     viewedObjectiveId: null,
     addObjective: mockAddObjective,
@@ -141,8 +142,21 @@ describe('SidebarLeft task rows', () => {
 
   beforeEach(() => {
     mockActiveId = null;
+    mockDeadline = null;
     mockDeleteObjective.mockClear();
     mockSetObjectiveMission.mockClear();
+  });
+
+  it('shows no deadline icon on a task without a deadline', () => {
+    renderSidebar();
+    expect(row().querySelector('[data-deadline-state]')).toBeNull();
+  });
+
+  it('shows only the deadline icon (no date) on a task that has one, red once it has passed', () => {
+    mockDeadline = new Date(2020, 0, 1, 9, 0).toISOString();
+    renderSidebar();
+    expect(row().querySelector('[data-deadline-state="overdue"]')).not.toBeNull();
+    expect(within(row()).queryByText(/Jan/)).toBeNull();
   });
 
   it('has no buttons; rename, remove-from-mission and delete are in the right-click menu', () => {

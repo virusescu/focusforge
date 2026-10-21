@@ -23,6 +23,8 @@ import {
   saveViewport,
   recenter,
   centerOn,
+  viewAt,
+  easeInOutCubic,
   screenToWorld,
   wheelZoomFactor,
   zoomAt,
@@ -35,6 +37,7 @@ import { ObjectiveDetails } from './ObjectiveDetails';
 import { CategoryManagerModal } from './CategoryManagerModal';
 import { CanvasNoteView } from './CanvasNoteView';
 import { useCanvasNotes } from '../hooks/useCanvasNotes';
+import { focusOrder } from '../utils/buckets';
 import type { StrategicObjective } from '../types';
 
 const BUCKET_COLORS = ['#3388ff', '#ff8844', '#44cc88', '#cc44cc', '#ffcc33', '#33cccc'];
@@ -46,6 +49,8 @@ const SAVE_DELAY_MS = 300;
 const DRAWER_DEFAULT_W = 420;
 const DRAWER_MIN_W = 280;
 const DRAWER_MIN_CANVAS_W = 160;
+// Space and double-click fly to a bucket at 100% zoom, over this long
+const FLY_MS = 600;
 const DEFAULT_NOTE_COLOR = '#ffcc33';
 const DEFAULT_NOTE_W = 260;
 const DEFAULT_NOTE_H = 200;
@@ -89,6 +94,7 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
     objectivePool,
     objectivesByBucket,
     missionObjectives,
+    deadlineObjectives,
     categories,
     setViewedObjective,
     setObjectiveMission,
@@ -114,6 +120,9 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
   const [drawerWidth, setDrawerWidth] = useState(DRAWER_DEFAULT_W);
   // Bucket of the task last selected on this visit (Space centers on it)
   const lastPickedBucketIdRef = useRef<number | null>(null);
+  // The focused panel (double-click, Tab) shows normally; the others are dimmed. Escape clears it.
+  const [focusedBucketId, setFocusedBucketId] = useState<number | null>(null);
+  const focusedBucket = buckets.find(b => b.id === focusedBucketId) ?? null;
   const drawerResizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [dragged, setDragged] = useState<StrategicObjective | null>(null);
@@ -121,6 +130,31 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
   // Read before any effect runs: StrictMode's simulated unmount saves the viewport, which
   // would make a re-run effect think this isn't the first visit
   const [isFirstVisit] = useState(() => localStorage.getItem(VIEWPORT_STORAGE_KEY) === null);
+
+  const flyRef = useRef<number | null>(null);
+
+  const cancelFly = useCallback(() => {
+    if (flyRef.current !== null) cancelAnimationFrame(flyRef.current);
+    flyRef.current = null;
+  }, []);
+
+  // Smoothly pans and zooms (to 100%) so the world point ends up in the middle of a vw×vh area
+  const flyTo = useCallback((worldX: number, worldY: number, vw: number, vh: number) => {
+    cancelFly();
+    const from = vpRef.current;
+    const to = centerOn({ ...from, zoom: 1 }, worldX, worldY, vw, vh);
+    // Timed from the first frame's own timestamp, so the clock is always the animation frame clock
+    let startedAt: number | null = null;
+    const step = (now: number) => {
+      if (startedAt === null) startedAt = now;
+      const t = Math.min(1, Math.max(0, (now - startedAt) / FLY_MS));
+      setVp(viewAt(from, to, easeInOutCubic(t)));
+      flyRef.current = t < 1 ? requestAnimationFrame(step) : null;
+    };
+    flyRef.current = requestAnimationFrame(step);
+  }, [cancelFly]);
+
+  useEffect(() => cancelFly, [cancelFly]);
 
   const getRect = () => viewportRef.current?.getBoundingClientRect() ?? { left: 0, top: 0, width: 0, height: 0 };
   // The part of the viewport not covered by the details drawer: recentering aims at its middle
@@ -167,6 +201,7 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
         return;
       }
       e.preventDefault();
+      cancelFly();
       const rect = el.getBoundingClientRect();
       const sx = e.clientX - rect.left;
       const sy = e.clientY - rect.top;
@@ -177,9 +212,9 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
     };
     el.addEventListener('wheel', handleWheel, { passive: false });
     return () => el.removeEventListener('wheel', handleWheel);
-  }, []);
+  }, [cancelFly]);
 
-  // The drawer closes with its X button or Escape (not by pressing elsewhere); closing also deselects the task
+  // The drawer closes with Escape (not by pressing elsewhere); closing also deselects the task
   const closeDetails = useCallback(() => {
     setDetailsOpen(false);
     setViewedObjective(null);
@@ -208,15 +243,23 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (isTypingTarget(e.target)) return;
+      const full = getRect();
+      const rect = { width: full.width - (detailsOpen ? Math.min(drawerWidth, full.width) : 0), height: full.height };
       if (e.key === ' ') {
         e.preventDefault();
-        const full = getRect();
-        const rect = { width: full.width - (detailsOpen ? Math.min(drawerWidth, full.width) : 0), height: full.height };
         // The bucket of the task selected last on this visit, else the Mission panel; the origin if neither exists
         const target = buckets.find(b => b.id === lastPickedBucketIdRef.current) ?? buckets.find(b => b.kind === 'mission');
-        setVp(v => target
-          ? centerOn(v, target.x + target.w / 2, target.y + target.h / 2, rect.width, rect.height)
-          : recenter(v, rect.width, rect.height));
+        if (target) flyTo(target.x + target.w / 2, target.y + target.h / 2, rect.width, rect.height);
+        else flyTo(0, 0, rect.width, rect.height);
+      } else if (e.key === 'Tab' && focusedBucket && !showCategoryManager) {
+        // With a panel focused, Tab (Shift+Tab: backwards) focuses the next one and flies to it
+        e.preventDefault();
+        const order = focusOrder(buckets);
+        const index = order.findIndex(b => b.id === focusedBucket.id);
+        const next = order[(index + (e.shiftKey ? -1 : 1) + order.length) % order.length];
+        lastPickedBucketIdRef.current = next.id;
+        setFocusedBucketId(next.id);
+        flyTo(next.x + next.w / 2, next.y + next.h / 2, rect.width, rect.height);
       } else if (e.key === 'Escape') {
         // dnd-kit cancels an active drag on Escape; don't also leave the page
         if (isDraggingRef.current) return;
@@ -224,6 +267,8 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
           setShowCategoryManager(false);
         } else if (detailsOpen) {
           closeDetails();
+        } else if (focusedBucket) {
+          setFocusedBucketId(null);
         } else {
           onBack();
         }
@@ -231,9 +276,10 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [detailsOpen, drawerWidth, showCategoryManager, onBack, closeDetails, buckets]);
+  }, [detailsOpen, drawerWidth, showCategoryManager, onBack, closeDetails, buckets, flyTo, focusedBucket]);
 
   const startPan = (e: React.PointerEvent<HTMLDivElement>) => {
+    cancelFly();
     e.preventDefault();
     e.currentTarget.setPointerCapture?.(e.pointerId);
     panRef.current = { startX: e.clientX, startY: e.clientY, panX: vp.panX, panY: vp.panY };
@@ -260,6 +306,21 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
     if (isTypingTarget(target) || target.closest(PAN_CONTROLS)) return;
     e.stopPropagation();
     startPan(e);
+  };
+
+  // Double-clicking anywhere on a panel (cards included) flies to that panel, like Space does; real controls keep their own behaviour
+  const handleViewportDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // A press on empty panel space starts a pan, which captures the pointer: the browser then reports the click
+    // against the viewport, not against what is under the pointer. So look at what is actually there.
+    const target = (typeof document.elementFromPoint === 'function' ? document.elementFromPoint(e.clientX, e.clientY) : null) ?? (e.target as Element);
+    const panel = target.closest('[data-bucket-id]');
+    if (!panel || target.closest(`${PAN_CONTROLS}, [data-no-focus]`)) return;
+    const bucket = buckets.find(b => b.id === Number(panel.getAttribute('data-bucket-id')));
+    if (!bucket) return;
+    lastPickedBucketIdRef.current = bucket.id;
+    setFocusedBucketId(bucket.id);
+    const size = getVisibleSize();
+    flyTo(bucket.x + bucket.w / 2, bucket.y + bucket.h / 2, size.width, size.height);
   };
 
   const handleViewportPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -348,7 +409,8 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
     const { active, over } = event;
     const data = active.data.current as DragData | undefined;
     const to = over?.data.current?.containerId as string | undefined;
-    if (!data || !over || !to) return;
+    // Nothing is dropped into the Deadlines panel (it only lists tasks that have a deadline)
+    if (!data || !over || !to || to === 'deadlines') return;
     const { objectiveId, containerId: from } = data;
     const overObjectiveId = over.data.current?.objectiveId as number | undefined;
 
@@ -436,6 +498,7 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
           }}
           onPointerDownCapture={handleViewportPointerDownCapture}
           onPointerDown={handleViewportPointerDown}
+          onDoubleClick={handleViewportDoubleClick}
           onPointerMove={handleViewportPointerMove}
           onPointerUp={handleViewportPointerUp}
           onPointerCancel={handleViewportPointerUp}
@@ -450,9 +513,10 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
               <BucketPanel
                 key={bucket.id}
                 bucket={bucket}
-                objectives={bucket.kind === 'mission' ? missionObjectives : objectivesByBucket.get(bucket.id) ?? []}
+                objectives={bucket.kind === 'mission' ? missionObjectives : bucket.kind === 'deadlines' ? deadlineObjectives : objectivesByBucket.get(bucket.id) ?? []}
                 zoom={vp.zoom}
                 zIndex={stackOrder.get(bucket.id) ?? 1}
+                dimmed={focusedBucket !== null && focusedBucket.id !== bucket.id}
                 onOpenDetails={handleOpenDetails}
                 onManageCategories={handleManageCategories}
               />

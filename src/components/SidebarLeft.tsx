@@ -23,12 +23,14 @@ import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifi
 import type { StrategicObjective, ObjectiveCategory, Bucket } from '../types';
 import { copyPlain } from '../utils/clipboard';
 import { readableOn } from '../utils/color';
+import { isHoldingBucket } from '../utils/buckets';
 import { firstValidBucketId, firstValidCategoryId, loadLastPicks, saveLastPicks } from '../utils/lastPicks';
 import { ContextMenu } from './ContextMenu';
 import { SaveTemplateModal } from './SaveTemplateModal';
 import { TemplateButtons } from './TemplateButtons';
 import { BucketSelect } from './BucketSelect';
 import { CategoryDotPicker } from './CategoryDotPicker';
+import { DeadlineBadge } from './DeadlineBadge';
 import { CategoryManagerModal } from './CategoryManagerModal';
 import { AlarmsModal } from './AlarmsModal';
 
@@ -203,6 +205,8 @@ const SortableItem: FC<SortableItemProps> = ({ obj, isActive, isViewed, categori
         </div>
       )}
 
+      {obj.deadline_at && <DeadlineBadge deadline={obj.deadline_at} />}
+
       {/* Always rendered: CSS opens it (width transition) while the row is active */}
       <div
         className={styles.activeTab}
@@ -278,7 +282,7 @@ export const SidebarLeft: FC<SidebarLeftProps> = ({ onOpenDetails, onViewBuckets
   const newCategoryId = categoryChoice !== undefined
     ? firstValidCategoryId([categoryChoice], categories)
     : firstValidCategoryId([loadLastPicks().categoryId, categories[0]?.id], categories);
-  const holdingBuckets = useMemo(() => buckets.filter(b => b.kind !== 'mission'), [buckets]);
+  const holdingBuckets = useMemo(() => buckets.filter(isHoldingBucket), [buckets]);
   const newBucketId = firstValidBucketId([bucketChoice, loadLastPicks().bucketId], buckets);
 
   const newCategoryColor = categories.find(c => c.id === newCategoryId)?.color;

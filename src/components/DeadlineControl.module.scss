@@ -1,0 +1,118 @@
+$later: #8fd0ff;
+$soon: #ffcc33;
+$overdue: #e5383b;
+
+.none,
+.date,
+.remove {
+  font-family: var(--font-mono);
+  cursor: pointer;
+}
+
+.none {
+  background: none;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  color: var(--text-muted);
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  padding: 0.25rem 0.5rem;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
+
+  &:hover {
+    color: var(--primary);
+    border-color: var(--primary);
+  }
+}
+
+.set {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  border: 1px solid rgba($later, 0.6);
+  color: $later;
+  white-space: nowrap;
+  cursor: pointer;
+
+  // Everything inside is clickable; no gap shows the arrow
+  * {
+    cursor: pointer;
+  }
+
+  &.soon {
+    color: $soon;
+    border-color: rgba($soon, 0.6);
+  }
+
+  &.overdue {
+    color: #fff;
+    background: $overdue;
+    border-color: $overdue;
+    animation: overdueGlow 1.6s ease-in-out infinite;
+
+    // Only the date's icon rings, not the remove button's
+    .date svg {
+      animation: ring 1.6s ease-in-out infinite;
+      transform-origin: 50% 20%;
+    }
+  }
+}
+
+.date {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  padding: 0.25rem 0.2rem 0.25rem 0.5rem;
+}
+
+// A separate segment on the right, divided from the date; it lights up on hover
+.remove {
+  display: inline-flex;
+  align-items: center;
+  align-self: stretch;
+  background: none;
+  border: none;
+  border-left: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  color: inherit;
+  padding: 0 0.5rem;
+  transition: background 0.15s, color 0.15s;
+
+  // Only the segment's background changes on hover: it turns red (darker on the red overdue pill)
+  &:hover {
+    background: $overdue;
+    color: #fff;
+  }
+}
+
+.overdue .remove:hover {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+// The real picker: invisible, under the date, so the system popup opens beside it
+.picker {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  pointer-events: none;
+  color-scheme: dark;
+}
+
+@keyframes ring {
+  0%, 60%, 100% { transform: rotate(0deg); }
+  10%, 30%, 50% { transform: rotate(-14deg); }
+  20%, 40% { transform: rotate(14deg); }
+}
+
+@keyframes overdueGlow {
+  0%, 100% { box-shadow: 0 0 0 rgba($overdue, 0); }
+  50% { box-shadow: 0 0 8px rgba($overdue, 0.7); }
+}

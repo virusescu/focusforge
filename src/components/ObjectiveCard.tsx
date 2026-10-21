@@ -11,6 +11,7 @@ import { copyPlain } from '../utils/clipboard';
 import { ContextMenu } from './ContextMenu';
 import { SaveTemplateModal } from './SaveTemplateModal';
 import { CategoryDotPicker } from './CategoryDotPicker';
+import { DeadlineBadge } from './DeadlineBadge';
 import type { StrategicObjective, ObjectiveCategory } from '../types';
 
 interface ObjectiveCardProps {
@@ -19,12 +20,13 @@ interface ObjectiveCardProps {
   categories: ObjectiveCategory[];
   isViewed: boolean;
   inMissionPanel: boolean;
+  inDeadlinesPanel?: boolean; // shows the deadline date; the card cannot be dragged there
   onOpenDetails: (id: number) => void;
   onManageCategories: () => void;
   zoom?: number; // canvas zoom; sortable offsets are screen px but the card lives inside the scaled world
 }
 
-export const ObjectiveCard: FC<ObjectiveCardProps> = ({ obj, containerId, categories, isViewed, inMissionPanel, onOpenDetails, onManageCategories, zoom = 1 }) => {
+export const ObjectiveCard: FC<ObjectiveCardProps> = ({ obj, containerId, categories, isViewed, inMissionPanel, inDeadlinesPanel = false, onOpenDetails, onManageCategories, zoom = 1 }) => {
   const { buckets, updateObjective, deleteObjective, duplicateObjective, updateObjectiveCategory, setObjectiveMission } = useFocus();
   // The same objective can appear in the Mission panel and in its bucket, so the id includes the container
   const [isEditing, setIsEditing] = useState(false);
@@ -33,7 +35,7 @@ export const ObjectiveCard: FC<ObjectiveCardProps> = ({ obj, containerId, catego
   const { listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `obj-${obj.id}@${containerId}`,
     data: { objectiveId: obj.id, containerId },
-    disabled: isEditing,
+    disabled: isEditing || inDeadlinesPanel,
   });
   const [editText, setEditText] = useState(obj.text);
   const [showPicker, setShowPicker] = useState(false);
@@ -44,7 +46,7 @@ export const ObjectiveCard: FC<ObjectiveCardProps> = ({ obj, containerId, catego
   const inputRef = useRef<HTMLInputElement>(null);
 
   const categoryColor = categories.find(c => c.id === obj.category_id)?.color;
-  const bucketColor = inMissionPanel ? buckets.find(b => b.id === obj.bucket_id)?.color : undefined;
+  const bucketColor = inMissionPanel || inDeadlinesPanel ? buckets.find(b => b.id === obj.bucket_id)?.color : undefined;
   const isMission = obj.is_mission === 1;
 
   useEffect(() => {
@@ -82,11 +84,6 @@ export const ObjectiveCard: FC<ObjectiveCardProps> = ({ obj, containerId, catego
     soundEngine.playEditStart();
     setEditText(obj.text);
     setIsEditing(true);
-  };
-
-  const startEditing = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    startRename();
   };
 
   const handleSave = () => {
@@ -134,8 +131,8 @@ export const ObjectiveCard: FC<ObjectiveCardProps> = ({ obj, containerId, catego
     <div
       ref={setNodeRef}
       style={style}
-      className={`${styles.card} ${isViewed ? styles.viewed : ''}`}
-      {...listeners}
+      className={`${styles.card} ${isViewed ? styles.viewed : ''} ${inDeadlinesPanel ? styles.fixed : ''}`}
+      {...(inDeadlinesPanel ? {} : listeners)}
       onClick={handleClick}
       onContextMenu={handleContextMenu}
       data-objective-id={obj.id}
@@ -144,13 +141,14 @@ export const ObjectiveCard: FC<ObjectiveCardProps> = ({ obj, containerId, catego
       <span
         className={styles.categoryBullet}
         style={{ backgroundColor: categoryColor || '#333333' }}
+        data-no-focus
         onClick={(e) => { e.stopPropagation(); setShowPicker(prev => !prev); }}
         onMouseEnter={() => setStatusHint('SET_CATEGORY')}
         onMouseLeave={clearStatusHint}
       />
 
       {showPicker && (
-        <div onClick={e => e.stopPropagation()} style={{ flexShrink: 0 }}>
+        <div onClick={e => e.stopPropagation()} style={{ flexShrink: 0 }} data-no-focus>
           <CategoryDotPicker
             categories={categories}
             selectedCategoryId={obj.category_id ?? null}
@@ -175,11 +173,14 @@ export const ObjectiveCard: FC<ObjectiveCardProps> = ({ obj, containerId, catego
           onBlur={handleSave}
         />
       ) : (
-        <span className={styles.text} onDoubleClick={startEditing}>
+        <span className={styles.text}>
           {!inMissionPanel && isMission && <span className={styles.missionMarker} title="In Mission">★</span>}
           {obj.text}
         </span>
       )}
+
+      {/* Rows show just the icon; the Deadlines panel shows the date as well */}
+      {obj.deadline_at && !isEditing && <DeadlineBadge deadline={obj.deadline_at} showText={inDeadlinesPanel} className={styles.deadline} />}
 
       {menu && (
         <ContextMenu

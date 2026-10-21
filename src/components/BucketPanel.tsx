@@ -1,21 +1,23 @@
-import { type FC, useState, useRef, useEffect } from 'react';
+import { type FC, useState, useRef, useEffect, useCallback } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { Trash2 } from 'lucide-react';
+import { ArrowDownNarrowWide, ArrowUpNarrowWide, Pencil, Trash2 } from 'lucide-react';
 import styles from './BucketPanel.module.scss';
 import { useFocus } from '../contexts/FocusContext';
 import { soundEngine } from '../utils/audio';
-import { setStatusHint, clearStatusHint } from '../utils/statusHint';
 import { usePanelDrag } from '../hooks/usePanelDrag';
+import { sortByDeadline } from '../utils/deadline';
 import { ObjectiveCard } from './ObjectiveCard';
 import { TemplateButtons } from './TemplateButtons';
 import { ConfirmDialog } from './ConfirmDialog';
+import { ContextMenu } from './ContextMenu';
 import type { Bucket, StrategicObjective } from '../types';
 
 interface BucketPanelProps {
   bucket: Bucket;
   objectives: StrategicObjective[];
   zoom: number;
+  dimmed?: boolean; // another panel is focused
   zIndex: number; // from stackingOrder (sort_order); a panel being moved/resized is lifted above all others
   onOpenDetails: (id: number) => void;
   onManageCategories: () => void;
@@ -24,11 +26,19 @@ interface BucketPanelProps {
 // A dragged bucket lifts above other buckets but stays below every note (BucketsPage NOTE_Z_BASE = 10000)
 const DRAGGING_Z_INDEX = 9999;
 
-export const BucketPanel: FC<BucketPanelProps> = ({ bucket, objectives, zoom, zIndex, onOpenDetails, onManageCategories }) => {
+// The Deadlines panel's sort direction is remembered on this machine
+const SORT_KEY = 'deadlines_sort_dir';
+const loadSortDirection = (): 'asc' | 'desc' => (localStorage.getItem(SORT_KEY) === 'desc' ? 'desc' : 'asc');
+
+export const BucketPanel: FC<BucketPanelProps> = ({ bucket, objectives, zoom, zIndex, dimmed = false, onOpenDetails, onManageCategories }) => {
   const { categories, viewedObjectiveId, addObjective, updateBucket, updateBucketGeometry, bringBucketToFront, deleteBucket } = useFocus();
   const isMissionPanel = bucket.kind === 'mission';
-  // Drop target ids parsed by BucketsPage: 'mission' or 'bucket-<id>'
-  const containerId = isMissionPanel ? 'mission' : `bucket-${bucket.id}`;
+  // The Deadlines panel lists every task that has a deadline; nothing can be dropped into it or dragged out of it
+  const isDeadlinesPanel = bucket.kind === 'deadlines';
+  // Drop target ids parsed by BucketsPage: 'mission', 'deadlines' or 'bucket-<id>'
+  const containerId = isMissionPanel ? 'mission' : isDeadlinesPanel ? 'deadlines' : `bucket-${bucket.id}`;
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>(loadSortDirection);
+  const shown = isDeadlinesPanel ? sortByDeadline(objectives, sortDirection) : objectives;
 
   const { geom, isDragging, beginPointerDrag, handlePointerMove, handlePointerUp } = usePanelDrag({
     geometry: { x: bucket.x, y: bucket.y, w: bucket.w, h: bucket.h },
@@ -43,6 +53,8 @@ export const BucketPanel: FC<BucketPanelProps> = ({ bucket, objectives, zoom, zI
   const [isRenaming, setIsRenaming] = useState(false);
   const [nameText, setNameText] = useState(bucket.name);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  const closeMenu = useCallback(() => setMenu(null), []);
   const [newText, setNewText] = useState('');
   const nameInputRef = useRef<HTMLInputElement>(null);
 
@@ -60,10 +72,18 @@ export const BucketPanel: FC<BucketPanelProps> = ({ bucket, objectives, zoom, zI
     beginPointerDrag(e, 'move');
   };
 
-  const startRename = (e: React.MouseEvent) => {
-    if (isMissionPanel || isRenaming) return;
-    if ((e.target as Element).closest('button, input')) return;
-    e.stopPropagation();
+  // Rename and Delete live in the header's right-click menu; Mission and Deadlines have neither
+  const canRename = !isMissionPanel && !isDeadlinesPanel;
+
+  const handleHeaderContextMenu = (e: React.MouseEvent) => {
+    if (!canRename || isRenaming) return; // keep the native menu in the rename box
+    e.preventDefault();
+    soundEngine.playClick();
+    setMenu({ x: e.clientX, y: e.clientY });
+  };
+
+  const startRename = () => {
+    if (!canRename || isRenaming) return;
     soundEngine.playEditStart();
     setNameText(bucket.name);
     setIsRenaming(true);
@@ -85,6 +105,13 @@ export const BucketPanel: FC<BucketPanelProps> = ({ bucket, objectives, zoom, zI
       setNameText(bucket.name);
       setIsRenaming(false);
     }
+  };
+
+  const toggleSort = () => {
+    soundEngine.playClick();
+    const next = sortDirection === 'asc' ? 'desc' : 'asc';
+    localStorage.setItem(SORT_KEY, next);
+    setSortDirection(next);
   };
 
   const handleColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -114,7 +141,7 @@ export const BucketPanel: FC<BucketPanelProps> = ({ bucket, objectives, zoom, zI
 
   return (
     <div
-      className={`${styles.panel} ${isDragging ? styles.dragging : ''}`}
+      className={`${styles.panel} ${isDragging ? styles.dragging : ''} ${dimmed ? styles.dimmed : ''}`}
       data-bucket-id={bucket.id}
       data-details-barrier
       style={{
@@ -135,7 +162,7 @@ export const BucketPanel: FC<BucketPanelProps> = ({ bucket, objectives, zoom, zI
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
-        onDoubleClick={startRename}
+        onContextMenu={handleHeaderContextMenu}
       >
         {isMissionPanel ? (
           <span className={styles.title}>MISSION_OBJECTIVES</span>
@@ -148,16 +175,22 @@ export const BucketPanel: FC<BucketPanelProps> = ({ bucket, objectives, zoom, zI
             onKeyDown={handleRenameKeyDown}
             onBlur={saveRename}
           />
+        ) : isDeadlinesPanel ? (
+          <span className={styles.title}>DEADLINES</span>
         ) : (
-          <span
-            className={styles.title}
-            onMouseEnter={() => setStatusHint('RENAME_BUCKET')}
-            onMouseLeave={clearStatusHint}
-          >
-            {bucket.name}
-          </span>
+          <span className={styles.title}>{bucket.name}</span>
         )}
         <span className={styles.count}>{objectives.length}</span>
+        {isDeadlinesPanel && (
+          <button
+            className={styles.sortBtn}
+            onClick={toggleSort}
+            title={sortDirection === 'asc' ? 'Soonest first (click for latest first)' : 'Latest first (click for soonest first)'}
+            aria-label={sortDirection === 'asc' ? 'Sort: soonest first' : 'Sort: latest first'}
+          >
+            {sortDirection === 'asc' ? <ArrowDownNarrowWide size={13} /> : <ArrowUpNarrowWide size={13} />}
+          </button>
+        )}
         <input
           type="color"
           className={styles.colorInput}
@@ -165,26 +198,27 @@ export const BucketPanel: FC<BucketPanelProps> = ({ bucket, objectives, zoom, zI
           onChange={handleColorChange}
           title="Bucket color"
         />
-        {bucket.kind === 'custom' && (
-          <button
-            className={styles.deleteBtn}
-            onClick={() => setConfirmingDelete(true)}
-            onMouseEnter={() => setStatusHint('DELETE_BUCKET')}
-            onMouseLeave={clearStatusHint}
-            title="Delete bucket"
-          >
-            <Trash2 size={12} />
-          </button>
-        )}
       </div>
+
+      {menu && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          onClose={closeMenu}
+          items={[
+            { label: 'Rename', icon: <Pencil size={12} />, onSelect: startRename },
+            ...(bucket.kind === 'custom' ? [{ label: 'Delete', icon: <Trash2 size={12} />, onSelect: () => setConfirmingDelete(true) }] : []),
+          ]}
+        />
+      )}
 
       <div
         ref={setDropRef}
         className={`${styles.body} ${isOver ? styles.over : ''}`}
         data-canvas-scroll
       >
-        <SortableContext items={objectives.map(o => `obj-${o.id}@${containerId}`)} strategy={verticalListSortingStrategy}>
-          {objectives.map(obj => (
+        <SortableContext items={shown.map(o => `obj-${o.id}@${containerId}`)} strategy={verticalListSortingStrategy}>
+          {shown.map(obj => (
             <ObjectiveCard
               key={obj.id}
               obj={obj}
@@ -192,29 +226,32 @@ export const BucketPanel: FC<BucketPanelProps> = ({ bucket, objectives, zoom, zI
               categories={categories}
               isViewed={viewedObjectiveId === obj.id}
               inMissionPanel={isMissionPanel}
+              inDeadlinesPanel={isDeadlinesPanel}
               onOpenDetails={onOpenDetails}
               onManageCategories={onManageCategories}
               zoom={zoom}
             />
           ))}
         </SortableContext>
-        {objectives.length === 0 && <div className={styles.empty}>EMPTY</div>}
+        {shown.length === 0 && <div className={styles.empty}>{isDeadlinesPanel ? 'NO_DEADLINES' : 'EMPTY'}</div>}
       </div>
 
       {/* One footer, one divider: template buttons (if any) above the add box, evenly spaced */}
-      <div className={styles.footer}>
-        <TemplateButtons defaultBucketId={isMissionPanel ? undefined : bucket.id} />
-        <div className={styles.addRow}>
-          <input
-            type="text"
-            className={styles.addInput}
-            placeholder="Add Objective..."
-            value={newText}
-            onChange={e => setNewText(e.target.value)}
-            onKeyDown={handleAddKeyDown}
-          />
+      {!isDeadlinesPanel && (
+        <div className={styles.footer}>
+          <TemplateButtons defaultBucketId={isMissionPanel ? undefined : bucket.id} />
+          <div className={styles.addRow}>
+            <input
+              type="text"
+              className={styles.addInput}
+              placeholder="Add Objective..."
+              value={newText}
+              onChange={e => setNewText(e.target.value)}
+              onKeyDown={handleAddKeyDown}
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       {confirmingDelete && (
         <ConfirmDialog
@@ -228,6 +265,7 @@ export const BucketPanel: FC<BucketPanelProps> = ({ bucket, objectives, zoom, zI
 
       <div
         className={styles.resizeHandle}
+        data-no-focus
         onPointerDown={e => beginPointerDrag(e, 'resize')}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}

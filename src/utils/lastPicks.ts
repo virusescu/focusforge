@@ -1,4 +1,5 @@
 import type { Bucket, ObjectiveCategory } from '../types';
+import { isHoldingBucket } from './buckets';
 
 // The bucket and category last used to create a task. Local to this machine on purpose: not worth syncing.
 const BUCKET_KEY = 'last_bucket_id';
@@ -32,11 +33,11 @@ export function saveLastPicks(picks: LastPicks): void {
 
 type Candidate = number | null | undefined;
 
-// First candidate that is still a bucket tasks can live in (not the Mission pseudo-bucket), else Unsorted.
+// First candidate that is still a bucket tasks can live in (not the Mission or Deadlines panels), else Unsorted.
 // null only while no buckets are loaded.
 export function firstValidBucketId(candidates: Candidate[], buckets: Bucket[]): number | null {
   for (const id of candidates) {
-    if (id != null && buckets.some(b => b.id === id && b.kind !== 'mission')) return id;
+    if (id != null && buckets.some(b => b.id === id && isHoldingBucket(b))) return id;
   }
   return buckets.find(b => b.kind === 'unsorted')?.id ?? null;
 }

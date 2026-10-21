@@ -7,6 +7,7 @@ import { useMarkdownEditor } from '../hooks/useMarkdownEditor';
 import { BucketTag } from './BucketTag';
 import { MarkdownView } from './MarkdownView';
 import { MarkdownToolbar } from './MarkdownToolbar';
+import { DeadlineControl } from './DeadlineControl';
 
 interface Props {
   onClose: () => void;
@@ -98,11 +99,13 @@ export const ObjectiveDetails: FC<Props> = ({ onClose, closeOnOutsidePress = tru
         <div className={styles.header}>
           <div className={styles.titleBlock}>
             <h4>{activeObjective?.text ?? 'OBJECTIVE_DETAILS'}</h4>
-            {activeBucket && <BucketTag bucket={activeBucket} className={styles.bucketTag} />}
+            {activeObjective && (
+              <div className={styles.metaRow}>
+                {activeBucket ? <BucketTag bucket={activeBucket} className={styles.bucketTag} /> : <span />}
+                <DeadlineControl objectiveId={activeObjective.id} deadline={activeObjective.deadline_at} />
+              </div>
+            )}
           </div>
-          <button className={styles.closeBtn} onClick={onClose} title="Close (Esc)">
-            <X size={16} />
-          </button>
         </div>
 
         <div className={styles.body}>

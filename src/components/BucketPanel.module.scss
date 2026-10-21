@@ -7,8 +7,15 @@
   backdrop-filter: blur(2px);
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
 
+  transition: opacity 0.3s ease;
+
   &.dragging {
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+  }
+
+  // Another panel is focused: this one fades back (it stays usable)
+  &.dimmed {
+    opacity: 0.3;
   }
 }
 
@@ -74,7 +81,7 @@
   }
 }
 
-.deleteBtn {
+.sortBtn {
   background: transparent;
   border: none;
   color: var(--text-muted);
@@ -82,11 +89,11 @@
   padding: 2px;
   display: flex;
   align-items: center;
-  opacity: 0.6;
+  opacity: 0.8;
   transition: all 0.2s ease;
 
   &:hover {
-    color: #ef4444;
+    color: var(--primary);
     opacity: 1;
   }
 }

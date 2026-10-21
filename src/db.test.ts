@@ -12,7 +12,7 @@ vi.mock('@libsql/client', () => ({
   }),
 }));
 
-import { initDbClient, saveFocusSession, getRecentSessions, deleteFocusSession, getObjectives, addObjective, duplicateObjective, reorderCategories, deleteCategory, getTemplates, addTemplate, updateTemplate, deleteTemplate, reorderTemplates, deleteObjective, completeObjective, getKillRate, getAllSessions, getFragmentationStats, getAlarms, addAlarm, toggleAlarm, deleteAlarm, ensureSystemBuckets, getBuckets, deleteBucket, moveObjectiveToBucket, reorderBucketObjectives, bringBucketToFront, getCanvasNotes, addCanvasNote, updateCanvasNoteContent, updateCanvasNoteGeometry, bringCanvasNoteToFront, deleteCanvasNote } from './db';
+import { initDbClient, saveFocusSession, getRecentSessions, deleteFocusSession, getObjectives, addObjective, duplicateObjective, reorderCategories, deleteCategory, getTemplates, addTemplate, updateTemplate, deleteTemplate, reorderTemplates, deleteObjective, completeObjective, getKillRate, getAllSessions, getFragmentationStats, getAlarms, addAlarm, toggleAlarm, deleteAlarm, ensureSystemBuckets, updateObjectiveDeadline, getBuckets, deleteBucket, moveObjectiveToBucket, reorderBucketObjectives, bringBucketToFront, getCanvasNotes, addCanvasNote, updateCanvasNoteContent, updateCanvasNoteGeometry, bringCanvasNoteToFront, deleteCanvasNote } from './db';
 
 describe('db utility functions', () => {
   beforeEach(() => {
@@ -106,7 +106,7 @@ describe('db utility functions', () => {
 
     it('duplicateObjective copies the row right after the original and shifts the rows behind it', async () => {
       mockExecute
-        .mockResolvedValueOnce({ rows: [{ user_id: 1, text: 'Task', sort_order: 5, category_id: 4, is_mission: 1, details: '# notes', bucket_id: 9, bucket_sort_order: 3 }], rowsAffected: 0 })
+        .mockResolvedValueOnce({ rows: [{ user_id: 1, text: 'Task', sort_order: 5, category_id: 4, is_mission: 1, details: '# notes', bucket_id: 9, bucket_sort_order: 3, deadline_at: '2026-12-24T13:30:00.000Z' }], rowsAffected: 0 })
         .mockResolvedValueOnce({ rows: [], rowsAffected: 2 })
         .mockResolvedValueOnce({ rows: [], rowsAffected: 1 })
         .mockResolvedValueOnce({ lastInsertRowid: BigInt(77), rows: [], rowsAffected: 1 });
@@ -124,7 +124,7 @@ describe('db utility functions', () => {
       });
       expect(mockExecute).toHaveBeenNthCalledWith(4, {
         sql: expect.stringContaining('INSERT INTO objectives'),
-        args: [1, 'Task', 6, 4, 1, '# notes', 9, 4],
+        args: [1, 'Task', 6, 4, 1, '# notes', 9, 4, '2026-12-24T13:30:00.000Z'],
       });
     });
 
@@ -139,8 +139,29 @@ describe('db utility functions', () => {
 
       expect(mockExecute).toHaveBeenLastCalledWith({
         sql: expect.stringContaining('INSERT INTO objectives'),
-        args: [1, 'Task', 1, null, 0, null, 9, 7],
+        args: [1, 'Task', 1, null, 0, null, 9, 7, null],
       });
+    });
+
+    it("getObjectives returns each objective's deadline, null when it has none", async () => {
+      mockExecute.mockResolvedValueOnce({ rows: [
+        { id: 1, text: 'A', created_at: 'x', sort_order: 0, is_mission: 1, deadline_at: '2026-12-24T13:30:00.000Z' },
+        { id: 2, text: 'B', created_at: 'x', sort_order: 1, is_mission: 1 },
+      ], rowsAffected: 0 });
+
+      const result = await getObjectives(1);
+
+      expect(result.map(o => o.deadline_at)).toEqual(['2026-12-24T13:30:00.000Z', null]);
+    });
+
+    it('updateObjectiveDeadline sets or clears the deadline', async () => {
+      mockExecute.mockResolvedValue({ rows: [], rowsAffected: 1 });
+
+      await updateObjectiveDeadline(5, '2026-12-24T13:30:00.000Z');
+      await updateObjectiveDeadline(5, null);
+
+      expect(mockExecute).toHaveBeenNthCalledWith(1, { sql: 'UPDATE objectives SET deadline_at = ? WHERE id = ?', args: ['2026-12-24T13:30:00.000Z', 5] });
+      expect(mockExecute).toHaveBeenNthCalledWith(2, { sql: 'UPDATE objectives SET deadline_at = ? WHERE id = ?', args: [null, 5] });
     });
 
     it('duplicateObjective returns null for an objective that no longer exists', async () => {
@@ -371,6 +392,7 @@ describe('db utility functions', () => {
         .mockResolvedValueOnce({ rows: [], rowsAffected: 0 })                       // SELECT kinds
         .mockResolvedValueOnce({ rows: [], rowsAffected: 1, lastInsertRowid: 1n })  // INSERT mission
         .mockResolvedValueOnce({ rows: [], rowsAffected: 1, lastInsertRowid: 2n })  // INSERT unsorted
+        .mockResolvedValueOnce({ rows: [], rowsAffected: 1, lastInsertRowid: 3n })  // INSERT deadlines
         .mockResolvedValueOnce({ rows: [{ id: 2 }], rowsAffected: 0 })              // SELECT unsorted id
         .mockResolvedValueOnce({ rows: [], rowsAffected: 3 });                      // UPDATE backfill
 
@@ -384,6 +406,10 @@ describe('db utility functions', () => {
         sql: expect.stringContaining('INTO buckets'),
         args: expect.arrayContaining([7, 'unsorted']),
       }));
+      expect(mockExecute).toHaveBeenCalledWith(expect.objectContaining({
+        sql: expect.stringContaining('INTO buckets'),
+        args: expect.arrayContaining([7, 'deadlines']),
+      }));
       expect(mockExecute).toHaveBeenLastCalledWith({
         sql: expect.stringMatching(/UPDATE objectives SET bucket_id = \?, bucket_sort_order = COALESCE\(bucket_sort_order, sort_order\) WHERE user_id = \? AND bucket_id IS NULL/),
         args: [2, 7],
@@ -392,7 +418,7 @@ describe('db utility functions', () => {
 
     it('ensureSystemBuckets does not insert when both system buckets exist', async () => {
       mockExecute
-        .mockResolvedValueOnce({ rows: [{ kind: 'mission' }, { kind: 'unsorted' }], rowsAffected: 0 })
+        .mockResolvedValueOnce({ rows: [{ kind: 'mission' }, { kind: 'unsorted' }, { kind: 'deadlines' }], rowsAffected: 0 })
         .mockResolvedValueOnce({ rows: [{ id: 2 }], rowsAffected: 0 })
         .mockResolvedValueOnce({ rows: [], rowsAffected: 0 });
 
@@ -407,6 +433,7 @@ describe('db utility functions', () => {
         .mockResolvedValueOnce({ rows: [], rowsAffected: 0 })
         .mockResolvedValueOnce({ rows: [], rowsAffected: 1 })
         .mockResolvedValueOnce({ rows: [], rowsAffected: 1 })
+        .mockResolvedValueOnce({ rows: [], rowsAffected: 1 })
         .mockResolvedValueOnce({ rows: [{ id: 2 }], rowsAffected: 0 })
         .mockResolvedValueOnce({ rows: [], rowsAffected: 0 });
 
@@ -415,7 +442,7 @@ describe('db utility functions', () => {
       const inserts = mockExecute.mock.calls
         .map(c => (c[0] as { sql: string }).sql)
         .filter(s => s.includes('INTO buckets'));
-      expect(inserts).toHaveLength(2);
+      expect(inserts).toHaveLength(3);
       for (const sql of inserts) expect(sql).toMatch(/^INSERT OR IGNORE INTO buckets/);
     });
 
@@ -424,17 +451,18 @@ describe('db utility functions', () => {
         .mockResolvedValueOnce({ rows: [], rowsAffected: 0 })
         .mockResolvedValueOnce({ rows: [], rowsAffected: 1 })
         .mockResolvedValueOnce({ rows: [], rowsAffected: 1 })
+        .mockResolvedValueOnce({ rows: [], rowsAffected: 1 })
         .mockResolvedValueOnce({ rows: [{ id: 2 }], rowsAffected: 0 })
         .mockResolvedValueOnce({ rows: [], rowsAffected: 0 });
 
       await Promise.all([ensureSystemBuckets(7), ensureSystemBuckets(7)]);
 
-      expect(mockExecute).toHaveBeenCalledTimes(5);
+      expect(mockExecute).toHaveBeenCalledTimes(6);
     });
 
     it('ensureSystemBuckets resolves the Unsorted id deterministically', async () => {
       mockExecute
-        .mockResolvedValueOnce({ rows: [{ kind: 'mission' }, { kind: 'unsorted' }], rowsAffected: 0 })
+        .mockResolvedValueOnce({ rows: [{ kind: 'mission' }, { kind: 'unsorted' }, { kind: 'deadlines' }], rowsAffected: 0 })
         .mockResolvedValueOnce({ rows: [{ id: 2 }], rowsAffected: 0 })
         .mockResolvedValueOnce({ rows: [], rowsAffected: 0 });
 
@@ -499,6 +527,11 @@ describe('db utility functions', () => {
       });
     });
 
+    it('moveObjectiveToBucket refuses the deadlines bucket', async () => {
+      mockExecute.mockResolvedValueOnce({ rows: [{ user_id: 7, kind: 'deadlines' }], rowsAffected: 0 });
+      await expect(moveObjectiveToBucket(11, 3)).rejects.toThrow('Cannot move objective into deadlines bucket');
+    });
+
     it('moveObjectiveToBucket refuses the mission bucket', async () => {
       mockExecute.mockResolvedValueOnce({ rows: [{ user_id: 7, kind: 'mission' }], rowsAffected: 0 });
       await expect(moveObjectiveToBucket(11, 1)).rejects.toThrow('Cannot move objective into mission bucket');
@@ -539,7 +572,7 @@ describe('db utility functions', () => {
 
     it('getBuckets maps rows to Bucket objects', async () => {
       mockExecute
-        .mockResolvedValueOnce({ rows: [{ kind: 'mission' }, { kind: 'unsorted' }], rowsAffected: 0 })
+        .mockResolvedValueOnce({ rows: [{ kind: 'mission' }, { kind: 'unsorted' }, { kind: 'deadlines' }], rowsAffected: 0 })
         .mockResolvedValueOnce({ rows: [{ id: 2 }], rowsAffected: 0 })
         .mockResolvedValueOnce({ rows: [], rowsAffected: 0 })
         .mockResolvedValueOnce({ rows: [{ id: 2, name: 'Unsorted', color: '#888888', x: 360, y: 0, w: 300, h: 420, sort_order: 1, kind: 'unsorted' }], rowsAffected: 0 });

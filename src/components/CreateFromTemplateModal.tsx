@@ -1,5 +1,6 @@
 import { type FC, useId, useMemo, useRef, useState } from 'react';
 import { BucketSelect } from './BucketSelect';
+import { isHoldingBucket } from '../utils/buckets';
 import { ModalFrame } from './ModalFrame';
 import form from './TemplateForm.module.scss';
 import { useFocus } from '../contexts/FocusContext';
@@ -19,7 +20,7 @@ export const CreateFromTemplateModal: FC<CreateFromTemplateModalProps> = ({ temp
   const { buckets, categories, addObjective } = useFocus();
   const id = useId();
   const fields = useMemo(() => extractFields(template.title, template.details), [template.title, template.details]);
-  const holdingBuckets = useMemo(() => buckets.filter(b => b.kind !== 'mission'), [buckets]);
+  const holdingBuckets = useMemo(() => buckets.filter(isHoldingBucket), [buckets]);
 
   const [values, setValues] = useState<Record<string, string>>({});
   const [bucketId, setBucketId] = useState<number | null>(() =>

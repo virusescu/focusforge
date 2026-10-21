@@ -48,6 +48,7 @@ export interface StrategicObjective {
   last_interacted_at?: string;
   bucket_id?: number | null;
   bucket_sort_order?: number | null;
+  deadline_at?: string | null; // ISO, UTC; null/absent = no deadline (may be in the past)
 }
 
 // A saved task shape: `title` and `details` may contain $placeholders (see utils/templates.ts)
@@ -64,7 +65,7 @@ export interface Template extends TemplateInput {
   sort_order: number;
 }
 
-export type BucketKind = 'custom' | 'unsorted' | 'mission';
+export type BucketKind = 'custom' | 'unsorted' | 'mission' | 'deadlines';
 
 export interface BucketGeometry {
   x: number;

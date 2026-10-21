@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  clampZoom, screenToWorld, worldToScreen, zoomAt, recenter, movePanel, resizePanel,
+  clampZoom, viewAt, easeInOutCubic, screenToWorld, worldToScreen, zoomAt, recenter, movePanel, resizePanel,
   wheelZoomFactor, loadViewport, saveViewport, DEFAULT_VIEWPORT, MIN_ZOOM, MAX_ZOOM,
   MIN_PANEL_W, MIN_PANEL_H, VIEWPORT_STORAGE_KEY, SNAP_STEP, stackingOrder, snapToGrid,
 } from './canvas';
@@ -87,6 +87,34 @@ describe('canvas math', () => {
     expect(wheelZoomFactor(-100)).toBeGreaterThan(1);
     expect(wheelZoomFactor(100)).toBeLessThan(1);
     expect(wheelZoomFactor(0)).toBe(1);
+  });
+
+  it('easeInOutCubic runs from 0 to 1, slow at both ends and fast in the middle', () => {
+    expect(easeInOutCubic(0)).toBe(0);
+    expect(easeInOutCubic(1)).toBe(1);
+    expect(easeInOutCubic(0.5)).toBeCloseTo(0.5);
+    expect(easeInOutCubic(0.25)).toBeCloseTo(0.0625);
+    expect(easeInOutCubic(0.75)).toBeCloseTo(0.9375);
+  });
+
+  it('viewAt moves panX, panY and zoom together by the same fraction and ends exactly on the target', () => {
+    const from = { panX: 100, panY: 50, zoom: 0.5 };
+    const to = { panX: -300, panY: 20, zoom: 2 };
+    expect(viewAt(from, to, 0)).toEqual(from);
+    expect(viewAt(from, to, 0.5)).toEqual({ panX: -100, panY: 35, zoom: 1.25 });
+    expect(viewAt(from, to, 1)).toBe(to);
+  });
+
+  it('viewAt brings the destination monotonically to the middle, even when zooming in over a long distance', () => {
+    const from = { panX: 500, panY: 300, zoom: 0.25 };   // middle is world (0, 0)
+    const to = { panX: -3500, panY: 300, zoom: 1 };      // middle is world (4000, 0)
+    let previous = Infinity;
+    for (let t = 0; t < 1; t += 0.05) {
+      const v = viewAt(from, to, t);
+      const distanceOnScreen = Math.abs(v.panX + 4000 * v.zoom - 500);
+      expect(distanceOnScreen).toBeLessThan(previous);
+      previous = distanceOnScreen;
+    }
   });
 
   it('recenter puts world origin at the viewport center and keeps zoom', () => {

@@ -36,6 +36,7 @@ const mockDeleteBucket = vi.fn();
 const mockMoveObjectiveToBucket = vi.fn();
 const mockSetObjectiveMission = vi.fn();
 const mockDuplicateObjective = vi.fn();
+const mockUpdateObjectiveDeadline = vi.fn();
 const mockReorderCategories = vi.fn();
 const mockGetCategories = vi.fn();
 const mockGetTemplates = vi.fn();
@@ -86,6 +87,7 @@ vi.mock('../db', () => ({
   reorderBucketObjectives: vi.fn().mockResolvedValue(undefined),
   setObjectiveMission: (id: number, m: number) => mockSetObjectiveMission(id, m),
   updateObjectiveDetails: vi.fn().mockResolvedValue(undefined),
+  updateObjectiveDeadline: (id: number, d: string | null) => mockUpdateObjectiveDeadline(id, d),
 }));
 
 // Mock UserContext
@@ -125,6 +127,7 @@ describe('FocusContext', () => {
     mockMoveObjectiveToBucket.mockResolvedValue(undefined);
     mockSetObjectiveMission.mockResolvedValue(undefined);
     mockDuplicateObjective.mockResolvedValue(5);
+    mockUpdateObjectiveDeadline.mockResolvedValue(undefined);
     mockReorderCategories.mockResolvedValue(undefined);
     mockGetCategories.mockResolvedValue([]);
     mockGetTemplates.mockResolvedValue([]);
@@ -427,6 +430,40 @@ describe('FocusContext', () => {
     expect(result.current.objectivesByBucket.get(9)!.map(o => o.id)).toEqual([2, 1]);
     expect(result.current.objectivesByBucket.get(2)!.map(o => o.id)).toEqual([3]);
     expect(result.current.missionObjectives.map(o => o.id)).toEqual([1]);
+  });
+
+  it('deadlineObjectives lists open objectives that have a deadline, and the Deadlines bucket holds no tasks', async () => {
+    const DEADLINES = { id: 3, name: 'Deadlines', color: '#f55', sort_order: 2, kind: 'deadlines', x: 0, y: 0, w: 1, h: 1 };
+    mockGetBuckets.mockResolvedValue([UNSORTED, DEADLINES, WORK]);
+    mockGetObjectives.mockResolvedValue([
+      { id: 1, text: 'a', created_at: '', is_mission: 0, bucket_id: 9, bucket_sort_order: 0, deadline_at: '2026-12-24T10:00:00.000Z' },
+      { id: 2, text: 'b', created_at: '', is_mission: 0, bucket_id: 9, bucket_sort_order: 1, deadline_at: null },
+    ]);
+    const { result } = renderHook(() => useFocus(), { wrapper });
+    await waitFor(() => expect(result.current.buckets).toHaveLength(3));
+    expect(result.current.deadlineObjectives.map(o => o.id)).toEqual([1]);
+    expect(result.current.objectivesByBucket.has(3)).toBe(false);
+  });
+
+  it('setObjectiveDeadline updates optimistically and saves; null removes it', async () => {
+    mockGetObjectives.mockResolvedValue([{ id: 4, text: 'x', created_at: '', is_mission: 0, bucket_id: 9, bucket_sort_order: 0 }]);
+    const { result } = renderHook(() => useFocus(), { wrapper });
+    await waitFor(() => expect(result.current.objectivePool).toHaveLength(1));
+    await act(async () => { await result.current.setObjectiveDeadline(4, '2026-12-24T10:00:00.000Z'); });
+    expect(mockUpdateObjectiveDeadline).toHaveBeenCalledWith(4, '2026-12-24T10:00:00.000Z');
+    expect(result.current.deadlineObjectives.map(o => o.id)).toEqual([4]);
+    await act(async () => { await result.current.setObjectiveDeadline(4, null); });
+    expect(mockUpdateObjectiveDeadline).toHaveBeenLastCalledWith(4, null);
+    expect(result.current.deadlineObjectives).toEqual([]);
+  });
+
+  it('a failed deadline save reloads the saved objectives', async () => {
+    mockGetObjectives.mockResolvedValue([{ id: 4, text: 'x', created_at: '', is_mission: 0, bucket_id: 9, bucket_sort_order: 0 }]);
+    const { result } = renderHook(() => useFocus(), { wrapper });
+    await waitFor(() => expect(result.current.objectivePool).toHaveLength(1));
+    mockUpdateObjectiveDeadline.mockRejectedValueOnce(new Error('offline'));
+    await act(async () => { await result.current.setObjectiveDeadline(4, '2026-12-24T10:00:00.000Z'); });
+    expect(result.current.deadlineObjectives).toEqual([]);
   });
 
   it('addObjective with bucket options passes them to the DB', async () => {

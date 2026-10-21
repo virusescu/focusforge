@@ -1,0 +1,54 @@
+$later: #fff;
+$soon: #ffcc33;
+$overdue: #e5383b;
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  line-height: 1;
+
+  // Far off, but clearly visible: white at full strength, never dimmed
+  &.later {
+    color: $later;
+  }
+
+  &.soon {
+    color: $soon;
+  }
+
+  // Past the deadline: more urgent than yellow (a red background, an alarm clock that rings)
+  &.overdue {
+    color: #fff;
+
+    &.withText {
+      background: $overdue;
+      padding: 0.2rem 0.4rem;
+      animation: overdueGlow 1.6s ease-in-out infinite;
+    }
+  }
+}
+
+.overdueIcon {
+  animation: ring 1.6s ease-in-out infinite;
+  transform-origin: 50% 20%;
+}
+
+// An icon on its own (task rows) gets the red as its own color
+.badge.overdue:not(.withText) {
+  color: $overdue;
+}
+
+@keyframes ring {
+  0%, 60%, 100% { transform: rotate(0deg); }
+  10%, 30%, 50% { transform: rotate(-14deg); }
+  20%, 40% { transform: rotate(14deg); }
+}
+
+@keyframes overdueGlow {
+  0%, 100% { box-shadow: 0 0 0 rgba($overdue, 0); }
+  50% { box-shadow: 0 0 8px rgba($overdue, 0.7); }
+}

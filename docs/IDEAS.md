@@ -84,5 +84,8 @@ Show focus time per task on the card and in Analytics. Only works if sessions re
 ### 9. End-of-Day Wrap-up
 A short summary when the day ends (what was finished, how long was focused) that offers to move stale tasks forward.
 
+### 10. Deadlines Popup on Startup
+*Builds on the Deadlines feature (built).* When the app opens, show a popup listing every task that has a deadline. The ones due today are highlighted, and overdue ones are marked more strongly. Each row has a button to put that task in the Mission Objectives list. Keep it dismissible and quick.
+
 ### Housekeeping Under Consideration
 - Remove some of the trackers and clean up history after a season ends. Undecided. Removing history is hard to undo, so decide after seeing what feels like noise over a full season.

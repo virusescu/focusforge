@@ -15,6 +15,12 @@
     cursor: grabbing;
   }
 
+  // Cards in the Deadlines panel are only read, clicked and right-clicked
+  &.fixed,
+  &.fixed:active {
+    cursor: pointer;
+  }
+
   &:hover {
     border-color: var(--primary);
     background: rgba(26, 26, 26, 0.95);
@@ -58,6 +64,11 @@
   white-space: normal;
   color: var(--text-primary);
   user-select: none;
+}
+
+.deadline {
+  margin-top: 1px;
+  font-size: 0.65rem;
 }
 
 .missionMarker {

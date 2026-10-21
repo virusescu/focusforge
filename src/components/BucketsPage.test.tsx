@@ -142,24 +142,173 @@ describe('BucketsPage', () => {
     expect(panel.style.background).toMatch(/#3388ff|rgb\(51, 136, 255\)/i);
   });
 
-  it('Space centers on the Mission panel when nothing was selected yet, keeping zoom', () => {
+  it('Space flies to the Mission panel at 100% zoom when nothing was selected yet', async () => {
     localStorage.setItem('bucket_canvas_viewport', JSON.stringify({ panX: -500, panY: -500, zoom: 1.5 }));
     render(<BucketsPage onBack={vi.fn()} />);
     const world = screen.getByTestId('canvas-world');
     fireEvent.keyDown(window, { key: ' ' });
     // jsdom rects are 0×0; the Mission panel's center is (-190, 210)
-    expect(world.style.transform).toBe('translate(285px, -315px) scale(1.5)');
+    await waitFor(() => expect(world.style.transform).toBe('translate(190px, -210px) scale(1)'));
   });
 
-  it('Space centers on the bucket of the task selected last on this visit', () => {
+  it('the fly is animated: the view is not at the target right away', async () => {
+    localStorage.setItem('bucket_canvas_viewport', JSON.stringify({ panX: -500, panY: -500, zoom: 1.5 }));
+    render(<BucketsPage onBack={vi.fn()} />);
+    const world = screen.getByTestId('canvas-world');
+    fireEvent.keyDown(window, { key: ' ' });
+    expect(world.style.transform).toBe('translate(-500px, -500px) scale(1.5)');
+    await waitFor(() => expect(world.style.transform).toBe('translate(190px, -210px) scale(1)'));
+  });
+
+  it('wheel zooming stops a fly in progress', async () => {
+    localStorage.setItem('bucket_canvas_viewport', JSON.stringify({ panX: -500, panY: -500, zoom: 1.5 }));
+    render(<BucketsPage onBack={vi.fn()} />);
+    const world = screen.getByTestId('canvas-world');
+    fireEvent.keyDown(window, { key: ' ' });
+    fireEvent.wheel(world, { deltaY: -100 });
+    await new Promise(resolve => setTimeout(resolve, 800));
+    expect(world.style.transform).not.toBe('translate(190px, -210px) scale(1)');
+  });
+
+  it('Space flies to the bucket of the task selected last on this visit', async () => {
     localStorage.setItem('bucket_canvas_viewport', JSON.stringify({ panX: -500, panY: -500, zoom: 1.5 }));
     render(<BucketsPage onBack={vi.fn()} />);
     fireEvent.click(document.querySelector('[data-objective-id="101"]') as HTMLElement); // in Work, center (490, 210)
     fireEvent.keyDown(window, { key: ' ' });
-    expect(screen.getByTestId('canvas-world').style.transform).toBe('translate(-735px, -315px) scale(1.5)');
+    await waitFor(() => expect(screen.getByTestId('canvas-world').style.transform).toBe('translate(-490px, -210px) scale(1)'));
   });
 
-  it('with the details drawer open, Space centers in the space beside it', () => {
+  it('double-clicking empty space in a bucket flies to it at 100% zoom', async () => {
+    localStorage.setItem('bucket_canvas_viewport', JSON.stringify({ panX: -500, panY: -500, zoom: 0.5 }));
+    render(<BucketsPage onBack={vi.fn()} />);
+    const body = document.querySelector('[data-bucket-id="9"] [data-canvas-scroll]') as HTMLElement;
+    fireEvent.doubleClick(body);
+    await waitFor(() => expect(screen.getByTestId('canvas-world').style.transform).toBe('translate(-490px, -210px) scale(1)'));
+  });
+
+  it("double-clicking a control or a task's category dot does not fly", async () => {
+    localStorage.setItem('bucket_canvas_viewport', JSON.stringify({ panX: -500, panY: -500, zoom: 0.5 }));
+    render(<BucketsPage onBack={vi.fn()} />);
+    const world = screen.getByTestId('canvas-world');
+    fireEvent.doubleClick(screen.getAllByTitle('Bucket color')[0]);
+    fireEvent.doubleClick(document.querySelector('[data-objective-id="101"] span') as HTMLElement); // the category dot
+    await new Promise(resolve => setTimeout(resolve, 800));
+    expect(world.style.transform).toBe('translate(-500px, -500px) scale(0.5)');
+  });
+
+  it('double-clicking a task flies to its bucket (rename is in the right-click menu)', async () => {
+    localStorage.setItem('bucket_canvas_viewport', JSON.stringify({ panX: -500, panY: -500, zoom: 0.5 }));
+    render(<BucketsPage onBack={vi.fn()} />);
+    const card = document.querySelector('[data-objective-id="101"]') as HTMLElement;
+    fireEvent.doubleClick(card.querySelector('span:last-of-type') as HTMLElement);
+    expect(within(card).queryByDisplayValue('Beta')).toBeNull();
+    await waitFor(() => expect(screen.getByTestId('canvas-world').style.transform).toBe('translate(-490px, -210px) scale(1)'));
+  });
+
+  it('double-clicking works when the pan captured the pointer (the event then targets the viewport)', async () => {
+    localStorage.setItem('bucket_canvas_viewport', JSON.stringify({ panX: -500, panY: -500, zoom: 0.5 }));
+    render(<BucketsPage onBack={vi.fn()} />);
+    const body = document.querySelector('[data-bucket-id="9"] [data-canvas-scroll]') as HTMLElement;
+    const original = document.elementFromPoint;
+    document.elementFromPoint = () => body;
+    try {
+      fireEvent.doubleClick(screen.getByTestId('canvas-world').parentElement as HTMLElement, { clientX: 5, clientY: 5 });
+      await waitFor(() => expect(screen.getByTestId('canvas-world').style.transform).toBe('translate(-490px, -210px) scale(1)'));
+    } finally {
+      document.elementFromPoint = original;
+    }
+  });
+
+  describe('focusing a bucket', () => {
+    const panel = (id: number) => document.querySelector(`[data-bucket-id="${id}"]`) as HTMLElement;
+    const dimmed = (id: number) => /dimmed/.test(panel(id).className);
+
+    it('nothing is dimmed until a bucket is focused', () => {
+      render(<BucketsPage onBack={vi.fn()} />);
+      for (const id of [1, 2, 9]) expect(dimmed(id)).toBe(false);
+    });
+
+    it('double-clicking a bucket focuses it and dims the others', () => {
+      render(<BucketsPage onBack={vi.fn()} />);
+      fireEvent.doubleClick(screen.getByText('Work'));
+      expect(dimmed(9)).toBe(false);
+      expect(dimmed(1)).toBe(true);
+      expect(dimmed(2)).toBe(true);
+    });
+
+    it('Tab does nothing while no bucket is focused', () => {
+      render(<BucketsPage onBack={vi.fn()} />);
+      const event = new KeyboardEvent('keydown', { key: 'Tab', cancelable: true, bubbles: true });
+      window.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+      for (const id of [1, 2, 9]) expect(dimmed(id)).toBe(false);
+    });
+
+    it('Tab focuses the next bucket: the virtual ones first, then by id, wrapping around', () => {
+      render(<BucketsPage onBack={vi.fn()} />);
+      fireEvent.doubleClick(screen.getByText('Work')); // order: Mission (1), Unsorted (2), Work (9)
+      fireEvent.keyDown(window, { key: 'Tab' });       // wraps to Mission
+      expect(dimmed(1)).toBe(false);
+      expect(dimmed(9)).toBe(true);
+      fireEvent.keyDown(window, { key: 'Tab' });
+      expect(dimmed(2)).toBe(false);
+      expect(dimmed(1)).toBe(true);
+    });
+
+    it('Shift+Tab goes back', () => {
+      render(<BucketsPage onBack={vi.fn()} />);
+      fireEvent.doubleClick(screen.getByText('Unsorted'));
+      fireEvent.keyDown(window, { key: 'Tab', shiftKey: true });
+      expect(dimmed(1)).toBe(false);
+      expect(dimmed(2)).toBe(true);
+    });
+
+    it('Tab flies to the newly focused bucket', async () => {
+      localStorage.setItem('bucket_canvas_viewport', JSON.stringify({ panX: -500, panY: -500, zoom: 1 }));
+      render(<BucketsPage onBack={vi.fn()} />);
+      fireEvent.doubleClick(screen.getByText('Unsorted'));
+      fireEvent.keyDown(window, { key: 'Tab' }); // Work, center (490, 210)
+      await waitFor(() => expect(screen.getByTestId('canvas-world').style.transform).toBe('translate(-490px, -210px) scale(1)'));
+    });
+
+    it('Escape clears the focus first, and only then leaves the page', () => {
+      const onBack = vi.fn();
+      render(<BucketsPage onBack={onBack} />);
+      fireEvent.doubleClick(screen.getByText('Work'));
+      fireEvent.keyDown(window, { key: 'Escape' });
+      for (const id of [1, 2, 9]) expect(dimmed(id)).toBe(false);
+      expect(onBack).not.toHaveBeenCalled();
+      fireEvent.keyDown(window, { key: 'Escape' });
+      expect(onBack).toHaveBeenCalledOnce();
+    });
+
+    it('Tab typed in an input is left alone', () => {
+      render(<BucketsPage onBack={vi.fn()} />);
+      fireEvent.doubleClick(screen.getByText('Work'));
+      fireEvent.keyDown(screen.getAllByPlaceholderText('Add Objective...')[0], { key: 'Tab' });
+      expect(dimmed(9)).toBe(false);
+      expect(dimmed(1)).toBe(true);
+    });
+  });
+
+  it('double-clicking a bucket header flies to it', async () => {
+    localStorage.setItem('bucket_canvas_viewport', JSON.stringify({ panX: -500, panY: -500, zoom: 0.5 }));
+    render(<BucketsPage onBack={vi.fn()} />);
+    fireEvent.doubleClick(screen.getByText('Work'));
+    await waitFor(() => expect(screen.getByTestId('canvas-world').style.transform).toBe('translate(-490px, -210px) scale(1)'));
+  });
+
+  it('after a double-click, Space flies back to that bucket', async () => {
+    localStorage.setItem('bucket_canvas_viewport', JSON.stringify({ panX: -500, panY: -500, zoom: 1 }));
+    render(<BucketsPage onBack={vi.fn()} />);
+    const world = screen.getByTestId('canvas-world');
+    fireEvent.doubleClick(document.querySelector('[data-bucket-id="9"] [data-canvas-scroll]') as HTMLElement);
+    await waitFor(() => expect(world.style.transform).toBe('translate(-490px, -210px) scale(1)'));
+    fireEvent.keyDown(window, { key: ' ' });
+    await waitFor(() => expect(world.style.transform).toBe('translate(-490px, -210px) scale(1)'));
+  });
+
+  it('with the details drawer open, Space centers in the space beside it', async () => {
     localStorage.setItem('bucket_canvas_viewport', JSON.stringify({ panX: 0, panY: 0, zoom: 1 }));
     render(<BucketsPage onBack={vi.fn()} />);
     const world = screen.getByTestId('canvas-world');
@@ -167,15 +316,15 @@ describe('BucketsPage', () => {
     fireEvent.click(document.querySelector('[data-objective-id="101"]') as HTMLElement); // Work, center (490, 210); drawer 420 wide
     fireEvent.keyDown(window, { key: ' ' });
     // visible width 580 → its middle is x=290
-    expect(world.style.transform).toBe('translate(-200px, 90px) scale(1)');
+    await waitFor(() => expect(world.style.transform).toBe('translate(-200px, 90px) scale(1)'));
   });
 
-  it('a task selected before opening the canvas does not count', () => {
+  it('a task selected before opening the canvas does not count', async () => {
     mockViewedId = 101;
     localStorage.setItem('bucket_canvas_viewport', JSON.stringify({ panX: -500, panY: -500, zoom: 1 }));
     render(<BucketsPage onBack={vi.fn()} />);
     fireEvent.keyDown(window, { key: ' ' });
-    expect(screen.getByTestId('canvas-world').style.transform).toBe('translate(190px, -210px) scale(1)');
+    await waitFor(() => expect(screen.getByTestId('canvas-world').style.transform).toBe('translate(190px, -210px) scale(1)'));
   });
 
   it('Space typed in an input does not recenter', () => {
@@ -210,12 +359,15 @@ describe('BucketsPage', () => {
   });
 
   describe('deleting a bucket', () => {
-    const workPanel = () => screen.getByText('Work').closest('[data-bucket-id]') as HTMLElement;
+    const openDeleteDialog = () => {
+      fireEvent.contextMenu(screen.getByText('Work'));
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Delete' }));
+    };
 
     it('asks in an in-app dialog, not a native confirm', () => {
       const nativeConfirm = vi.spyOn(window, 'confirm');
       render(<BucketsPage onBack={vi.fn()} />);
-      fireEvent.click(within(workPanel()).getByTitle('Delete bucket'));
+      openDeleteDialog();
       expect(screen.getByRole('dialog', { name: 'DELETE_BUCKET' })).toBeInTheDocument();
       expect(screen.getByText(/Work/, { selector: 'p' })).toHaveTextContent(/UNSORTED/);
       expect(nativeConfirm).not.toHaveBeenCalled();
@@ -225,7 +377,7 @@ describe('BucketsPage', () => {
 
     it('confirming deletes the bucket', () => {
       render(<BucketsPage onBack={vi.fn()} />);
-      fireEvent.click(within(workPanel()).getByTitle('Delete bucket'));
+      openDeleteDialog();
       fireEvent.click(screen.getByRole('button', { name: 'DELETE' }));
       expect(mockDeleteBucket).toHaveBeenCalledWith(9);
       expect(screen.queryByRole('dialog')).toBeNull();
@@ -233,7 +385,7 @@ describe('BucketsPage', () => {
 
     it('cancelling keeps the bucket', () => {
       render(<BucketsPage onBack={vi.fn()} />);
-      fireEvent.click(within(workPanel()).getByTitle('Delete bucket'));
+      openDeleteDialog();
       fireEvent.click(screen.getByRole('button', { name: 'CANCEL' }));
       expect(mockDeleteBucket).not.toHaveBeenCalled();
       expect(screen.queryByRole('dialog')).toBeNull();
@@ -242,7 +394,7 @@ describe('BucketsPage', () => {
     it('Escape cancels without leaving the page', () => {
       const onBack = vi.fn();
       render(<BucketsPage onBack={onBack} />);
-      fireEvent.click(within(workPanel()).getByTitle('Delete bucket'));
+      openDeleteDialog();
       fireEvent.keyDown(window, { key: 'Escape' });
       expect(screen.queryByRole('dialog')).toBeNull();
       expect(mockDeleteBucket).not.toHaveBeenCalled();
@@ -259,12 +411,24 @@ describe('BucketsPage', () => {
     expect(footer).toContainElement(within(panel).getByRole('button', { name: 'Bug' }));
   });
 
-  it('system buckets have no delete button', () => {
+  it('panels have no header buttons for deleting', () => {
     render(<BucketsPage onBack={vi.fn()} />);
-    const unsorted = screen.getByText('Unsorted').closest('[data-bucket-id]') as HTMLElement;
-    expect(within(unsorted).queryByTitle('Delete bucket')).toBeNull();
-    const work = screen.getByText('Work').closest('[data-bucket-id]') as HTMLElement;
-    expect(within(work).getByTitle('Delete bucket')).toBeInTheDocument();
+    expect(screen.queryByTitle('Delete bucket')).toBeNull();
+  });
+
+  it('system buckets have no Delete in their right-click menu, custom ones do', () => {
+    render(<BucketsPage onBack={vi.fn()} />);
+    fireEvent.contextMenu(screen.getByText('Unsorted'));
+    expect(screen.getAllByRole('menuitem').map(i => i.textContent)).toEqual(['Rename']);
+    fireEvent.keyDown(window, { key: 'Escape' });
+    fireEvent.contextMenu(screen.getByText('Work'));
+    expect(screen.getAllByRole('menuitem').map(i => i.textContent)).toEqual(['Rename', 'Delete']);
+  });
+
+  it('the Mission panel header has no right-click menu', () => {
+    render(<BucketsPage onBack={vi.fn()} />);
+    fireEvent.contextMenu(screen.getByText('MISSION_OBJECTIVES'));
+    expect(screen.queryByRole('menu')).toBeNull();
   });
 
   it('wheel over the details drawer does not zoom the canvas', () => {
@@ -288,11 +452,13 @@ describe('BucketsPage', () => {
     expect(onBack).not.toHaveBeenCalled();
   });
 
-  it('double-clicking a bucket header opens rename', () => {
+  it('Rename in the header right-click menu opens rename; double-clicking the header does not', () => {
     render(<BucketsPage onBack={vi.fn()} />);
     const panel = screen.getByText('Work').closest('[data-bucket-id]') as HTMLElement;
-    const header = screen.getByText('Work').parentElement as HTMLElement;
-    fireEvent.doubleClick(header);
+    fireEvent.doubleClick(screen.getByText('Work').parentElement as HTMLElement);
+    expect(within(panel).queryByDisplayValue('Work')).toBeNull();
+    fireEvent.contextMenu(screen.getByText('Work'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }));
     expect(within(panel).getByDisplayValue('Work')).toBeInTheDocument();
   });
 
@@ -726,7 +892,7 @@ describe('BucketsPage', () => {
 
     it('Shift on a button still presses the button instead of panning', () => {
       render(<BucketsPage onBack={vi.fn()} />);
-      press(screen.getByTitle('Delete bucket'), { shiftKey: true });
+      press(screen.getAllByTitle('Bucket color')[0], { shiftKey: true });
       dragTo(40, 10);
       expect(transform()).toBe('translate(100px, 50px) scale(1)');
     });
