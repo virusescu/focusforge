@@ -16,11 +16,15 @@ interface Props {
 }
 
 export const ObjectiveDetails: FC<Props> = ({ onClose, closeOnOutsidePress = true }) => {
-  const { viewedObjectiveId, objectivePool, buckets, updateObjectiveDetails } = useFocus();
+  const { viewedObjectiveId, objectivePool, buckets, updateObjectiveDetails, updateObjective } = useFocus();
   const activeObjective = objectivePool.find(o => o.id === viewedObjectiveId) ?? null;
   const activeBucket = activeObjective ? buckets.find(b => b.id === activeObjective.bucket_id) : undefined;
 
   const [isEditing, setIsEditing] = useState(false);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState('');
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const titleCancelledRef = useRef(false);
   const asideRef = useRef<HTMLElement>(null);
 
   const handleSave = () => {
@@ -58,7 +62,38 @@ export const ObjectiveDetails: FC<Props> = ({ onClose, closeOnOutsidePress = tru
 
   useEffect(() => {
     setIsEditing(false);
+    setIsEditingTitle(false);
   }, [viewedObjectiveId]);
+
+  useEffect(() => {
+    if (isEditingTitle) titleInputRef.current?.select();
+  }, [isEditingTitle]);
+
+  const startTitleEdit = () => {
+    if (!activeObjective) return;
+    soundEngine.playEditStart();
+    setTitleDraft(activeObjective.text);
+    titleCancelledRef.current = false;
+    setIsEditingTitle(true);
+  };
+
+  // An empty title is a typo, not a rename: it keeps the old one
+  const saveTitle = () => {
+    if (titleCancelledRef.current) return; // Escape: the input going away must not save
+    const text = titleDraft.trim();
+    if (activeObjective && text && text !== activeObjective.text) updateObjective(activeObjective.id, text);
+    setIsEditingTitle(false);
+  };
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Typing here must not reach the page's shortcuts (Escape would close the pane or leave the page)
+    e.stopPropagation();
+    if (e.key === 'Enter') saveTitle();
+    else if (e.key === 'Escape') {
+      titleCancelledRef.current = true;
+      setIsEditingTitle(false);
+    }
+  };
 
   // Enter in preview mode → enter edit mode
   useEffect(() => {
@@ -98,10 +133,25 @@ export const ObjectiveDetails: FC<Props> = ({ onClose, closeOnOutsidePress = tru
       <div className="card" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <div className={styles.header}>
           <div className={styles.titleBlock}>
-            <h4>{activeObjective?.text ?? 'OBJECTIVE_DETAILS'}</h4>
+            {isEditingTitle ? (
+              <input
+                ref={titleInputRef}
+                className={styles.titleInput}
+                value={titleDraft}
+                onChange={e => setTitleDraft(e.target.value)}
+                onKeyDown={handleTitleKeyDown}
+                onBlur={saveTitle}
+                aria-label="Task title"
+                autoFocus
+              />
+            ) : (
+              <h4 onDoubleClick={startTitleEdit} title={activeObjective ? 'Double-click to rename' : undefined}>
+                {activeObjective?.text ?? 'OBJECTIVE_DETAILS'}
+              </h4>
+            )}
             {activeObjective && (
               <div className={styles.metaRow}>
-                {activeBucket ? <BucketTag bucket={activeBucket} className={styles.bucketTag} /> : <span />}
+                {activeBucket && <BucketTag bucket={activeBucket} className={styles.bucketTag} />}
                 <DeadlineControl objectiveId={activeObjective.id} deadline={activeObjective.deadline_at} />
               </div>
             )}
