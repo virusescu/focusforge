@@ -122,6 +122,17 @@ export const ObjectiveDetails: FC<Props> = ({ onClose, closeOnOutsidePress = tru
     setIsEditing(true);
   };
 
+  // The search popup asks for edit mode when Enter is pressed in its box (the Enter listener above ignores inputs)
+  useEffect(() => {
+    const handleEditRequest = () => {
+      if (!activeObjective) return;
+      soundEngine.playEditStart();
+      setIsEditing(true);
+    };
+    window.addEventListener('objective-details-edit', handleEditRequest);
+    return () => window.removeEventListener('objective-details-edit', handleEditRequest);
+  }, [activeObjective]);
+
   const handleDetailsChange = useCallback((next: string) => {
     if (activeObjective) updateObjectiveDetails(activeObjective.id, next);
   }, [activeObjective, updateObjectiveDetails]);
@@ -129,7 +140,7 @@ export const ObjectiveDetails: FC<Props> = ({ onClose, closeOnOutsidePress = tru
   const details = activeObjective?.details ?? null;
 
   return (
-    <aside className={styles.sidebar} ref={asideRef as any}>
+    <aside className={styles.sidebar} ref={asideRef as any} data-details-pane>
       <div className="card" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <div className={styles.header}>
           <div className={styles.titleBlock}>

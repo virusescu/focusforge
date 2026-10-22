@@ -1,0 +1,279 @@
+// Darkens the whole window behind the popup (the title bar too), with a hole where the details pane is
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 8999;
+  background: rgba(0, 0, 0, 0.62);
+}
+
+// A layer over the window, minus the details pane on the right (`right` is set inline and animated), that
+// centers the popup in what is left
+.layer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 9000;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 12vh;
+  box-sizing: border-box;
+  pointer-events: none; // only the popup takes presses; the app behind stays usable
+  transition: right 0.25s ease;
+}
+
+.popup {
+  pointer-events: auto;
+  width: min(580px, calc(100% - 3rem));
+  max-height: 74vh;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  font-family: var(--font-mono);
+  background: var(--bg-dark);
+  border: 1px solid var(--border-window);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.65);
+}
+
+.titleRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.title {
+  margin: 0;
+  letter-spacing: 0.1em;
+}
+
+.count {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+}
+
+.input {
+  background: var(--bg-dark);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  padding: 0.5rem 0.6rem;
+  outline: none;
+
+  &:focus {
+    border-color: var(--primary);
+  }
+}
+
+.filters {
+  display: flex;
+  gap: 0.5rem;
+
+  .select {
+    flex: 1 1 0;
+    min-width: 0;
+    background: var(--bg-dark);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    padding: 0.4rem 0.6rem;
+    outline: none;
+    cursor: pointer;
+
+    &:focus {
+      border-color: var(--primary);
+    }
+  }
+}
+
+.options {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.9rem;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+
+  // A small switch: a track with a knob that slides when it is on
+  .knob {
+    position: relative;
+    width: 22px;
+    height: 12px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--bg-dark);
+    transition: background 0.15s, border-color 0.15s;
+
+    &::after {
+      content: "";
+      position: absolute;
+      top: 1px;
+      left: 1px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      transition: transform 0.15s, background 0.15s;
+    }
+  }
+
+  &:hover {
+    color: var(--text-primary);
+  }
+
+  &.on {
+    color: var(--primary);
+
+    .knob {
+      border-color: var(--primary);
+
+      &::after {
+        transform: translateX(10px);
+        background: var(--primary);
+      }
+    }
+  }
+}
+
+.sortGroup {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 0.3rem;
+}
+
+.sortBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  padding: 0.2rem 0.45rem;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--text-primary);
+  }
+
+  // The sort in use; one of the two is always on
+  &.on {
+    color: var(--primary);
+    border-color: var(--primary);
+    background: var(--primary-muted);
+  }
+}
+
+.list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding-right: 2px;
+
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: var(--border);
+  }
+}
+
+// The same look as a Mission list row: a 2px bucket-colored border and a dark tint of the bucket color
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  flex-shrink: 0;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  background: rgba(var(--primary-rgb), 0.05);
+  font-size: 0.85rem;
+  cursor: pointer;
+  user-select: none;
+  transition: filter 0.15s;
+
+  &:hover {
+    filter: brightness(1.2);
+  }
+
+  // The highlighted task (its details are shown): brighter, with bold text
+  &.current {
+    filter: brightness(1.45);
+
+    .text {
+      font-weight: bold;
+    }
+  }
+}
+
+.bullet {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+
+.text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  word-break: break-word;
+  white-space: normal;
+  color: var(--text-primary);
+}
+
+.deadline {
+  margin-top: 2px;
+}
+
+.editInput {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-dark);
+  border: 1px solid var(--primary);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  padding: 2px 4px;
+  outline: none;
+}
+
+.mission {
+  flex-shrink: 0;
+  color: var(--primary);
+  text-shadow: 0 0 6px var(--primary-glow);
+}
+
+.empty {
+  padding: 1.2rem 0;
+  text-align: center;
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  border: 1px dashed var(--border);
+}

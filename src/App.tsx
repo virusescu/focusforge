@@ -24,6 +24,9 @@ import { AlarmProvider } from './contexts/AlarmContext';
 import { SeasonTransitionModal } from './components/SeasonTransitionModal';
 import { VaultPage } from './components/VaultPage';
 import { BucketsPage } from './components/BucketsPage';
+import { SearchPopup } from './components/SearchPopup';
+import { isTypingTarget } from './utils/canvas';
+import { soundEngine } from './utils/audio';
 import { FireBackground } from './components/FireBackground';
 import AlarmOverlay from './components/AlarmOverlay';
 
@@ -46,7 +49,8 @@ function HudApp() {
   const [rightSidebarWidth, setRightSidebarWidth] = useState(350);
   const [leftSidebarWidth, setLeftSidebarWidth] = useState(loadLeftSidebarWidth);
   const resizingRef = useRef(false);
-  const { activeObjectiveId } = useFocus();
+  const { activeObjectiveId, setViewedObjective } = useFocus();
+  const [searchOpen, setSearchOpen] = useState(false);
   const { activeAlarm, dismissAlarm } = useAlarms();
   const [availableUpdate, setAvailableUpdate] = useState<Update | null>(null);
 
@@ -69,6 +73,30 @@ function HudApp() {
       setDetailsPanelOpen(false);
     }
   }, [activeObjectiveId]);
+
+  // S opens the search (and closes it again) on the main screen
+  useEffect(() => {
+    if (view !== 'hud') return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== 's' || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (isTypingTarget(e.target) || isSettingsOpen) return;
+      e.preventDefault();
+      soundEngine.playTab();
+      setSearchOpen(open => !open);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [view, isSettingsOpen]);
+
+  const handleSearchOpenDetails = useCallback((id: number) => {
+    setViewedObjective(id);
+    setDetailsPanelOpen(true);
+  }, [setViewedObjective]);
+
+  const handleSearchCloseDetails = useCallback(() => {
+    soundEngine.playDetailsClose();
+    setDetailsPanelOpen(false);
+  }, []);
 
   const handleViewAnalytics = (dateStr?: string) => {
     if (dateStr) setAnalyticsDate(new Date(dateStr));
@@ -167,6 +195,16 @@ function HudApp() {
           <IntelligenceHub onBack={() => setView('hud')} />
         )}
         <Footer />
+        {view === 'hud' && searchOpen && (
+          <SearchPopup
+            onClose={() => setSearchOpen(false)}
+            onOpenDetails={handleSearchOpenDetails}
+            onCloseDetails={handleSearchCloseDetails}
+            detailsOpen={detailsPanelOpen}
+            // The details open in the right sidebar (its width plus the HUD's 2rem padding)
+            reservedRight={detailsPanelOpen ? rightSidebarWidth + 32 : 0}
+          />
+        )}
 
 
       </div>

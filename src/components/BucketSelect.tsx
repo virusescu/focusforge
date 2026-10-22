@@ -10,6 +10,8 @@ interface BucketSelectProps {
   buckets: Bucket[];
   value: number | null;
   onChange: (bucketId: number) => void;
+  allLabel?: string;       // adds a first, color-less entry (e.g. "All buckets") that means "no choice": value null, onClear
+  onClear?: () => void;
   id?: string;
   ariaLabel?: string;
   title?: string;
@@ -22,9 +24,10 @@ const EDGE_MARGIN = 6;
 
 // A drop-down that shows each bucket's color as a small rectangle beside its name (a native <select>
 // cannot draw one). The list is portalled to document.body: the sidebar and dialogs clip overflow.
-export const BucketSelect: FC<BucketSelectProps> = ({ buckets: bucketList, value, onChange, id, ariaLabel, title, className, onMouseEnter, onMouseLeave }) => {
+export const BucketSelect: FC<BucketSelectProps> = ({ buckets: bucketList, value, onChange, allLabel, onClear, id, ariaLabel, title, className, onMouseEnter, onMouseLeave }) => {
   // Unsorted always comes first; the rest keep the order they were given
-  const buckets = [...bucketList.filter(b => b.kind === 'unsorted'), ...bucketList.filter(b => b.kind !== 'unsorted')];
+  const sorted = [...bucketList.filter(b => b.kind === 'unsorted'), ...bucketList.filter(b => b.kind !== 'unsorted')];
+  const buckets: Array<{ id: number | null; name: string; color?: string }> = [...(allLabel ? [{ id: null, name: allLabel }] : []), ...sorted];
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const [pos, setPos] = useState<{ left: number; top: number; minWidth: number } | null>(null);
@@ -47,9 +50,12 @@ export const BucketSelect: FC<BucketSelectProps> = ({ buckets: bucketList, value
   // Escape closes the list wherever the focus is (the list takes focus on open, but a click elsewhere can move it)
   useEscapeToClose(open, () => closeList(true));
 
-  const choose = (bucketId: number) => {
+  const choose = (bucketId: number | null) => {
     soundEngine.playClick();
-    if (bucketId !== value) onChange(bucketId);
+    if (bucketId !== value) {
+      if (bucketId === null) onClear?.();
+      else onChange(bucketId);
+    }
     closeList(true);
   };
 
@@ -68,9 +74,13 @@ export const BucketSelect: FC<BucketSelectProps> = ({ buckets: bucketList, value
     });
   }, [open]);
 
+  // Focus the list once it has a position: a hidden element cannot take focus
+  useEffect(() => {
+    if (open && pos) listRef.current?.focus();
+  }, [open, pos]);
+
   useEffect(() => {
     if (!open) return;
-    listRef.current?.focus();
     const handlePointerDown = (e: PointerEvent) => {
       const target = e.target as Node;
       if (listRef.current?.contains(target) || triggerRef.current?.contains(target)) return;
@@ -86,6 +96,36 @@ export const BucketSelect: FC<BucketSelectProps> = ({ buckets: bucketList, value
       window.removeEventListener('resize', handleClose);
     };
   }, [open]);
+
+  // On the closed trigger: Space / Enter open the list; Up / Down cycle through the options without opening it.
+  // Handled keys stay here (Space would otherwise start the timer).
+  const handleTriggerKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!open) openList();
+    } else if (e.key === 'Backspace' && allLabel && !open) {
+      // The "all" entry is the way back to no filter
+      e.preventDefault();
+      e.stopPropagation();
+      if (value !== null) {
+        soundEngine.playClick();
+        onClear?.();
+      }
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      // Never let the arrows leak to the page (they move the selection in the Mission list)
+      e.preventDefault();
+      e.stopPropagation();
+      if (open) return;
+      const index = buckets.findIndex(b => b.id === value);
+      const down = e.key === 'ArrowDown';
+      const next = index === -1 ? (down ? buckets[0] : buckets[buckets.length - 1]) : buckets[(index + (down ? 1 : -1) + buckets.length) % buckets.length];
+      if (!next || next.id === value) return;
+      soundEngine.playClick();
+      if (next.id === null) onClear?.();
+      else onChange(next.id);
+    }
+  };
 
   const handleListKeyDown = (e: React.KeyboardEvent) => {
     // Handled keys stay here: Space/Enter/arrows must not reach the HUD shortcuts or a dialog's Enter-to-submit
@@ -123,10 +163,13 @@ export const BucketSelect: FC<BucketSelectProps> = ({ buckets: bucketList, value
         title={title}
         className={`${styles.trigger} ${className ?? ''}`}
         onClick={() => (open ? closeList(false) : openList())}
+        onKeyDown={handleTriggerKeyDown}
+        // Space clicks on key-up; the key-down already opened the list
+        onKeyUp={e => { if (e.key === ' ') e.preventDefault(); }}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
       >
-        {selected && <span className={styles.swatch} style={{ backgroundColor: selected.color }} />}
+        {selected?.color && <span className={styles.swatch} style={{ backgroundColor: selected.color }} />}
         <span className={styles.name}>{selected?.name ?? ''}</span>
         <ChevronDown size={10} className={styles.chevron} />
       </button>
@@ -134,7 +177,7 @@ export const BucketSelect: FC<BucketSelectProps> = ({ buckets: bucketList, value
         <div
           ref={listRef}
           className={styles.list}
-          style={{ left: pos?.left ?? 0, top: pos?.top ?? 0, minWidth: pos?.minWidth, visibility: pos ? 'visible' : 'hidden' }}
+          style={{ left: pos?.left ?? 0, top: pos?.top ?? 0, minWidth: pos?.minWidth, opacity: pos ? 1 : 0 }}
           role="listbox"
           tabIndex={-1}
           aria-label={ariaLabel ? `${ariaLabel} list` : undefined}
@@ -150,14 +193,14 @@ export const BucketSelect: FC<BucketSelectProps> = ({ buckets: bucketList, value
         >
           {buckets.map((b, i) => (
             <div
-              key={b.id}
+              key={b.id ?? 'all'}
               role="option"
               aria-selected={b.id === value}
               className={`${styles.option} ${i === active ? styles.active : ''} ${b.id === value ? styles.selected : ''}`}
               onMouseEnter={() => setActive(i)}
               onClick={() => choose(b.id)}
             >
-              <span className={styles.swatch} style={{ backgroundColor: b.color }} />
+              {b.color && <span className={styles.swatch} style={{ backgroundColor: b.color }} />}
               <span className={styles.name}>{b.name}</span>
             </div>
           ))}

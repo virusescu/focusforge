@@ -22,6 +22,15 @@ const renderDetails = (onClose = vi.fn()) => render(<ObjectiveDetails onClose={o
 const startEdit = () => fireEvent.doubleClick(screen.getByText('Ship the release'));
 const input = () => screen.getByLabelText('Task title') as HTMLInputElement;
 
+describe('ObjectiveDetails edit request', () => {
+  it('starts editing the notes when asked (the search popup does this on Enter)', () => {
+    renderDetails();
+    expect(document.querySelector('textarea')).toBeNull();
+    fireEvent(window, new CustomEvent('objective-details-edit'));
+    expect(document.querySelector('textarea')).not.toBeNull();
+  });
+});
+
 describe('ObjectiveDetails title', () => {
   beforeEach(() => mockUpdateObjective.mockClear());
 

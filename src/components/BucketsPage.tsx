@@ -37,6 +37,7 @@ import { ObjectiveDetails } from './ObjectiveDetails';
 import { CategoryManagerModal } from './CategoryManagerModal';
 import { CanvasNoteView } from './CanvasNoteView';
 import { TabOrderModal } from './TabOrderModal';
+import { SearchPopup } from './SearchPopup';
 import { useCanvasNotes } from '../hooks/useCanvasNotes';
 import { focusOrder } from '../utils/buckets';
 import type { StrategicObjective } from '../types';
@@ -127,6 +128,7 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
   const drawerResizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [showTabOrder, setShowTabOrder] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [dragged, setDragged] = useState<StrategicObjective | null>(null);
   const isDraggingRef = useRef(false);
   // Read before any effect runs: StrictMode's simulated unmount saves the viewport, which
@@ -253,12 +255,22 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
       if (isTypingTarget(e.target)) return;
       const full = getRect();
       const rect = { width: full.width - (detailsOpen ? Math.min(drawerWidth, full.width) : 0), height: full.height };
-      if (e.key === ' ') {
+      if (e.key.toLowerCase() === 's' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        // S opens the search (and closes it again)
+        if (showCategoryManager || showTabOrder) return;
+        e.preventDefault();
+        soundEngine.playTab();
+        setSearchOpen(open => !open);
+      } else if (e.key === ' ') {
         e.preventDefault();
         // The bucket of the task selected last on this visit, else the Mission panel; the origin if neither exists
         const target = buckets.find(b => b.id === lastPickedBucketIdRef.current) ?? buckets.find(b => b.kind === 'mission');
-        if (target) flyTo(target.x + target.w / 2, target.y + target.h / 2, rect.width, rect.height);
-        else flyTo(0, 0, rect.width, rect.height);
+        if (target) {
+          setFocusedBucketId(target.id); // focused, as if it had been double-clicked
+          flyTo(target.x + target.w / 2, target.y + target.h / 2, rect.width, rect.height);
+        } else {
+          flyTo(0, 0, rect.width, rect.height);
+        }
       } else if (e.key === 'Tab' && focusedBucket && !showCategoryManager && !showTabOrder) {
         // With a panel focused, Tab (Shift+Tab: backwards) focuses the next one and flies to it
         e.preventDefault();
@@ -585,6 +597,16 @@ export const BucketsPage: FC<BucketsPageProps> = ({ onBack }) => {
       </DndContext>
 
       {showTabOrder && <TabOrderModal onClose={() => setShowTabOrder(false)} />}
+
+      {searchOpen && (
+        <SearchPopup
+          onClose={() => setSearchOpen(false)}
+          onOpenDetails={handleOpenDetails}
+          onCloseDetails={closeDetails}
+          detailsOpen={detailsOpen}
+          reservedRight={detailsOpen ? drawerWidth : 0}
+        />
+      )}
 
       {showCategoryManager && (
         <CategoryManagerModal

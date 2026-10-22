@@ -73,6 +73,7 @@ vi.mock('../utils/audio', () => ({
     playEditStart: vi.fn(),
     playReorder: vi.fn(),
     playNavSelect: vi.fn(),
+    playTab: vi.fn(),
     playCheckboxUncheck: vi.fn(),
   },
   playCheckboxCheckWithFile: vi.fn(),
@@ -152,6 +153,19 @@ describe('BucketsPage', () => {
     await waitFor(() => expect(world.style.transform).toBe('translate(190px, -210px) scale(1)'));
   });
 
+  it('Space also focuses the bucket it flies to, dimming the others', () => {
+    render(<BucketsPage onBack={vi.fn()} />);
+    const dimmed = (id: number) => /dimmed/.test((document.querySelector(`[data-bucket-id="${id}"]`) as HTMLElement).className);
+    fireEvent.keyDown(window, { key: ' ' }); // nothing selected yet: the Mission panel
+    expect(dimmed(1)).toBe(false);
+    expect(dimmed(2)).toBe(true);
+    expect(dimmed(9)).toBe(true);
+    fireEvent.click(document.querySelector('[data-objective-id="101"]') as HTMLElement); // Beta, in Work
+    fireEvent.keyDown(window, { key: ' ' });
+    expect(dimmed(9)).toBe(false);
+    expect(dimmed(1)).toBe(true);
+  });
+
   it('the fly is animated: the view is not at the target right away', async () => {
     localStorage.setItem('bucket_canvas_viewport', JSON.stringify({ panX: -500, panY: -500, zoom: 1.5 }));
     render(<BucketsPage onBack={vi.fn()} />);
@@ -218,6 +232,65 @@ describe('BucketsPage', () => {
     } finally {
       document.elementFromPoint = original;
     }
+  });
+
+  describe('search (S)', () => {
+    const popup = () => screen.queryByRole('dialog', { name: 'Search objectives' });
+
+    it('S opens the search popup and S again closes it', () => {
+      render(<BucketsPage onBack={vi.fn()} />);
+      expect(popup()).toBeNull();
+      fireEvent.keyDown(window, { key: 's' });
+      expect(popup()).toBeInTheDocument();
+      fireEvent.keyDown(window, { key: 'S' });
+      expect(popup()).toBeNull();
+    });
+
+    it('S typed in a text box does not open it', () => {
+      render(<BucketsPage onBack={vi.fn()} />);
+      fireEvent.keyDown(screen.getAllByPlaceholderText('Add Objective...')[0], { key: 's' });
+      expect(popup()).toBeNull();
+    });
+
+    it('Ctrl+S is left alone', () => {
+      render(<BucketsPage onBack={vi.fn()} />);
+      fireEvent.keyDown(window, { key: 's', ctrlKey: true });
+      expect(popup()).toBeNull();
+    });
+
+    it('opens with the first result\'s details already shown in the drawer, the popup beside it', () => {
+      render(<BucketsPage onBack={vi.fn()} />);
+      fireEvent.keyDown(window, { key: 's' });
+      expect(screen.getByTestId('details')).toBeInTheDocument();
+      expect(mockSetViewedObjective).toHaveBeenCalledWith(100); // Alpha, first by title
+      expect((popup()!.parentElement as HTMLElement).style.right).toBe('420px');
+    });
+
+    it('Escape just closes the popup (and the drawer it opened), and never leaves the page', () => {
+      const onBack = vi.fn();
+      render(<BucketsPage onBack={onBack} />);
+      fireEvent.keyDown(window, { key: 's' });
+      expect(screen.getByTestId('details')).toBeInTheDocument();
+      fireEvent.keyDown(screen.getByLabelText('Search objectives', { selector: 'input' }), { key: 'Escape' });
+      expect(popup()).toBeNull();
+      expect(screen.queryByTestId('details')).toBeNull();
+      expect(onBack).not.toHaveBeenCalled();
+    });
+
+    it('down arrow moves the highlight and shows that task\'s details', () => {
+      render(<BucketsPage onBack={vi.fn()} />);
+      fireEvent.keyDown(window, { key: 's' });
+      mockSetViewedObjective.mockClear();
+      fireEvent.keyDown(screen.getByLabelText('Search objectives', { selector: 'input' }), { key: 'ArrowDown' });
+      expect(mockSetViewedObjective).toHaveBeenCalledWith(101); // Beta
+    });
+
+    it('double-clicking a result adds it to Mission', () => {
+      render(<BucketsPage onBack={vi.fn()} />);
+      fireEvent.keyDown(window, { key: 's' });
+      fireEvent.doubleClick(within(popup()!).getByText('Beta'));
+      expect(mockSetObjectiveMission).toHaveBeenCalledWith(101, true);
+    });
   });
 
   describe('focusing a bucket', () => {

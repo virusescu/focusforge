@@ -101,4 +101,94 @@ describe('BucketSelect', () => {
     expect(screen.queryByRole('listbox')).toBeNull();
     expect(onChange).not.toHaveBeenCalled();
   });
+
+  describe('keyboard on the closed trigger', () => {
+    it('opening the list moves the keyboard into it', () => {
+      render(<Harness />);
+      fireEvent.click(trigger());
+      expect(screen.getByRole('listbox')).toHaveFocus();
+    });
+
+    it('Backspace picks the "all" entry when there is one, and does nothing otherwise', () => {
+      const onClear = vi.fn();
+      const { unmount } = render(<BucketSelect ariaLabel="Bucket" buckets={BUCKETS} value={9} allLabel="All buckets" onChange={vi.fn()} onClear={onClear} />);
+      fireEvent.keyDown(trigger(), { key: 'Backspace' });
+      expect(onClear).toHaveBeenCalledOnce();
+      unmount();
+      const onChange = vi.fn();
+      render(<BucketSelect ariaLabel="Bucket" buckets={BUCKETS} value={9} onChange={onChange} />);
+      fireEvent.keyDown(trigger(), { key: 'Backspace' });
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it('Up and Down cycle through the options without opening the list, wrapping around', () => {
+      const onChange = vi.fn();
+      render(<Harness initial={9} onChange={onChange} />);
+      fireEvent.keyDown(trigger(), { key: 'ArrowDown' });
+      expect(trigger()).toHaveTextContent('Home');
+      fireEvent.keyDown(trigger(), { key: 'ArrowDown' });
+      expect(trigger()).toHaveTextContent('Unsorted'); // wrapped
+      fireEvent.keyDown(trigger(), { key: 'ArrowUp' });
+      expect(trigger()).toHaveTextContent('Home');
+      expect(screen.queryByRole('listbox')).toBeNull();
+      expect(onChange).toHaveBeenCalledTimes(3);
+    });
+
+    it('Space and Enter open the list, and the keys do not reach the page', () => {
+      const onWindowKey = vi.fn();
+      window.addEventListener('keydown', onWindowKey);
+      render(<Harness />);
+      fireEvent.keyDown(trigger(), { key: ' ' });
+      expect(screen.getByRole('listbox')).toBeInTheDocument();
+      window.removeEventListener('keydown', onWindowKey);
+      expect(onWindowKey).not.toHaveBeenCalled();
+    });
+
+    it('with an "all" entry the cycle includes it', () => {
+      const onClear = vi.fn();
+      render(
+        <BucketSelect ariaLabel="Bucket" buckets={BUCKETS} value={2} allLabel="All buckets" onChange={vi.fn()} onClear={onClear} />,
+      );
+      fireEvent.keyDown(trigger(), { key: 'ArrowUp' }); // Unsorted -> All
+      expect(onClear).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe('with an "all" entry', () => {
+    function AllHarness({ onClear = vi.fn(), onChange = vi.fn() }: { onClear?: () => void; onChange?: (id: number) => void }) {
+      const [value, setValue] = useState<number | null>(null);
+      return (
+        <BucketSelect
+          ariaLabel="Bucket"
+          buckets={BUCKETS}
+          value={value}
+          allLabel="All buckets"
+          onChange={id => { setValue(id); onChange(id); }}
+          onClear={() => { setValue(null); onClear(); }}
+        />
+      );
+    }
+
+    it('lists it first, without a color, and shows it while nothing is chosen', () => {
+      render(<AllHarness />);
+      expect(trigger()).toHaveTextContent('All buckets');
+      fireEvent.click(trigger());
+      expect(options().map(o => o.textContent)).toEqual(['All buckets', 'Unsorted', 'Work', 'Home']);
+      expect(options()[0].querySelector('span[style]')).toBeNull();
+      expect(options()[0]).toHaveAttribute('aria-selected', 'true');
+    });
+
+    it('choosing a bucket reports it, and choosing "all" again reports a clear', () => {
+      const onChange = vi.fn();
+      const onClear = vi.fn();
+      render(<AllHarness onChange={onChange} onClear={onClear} />);
+      fireEvent.click(trigger());
+      fireEvent.click(options()[2]);
+      expect(onChange).toHaveBeenCalledWith(9);
+      fireEvent.click(trigger());
+      fireEvent.click(options()[0]);
+      expect(onClear).toHaveBeenCalledOnce();
+      expect(trigger()).toHaveTextContent('All buckets');
+    });
+  });
 });
